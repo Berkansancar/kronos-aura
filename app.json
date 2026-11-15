@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "Kronos & Aura",
+    "slug": "kronos-aura",
+    "scheme": "kronosaura",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0B0D12",
+    "android": {
+      "package": "com.kronosaura.app"
+    },
+    "ios": {
+      "bundleIdentifier": "com.kronosaura.app",
+      "supportsTablet": false
+    },
+    "plugins": ["expo-router", "expo-sqlite"]
+  }
+}

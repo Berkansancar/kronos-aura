@@ -1,0 +1,99 @@
+import type { SQLiteDatabase } from 'expo-sqlite';
+
+export const DB_NAME = 'kronos-aura.db';
+export const DATABASE_VERSION = 2;
+
+/**
+ * Not: SQLite'ın gerçek bir DATETIME tipi yoktur. Zaman alanlarını ISO-8601 (UTC) TEXT
+ * olarak saklıyoruz; bu biçim alfabetik sıralamayla zaman sıralamasını da verir.
+ *
+ * Şemaya, istenen taslağa göre şu eklemeler yapıldı:
+ *  - Task.createdAt / Task.startedAt   -> gerçek süreyi ölçmek ve "bugünün görevleri"ni listelemek için
+ *  - TimeLog.loggedAt                  -> öğrenme ve geçmiş sorguları için
+ *  - TimeLog.taskId boş olabilir       -> Aura'nın "zaman akıp gitti" kayıtları görevden bağımsızdır
+ */
+const CREATE_TABLES_V1 = `
+CREATE TABLE IF NOT EXISTS User (
+  id            TEXT PRIMARY KEY NOT NULL,
+  chronotype    TEXT NOT NULL CHECK (chronotype IN ('MORNING', 'NIGHT', 'BALANCED')),
+  peakStartHour INTEGER NOT NULL CHECK (peakStartHour BETWEEN 0 AND 23),
+  peakEndHour   INTEGER NOT NULL CHECK (peakEndHour BETWEEN 1 AND 24),
+  CHECK (peakEndHour > peakStartHour)
+);
+
+CREATE TABLE IF NOT EXISTS Task (
+  id                TEXT PRIMARY KEY NOT NULL,
+  title             TEXT NOT NULL,
+  estimatedDuration INTEGER NOT NULL CHECK (estimatedDuration > 0),
+  cognitiveWeight   TEXT NOT NULL CHECK (cognitiveWeight IN ('HIGH', 'MEDIUM', 'LOW')),
+  status            TEXT NOT NULL DEFAULT 'PENDING'
+                    CHECK (status IN ('PENDING', 'IN_PROGRESS', 'COMPLETED', 'POSTPONED')),
+  createdAt         TEXT NOT NULL,
+  startedAt         TEXT
+);
+
+CREATE TABLE IF NOT EXISTS TimeBlock (
+  id         TEXT PRIMARY KEY NOT NULL,
+  taskId     TEXT NOT NULL REFERENCES Task(id) ON DELETE CASCADE,
+  startTime  TEXT NOT NULL,
+  endTime    TEXT NOT NULL,
+  bufferTime INTEGER NOT NULL DEFAULT 0 CHECK (bufferTime >= 0),
+  CHECK (endTime > startTime)
+);
+
+CREATE TABLE IF NOT EXISTS TimeLog (
+  id                      TEXT PRIMARY KEY NOT NULL,
+  taskId                  TEXT REFERENCES Task(id) ON DELETE CASCADE,
+  actualDuration          INTEGER NOT NULL CHECK (actualDuration >= 0),
+  energyStateAtCompletion TEXT NOT NULL
+                          CHECK (energyStateAtCompletion IN ('HIGH', 'EXHAUSTED', 'DISTRACTED')),
+  coachNotes              TEXT,
+  loggedAt                TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_task_status       ON Task(status);
+CREATE INDEX IF NOT EXISTS idx_timeblock_start   ON TimeBlock(startTime);
+CREATE INDEX IF NOT EXISTS idx_timeblock_task    ON TimeBlock(taskId);
+CREATE INDEX IF NOT EXISTS idx_timelog_task      ON TimeLog(taskId);
+CREATE INDEX IF NOT EXISTS idx_timelog_loggedAt  ON TimeLog(loggedAt);
+`;
+
+/** Sürüm 2: koç sohbet geçmişi. */
+const CREATE_TABLES_V2 = `
+CREATE TABLE IF NOT EXISTS CoachChat (
+  id        TEXT PRIMARY KEY NOT NULL,
+  coach     TEXT NOT NULL CHECK (coach IN ('KRONOS', 'AURA')),
+  role      TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+  content   TEXT NOT NULL,
+  createdAt TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_coachchat_coach ON CoachChat(coach, createdAt);
+`;
+
+/**
+ * SQLiteProvider'ın onInit'ine verilir. Veritabanı ilk açıldığında tabloları kurar,
+ * sonraki sürümlerde buraya yeni migrasyon adımları eklenir.
+ */
+export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {
+  // Yabancı anahtarlar bağlantı başına açılır; her açılışta etkinleştirilmeli.
+  await db.execAsync('PRAGMA foreign_keys = ON;');
+
+  const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
+  let current = row?.user_version ?? 0;
+  if (current >= DATABASE_VERSION) return;
+
+  if (current === 0) {
+    await db.execAsync(`PRAGMA journal_mode = 'wal'; ${CREATE_TABLES_V1}`);
+    current = 1;
+  }
+
+  if (current === 1) {
+    await db.execAsync(CREATE_TABLES_V2);
+    current = 2;
+  }
+
+  // Gelecekteki migrasyonlar:
+  // if (current === 2) { await db.execAsync(`ALTER TABLE ...`); current = 3; }
+
+  await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
+}

@@ -1,0 +1,17 @@
+{
+  "name": "kronos-aura",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "typecheck": "tsc --noEmit",
+    "test:scheduler": "tsx scripts/test-scheduler.ts",
+    "build:apk": "eas build -p android --profile preview",
+    "test:ai": "tsx scripts/test-ai.ts"
+  },
+  "dependencies": {
+    "expo": "~58.0.0"
+  }
+}
