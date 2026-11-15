@@ -26,6 +26,8 @@ export interface Task {
   createdAt: string;
   /** Görev "Başla" ile başlatıldığında dolar; gerçek süreyi hesaplamak için gerekir. */
   startedAt: string | null;
+  /** Bir rutinin "Yapacağım" cevabıyla oluştuysa o rutinin id'si. */
+  routineId?: string | null;
 }
 
 /** Veritabanındaki TimeBlock satırı. Tarihler ISO-8601 (UTC) metin olarak saklanır. */
@@ -93,4 +95,102 @@ export interface ActivitySummary {
   /** null = ekran süresi okunamıyor */
   screenMinutes: number | null;
   topApps: { label: string; minutes: number }[];
+}
+
+// ───────────────────────── Rutinler ─────────────────────────
+
+export type RoutineCategory = 'SAGLIK' | 'ZIHIN' | 'ODAK' | 'DUZEN';
+export type RoutineStatus = 'ACTIVE' | 'RETIRED';
+
+/** Her gün tekrarlanan alışkanlık. `askHour:askMinute` uygulamanın "yapacak mısın?" diye sorduğu saattir. */
+export interface Routine {
+  id: string;
+  title: string;
+  category: RoutineCategory;
+  /** dakika */
+  estimatedDuration: number;
+  cognitiveWeight: CognitiveWeight;
+  askHour: number;
+  askMinute: number;
+  status: RoutineStatus;
+  createdAt: string;
+  retiredAt: string | null;
+  /** Hazır örnekten eklendiyse şablon id'si */
+  templateId: string | null;
+}
+
+/**
+ * ACCEPTED: "Yapacağım"  · DONE: yapıldı · SNOOZED: "Sonra" · SKIPPED: "Bugün değil"
+ * RETIRED: "Bir daha yapmam"
+ */
+export type RoutineOutcome = 'ACCEPTED' | 'DONE' | 'SNOOZED' | 'SKIPPED' | 'RETIRED';
+
+export interface RoutineLog {
+  id: string;
+  routineId: string;
+  /** Yerel gün: YYYY-MM-DD */
+  day: string;
+  outcome: RoutineOutcome;
+  /** ACCEPTED ise plana eklenen görev */
+  taskId: string | null;
+  /** SNOOZED ise yeniden sorulacak an (ISO) */
+  snoozeUntil: string | null;
+  loggedAt: string;
+}
+
+/** Bir rutinin bugünkü durumu. */
+export type RoutineDayState = 'WAITING' | 'DUE' | 'SNOOZED' | 'ACCEPTED' | 'DONE' | 'SKIPPED';
+
+export interface RoutineStats {
+  /** Cevap verilen (kapanmış) gün sayısı */
+  closedDays: number;
+  doneDays: number;
+  skippedDays: number;
+  snoozeCount: number;
+  acceptedNotDone: number;
+  /** 0..1 */
+  rate: number;
+  /** Üst üste yapılan gün sayısı */
+  streak: number;
+  /** En sık yapıldığı saat (en az 3 kayıt gerekir) */
+  bestHour: number | null;
+}
+
+export type RoutineSuggestionKind = 'MOVE_TIME' | 'SHRINK' | 'RETIRE' | 'KEEP_GOING';
+
+export interface RoutineSuggestion {
+  kind: RoutineSuggestionKind;
+  text: string;
+  hour?: number;
+  minute?: number;
+  minutes?: number;
+}
+
+/** Koçların ve ana ekranın kullandığı, bir rutinin bugünkü özeti. */
+export interface RoutineBrief {
+  routine: Routine;
+  state: RoutineDayState;
+  snoozeUntil: string | null;
+  stats: RoutineStats;
+  suggestion: RoutineSuggestion | null;
+}
+
+// ───────────────────────── Uyku ─────────────────────────
+
+/** Tahmini uyku: telefon ekranının en uzun süre kapalı kaldığı gece aralığı. `day` uyanılan yerel gündür. */
+export interface SleepLog {
+  day: string;
+  bedtime: string;
+  wakeTime: string;
+  durationMinutes: number;
+}
+
+export interface SleepSummary {
+  /** Son gecenin tahmini süresi (dk) */
+  lastMinutes: number | null;
+  lastBedtime: string | null;
+  lastWake: string | null;
+  /** Son günlerin ortalaması */
+  avgMinutes: number | null;
+  nights: number;
 }

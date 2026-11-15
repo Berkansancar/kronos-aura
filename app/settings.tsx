@@ -132,7 +132,7 @@ export default function SettingsScreen() {
             konmaz.{'\n'}• Her yapay zekâ mesajı API'den ücretlendirilir; Claude aboneliğinden
             ayrıdır. Anthropic Console'dan harcama sınırı belirleyebilirsin.{'\n'}• Koçlara görev
             adların, planın ve enerji kayıtların gönderilir. Göndermek istemediğin bir şeyi görev
-            adına yazma. Gün analizinde paylaşımı açtıysan adım ve ekran süren de gider.{'\n'}• Anahtar yoksa ya da internet kesilirse koçlar kural tabanlı
+            adına yazma. Rutinlerinin adı ve bugünkü durumu da gider. Gün analizinde paylaşımı açtıysan adım, ekran süren ve uyku tahminin de gider.{'\n'}• Anahtar yoksa ya da internet kesilirse koçlar kural tabanlı
             çalışmaya devam eder.
           </Text>
         </View>

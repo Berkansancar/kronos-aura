@@ -7,9 +7,10 @@ import { PermissionsAndroid, Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { DeviceActivity, deviceActivityAvailable } from '../modules/device-activity';
-import { getDailyStat, upsertDailyStat } from '../database/repository';
-import type { ActivitySummary } from '../database/types';
+import { getDailyStat, listSleepLogs, upsertDailyStat, upsertSleepLog } from '../database/repository';
+import type { ActivitySummary, SleepSummary } from '../database/types';
 import { buildActivitySummary, dayKey } from './activityLogic';
+import { estimateSleep, sleepWindow, summarizeSleep, toSleepLog } from './sleepLogic';
 
 const K_TRACKING = 'activity_tracking';
 const K_SINCE = 'activity_tracking_since';
@@ -171,12 +172,52 @@ export async function readActivity(now = new Date()): Promise<ActivityReading> {
   return r;
 }
 
+// ───────────────────────── Uyku ─────────────────────────
+
+let lastSleepRefresh = 0;
+
+/**
+ * Son 3 gecenin uykusunu ekran oturumlarından tahmin edip kaydeder. Android olay geçmişini kısa süre
+ * tuttuğu için uygulama açıldıkça güncellenir; 20 dakikada bir çalışır (zorlanmadıkça).
+ */
+export async function refreshSleep(db: SQLiteDatabase, now = new Date(), force = false): Promise<void> {
+  if (!DeviceActivity) return;
+  try {
+    if (!DeviceActivity.hasUsageAccess()) return;
+    if (!force && now.getTime() - lastSleepRefresh < 20 * 60_000) return;
+    lastSleepRefresh = now.getTime();
+    for (let back = 0; back < 3; back += 1) {
+      const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() - back);
+      const { start, end } = sleepWindow(day, now);
+      if (end <= start) continue;
+      const est = estimateSleep(await DeviceActivity.getScreenSessions(start, end));
+      if (est) await upsertSleepLog(db, toSleepLog(est));
+    }
+  } catch {
+    // Uyku tahmini yapılamazsa uygulamanın geri kalanı etkilenmez.
+  }
+}
+
+export async function loadSleepSummary(
+  db: SQLiteDatabase,
+  now = new Date()
+): Promise<SleepSummary | undefined> {
+  if (!deviceActivityAvailable) return undefined;
+  try {
+    const logs = await listSleepLogs(db, 14);
+    return logs.length > 0 ? summarizeSleep(logs, now) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Bugünün özetini veritabanına yazar ve koçların kullanacağı özeti döndürür. */
 export async function refreshActivity(
   db: SQLiteDatabase,
   now = new Date()
 ): Promise<{ reading: ActivityReading; summary: ActivitySummary | undefined }> {
   const reading = await readActivity(now);
+  await refreshSleep(db, now);
   if (reading.available && (reading.trackingEnabled || reading.screenMinutes !== null)) {
     try {
       await upsertDailyStat(db, {

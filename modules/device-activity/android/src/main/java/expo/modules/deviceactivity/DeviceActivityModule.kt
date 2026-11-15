@@ -36,6 +36,10 @@ class DeviceActivityModule : Module() {
       usageSummary(startMs.toLong(), endMs.toLong())
     }
 
+    AsyncFunction("getScreenSessions") { startMs: Double, endMs: Double ->
+      screenSessions(startMs.toLong(), endMs.toLong())
+    }
+
     Function("hasStepSensor") { hasStepSensor() }
     Function("getTodaySteps") { StepStore.todaySteps(ctx) }
     Function("startTracking") { startTracking() }
@@ -149,6 +153,39 @@ class DeviceActivityModule : Module() {
         }
 
     return mapOf<String, Any>("screenMs" to totalMs.toDouble(), "apps" to apps)
+  }
+
+  /** Ekranin acik kaldigi araliklar (uyku tahmini icin). Her oge: { on, off } (ms). */
+  private fun screenSessions(start: Long, end: Long): List<Map<String, Any>> {
+    val usm = ctx.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+    val events = usm.queryEvents(start, end)
+    val ev = UsageEvents.Event()
+    val out = ArrayList<Map<String, Any>>()
+    var onAt = -1L
+    while (events.hasNextEvent()) {
+      events.getNextEvent(ev)
+      val t = ev.timeStamp
+      when (ev.eventType) {
+        EVENT_SCREEN_ON -> {
+          if (onAt < 0L) {
+            onAt = t
+          }
+        }
+        EVENT_SCREEN_OFF -> {
+          if (onAt >= 0L) {
+            out.add(mapOf<String, Any>("on" to onAt.toDouble(), "off" to t.toDouble()))
+            onAt = -1L
+          } else {
+            // Pencere basinda ekran zaten aciksa
+            out.add(mapOf<String, Any>("on" to start.toDouble(), "off" to t.toDouble()))
+          }
+        }
+      }
+    }
+    if (onAt >= 0L) {
+      out.add(mapOf<String, Any>("on" to onAt.toDouble(), "off" to end.toDouble()))
+    }
+    return out
   }
 
   // ───────────── Adim ve arka plan takibi ─────────────

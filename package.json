@@ -10,7 +10,9 @@
     "test:scheduler": "tsx scripts/test-scheduler.ts",
     "build:apk": "eas build -p android --profile preview",
     "test:ai": "tsx scripts/test-ai.ts",
-    "test:activity": "tsx scripts/test-activity.ts"
+    "test:activity": "tsx scripts/test-activity.ts",
+    "test:routines": "tsx scripts/test-routines.ts",
+    "test:sleep": "tsx scripts/test-sleep.ts"
   },
   "dependencies": {
     "expo": "~58.0.0"

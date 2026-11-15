@@ -13,6 +13,8 @@ import type {
   ActivitySummary,
   CoachId,
   EnergyState,
+  RoutineBrief,
+  SleepSummary,
   Task,
   TimeLog,
   UserProfile,
@@ -61,6 +63,10 @@ export interface CoachContext {
   activity?: ActivitySummary;
   /** Kullanıcı aktivite verisinin yapay zekâya da gönderilmesine izin verdi mi? */
   shareActivityWithAi?: boolean;
+  /** Günlük rutinler ve bugünkü durumları (kullanıcı ekledikçe dolar) */
+  routines?: RoutineBrief[];
+  /** Ekran hareketinden tahmin edilen uyku (yatış, kalkış, süre). Kesin ölçüm değildir. */
+  sleep?: SleepSummary;
 }
 
 const ZONE_LABEL: Record<EnergyZone, string> = {
@@ -105,7 +111,35 @@ function titleOf(ctx: CoachContext, taskId: string): string {
   return ctx.tasks.find((t) => t.id === taskId)?.title ?? 'Görev';
 }
 
+/** Şimdi cevap bekleyen rutinler, sorulma saatine göre. */
+function dueRoutines(ctx: CoachContext): RoutineBrief[] {
+  return (ctx.routines ?? [])
+    .filter((b) => b.state === 'DUE')
+    .sort(
+      (a, b) =>
+        a.routine.askHour * 60 + a.routine.askMinute - (b.routine.askHour * 60 + b.routine.askMinute)
+    );
+}
+
 // ───────────────────────── Kronos ─────────────────────────
+
+/** Rutin sorusu: görev akışını bölmeyecek anlarda gösterilir. */
+function kronosRoutineMessage(ctx: CoachContext): CoachMessage | null {
+  const due = dueRoutines(ctx);
+  if (due.length === 0) return null;
+  const first = due[0].routine;
+  const more = due.length - 1;
+  return {
+    coach: 'KRONOS',
+    tone: 'STRATEGIC',
+    headline: more === 0 ? `Rutin zamanı: ${first.title}` : `${due.length} rutin seni bekliyor`,
+    body:
+      more === 0
+        ? `"${first.title}" için bugün yapacak mısın? "Yapacağım" dersen ${first.estimatedDuration} dk'yı enerji saatlerine göre plana yerleştiririm; "sonra" ya da "bugün değil" de olur.`
+        : `"${first.title}" ve ${more} rutin daha cevap bekliyor. "Yapacağım" dediklerini enerji saatlerine göre plana yerleştiririm; "sonra" ya da "bugün değil" de olur.`,
+    actions: [],
+  };
+}
 
 export function getKronosMessage(ctx: CoachContext): CoachMessage {
   const active = ctx.tasks.filter((t) => t.status === 'PENDING' || t.status === 'IN_PROGRESS');
@@ -113,6 +147,8 @@ export function getKronosMessage(ctx: CoachContext): CoachMessage {
   const postponed = ctx.tasks.filter((t) => t.status === 'POSTPONED');
 
   if (active.length === 0 && done.length === 0 && postponed.length === 0) {
+    const nudge = kronosRoutineMessage(ctx);
+    if (nudge) return nudge;
     return {
       coach: 'KRONOS',
       tone: 'STRATEGIC',
@@ -123,6 +159,8 @@ export function getKronosMessage(ctx: CoachContext): CoachMessage {
   }
 
   if (active.length === 0) {
+    const nudge = kronosRoutineMessage(ctx);
+    if (nudge) return nudge;
     return {
       coach: 'KRONOS',
       tone: 'STRATEGIC',
@@ -199,6 +237,8 @@ export function getKronosMessage(ctx: CoachContext): CoachMessage {
         actions: [],
       };
     }
+    const nudge = kronosRoutineMessage(ctx);
+    if (nudge) return nudge;
     const zone = energyZoneAt(ctx.user, next.startTime);
     return {
       coach: 'KRONOS',
@@ -209,6 +249,8 @@ export function getKronosMessage(ctx: CoachContext): CoachMessage {
     };
   }
 
+  const routineNudge = kronosRoutineMessage(ctx);
+  if (routineNudge) return routineNudge;
   return {
     coach: 'KRONOS',
     tone: 'STRATEGIC',
@@ -293,6 +335,37 @@ export function getAuraMessage(ctx: CoachContext): CoachMessage {
     };
   }
 
+  // Kısa uyku (yalnızca sabah/öğleye kadar; tahmin olduğu açıkça söylenir)
+  const sleep = ctx.sleep;
+  if (
+    sleep &&
+    sleep.lastMinutes !== null &&
+    sleep.lastMinutes < 360 &&
+    ctx.now.getHours() < 14
+  ) {
+    return {
+      ...base,
+      tone: 'CALM',
+      headline: 'Kısa bir gece görünüyor',
+      body: `Ekran hareketine göre dün gece yaklaşık ${formatDuration(sleep.lastMinutes)} uyumuşsun (tahmin). Bugün kendine nazik ol: ağır işi tepe saatine koy, gerisini hafif tut.`,
+    };
+  }
+
+  // Sık ertelenen ya da tutmayan rutin: suçlama yok, ayarlama önerisi var
+  const struggling = (ctx.routines ?? []).find(
+    (b) =>
+      b.suggestion !== null &&
+      (b.suggestion.kind === 'MOVE_TIME' || b.suggestion.kind === 'SHRINK' || b.suggestion.kind === 'RETIRE')
+  );
+  if (struggling) {
+    return {
+      ...base,
+      tone: 'CALM',
+      headline: 'Bu rutin sana uymuyor olabilir',
+      body: `"${struggling.routine.title}" birkaç gündür ertelendi ya da yapılamadı. Bu bir eksiklik değil, bir veri: belki saati ya da süresi sana göre değil. Rutinlerim sayfasında birlikte ayarlayabiliriz; istersen tamamen bırakmak da meşru bir seçim.`,
+    };
+  }
+
   // Telefon kullanımı: yargısız, yalnızca veri olarak
   const act = ctx.activity;
   if (act) {
@@ -317,6 +390,17 @@ export function getAuraMessage(ctx: CoachContext): CoachMessage {
         body: `Bugün ${act.steps} adım atıldı. Kısa bir yürüyüş zihni tazeler; şu an belki sadece buna ihtiyacın vardır.`,
       };
     }
+  }
+
+  // Bugün yapılan ve süren bir rutin: küçük bir takdir
+  const streaking = (ctx.routines ?? []).find((b) => b.state === 'DONE' && b.stats.streak >= 3);
+  if (streaking) {
+    return {
+      ...base,
+      tone: 'CALM',
+      headline: 'Rutinin yerinde',
+      body: `"${streaking.routine.title}" ${streaking.stats.streak} gündür sürüyor. Bu ritim kıymetli; hız değil süreklilik seni taşıyor.`,
+    };
   }
 
   const byZone: Record<EnergyZone, { headline: string; body: string }> = {
@@ -345,6 +429,35 @@ export function getAuraDriftReply(minutes: number): CoachMessage {
     body: `${formatDuration(minutes)} kayda geçti. Hiçbir şey kaybolmadı; bu artık planını iyileştiren bir veri. Hazır olduğunda tek bir küçük adımla devam edebiliriz.`,
     actions: [],
   };
+}
+
+export type RoutineReplyKind = 'ACCEPTED' | 'DONE' | 'SNOOZED' | 'SKIPPED' | 'RETIRED';
+
+/** Aura'nın rutin cevabına kısa yanıtı: hangi seçenek olursa olsun yargı yok. */
+export function getAuraRoutineReply(kind: RoutineReplyKind, title: string): CoachMessage {
+  const texts: Record<RoutineReplyKind, { headline: string; body: string }> = {
+    ACCEPTED: {
+      headline: 'Plana aldım',
+      body: `"${title}" bugünün planına girdi. Küçük bir adım yeterli; gerisi kendiliğinden gelir.`,
+    },
+    DONE: {
+      headline: 'Kayda geçti',
+      body: `"${title}" bugün tamam. Bu ritim sana iyi geliyor olabilir.`,
+    },
+    SNOOZED: {
+      headline: 'Sorun değil',
+      body: `Ertelemek de bir cevap. Söz verdiğim saatte "${title}" için yeniden soracağım.`,
+    },
+    SKIPPED: {
+      headline: 'Bugünlük tamam',
+      body: `"${title}" bugün için kapandı; yarın yine soracağım. Hiçbir borç taşımıyorsun.`,
+    },
+    RETIRED: {
+      headline: 'Saygı duyuyorum',
+      body: `"${title}" listenden çıktı. Her rutin her dönem için doğru olmaz; istersen Rutinlerim sayfasından geri alabilirsin.`,
+    },
+  };
+  return { coach: 'AURA', tone: 'CALM', ...texts[kind], actions: [] };
 }
 
 // ───────────────────────── TimeLog notları ─────────────────────────

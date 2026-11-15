@@ -9,6 +9,12 @@ import type {
   DurationSample,
   EnergyState,
   PlannedSlot,
+  Routine,
+  RoutineCategory,
+  RoutineLog,
+  RoutineOutcome,
+  RoutineStatus,
+  SleepLog,
   Task,
   TaskStatus,
   TimeBlockRow,
@@ -72,7 +78,13 @@ export async function saveUserProfile(
 
 export async function createTask(
   db: SQLiteDatabase,
-  input: { title: string; estimatedDuration: number; cognitiveWeight: CognitiveWeight }
+  input: {
+    title: string;
+    estimatedDuration: number;
+    cognitiveWeight: CognitiveWeight;
+    /** Rutinden doğan görevlerde rutinin id'si */
+    routineId?: string | null;
+  }
 ): Promise<Task> {
   const title = input.title.trim();
   if (!title) throw new Error('Görev başlığı boş olamaz.');
@@ -84,10 +96,11 @@ export async function createTask(
     status: 'PENDING',
     createdAt: new Date().toISOString(),
     startedAt: null,
+    routineId: input.routineId ?? null,
   };
   await db.runAsync(
-    `INSERT INTO Task (id, title, estimatedDuration, cognitiveWeight, status, createdAt, startedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO Task (id, title, estimatedDuration, cognitiveWeight, status, createdAt, startedAt, routineId)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       task.id,
       task.title,
@@ -96,6 +109,7 @@ export async function createTask(
       task.status,
       task.createdAt,
       task.startedAt,
+      task.routineId ?? null,
     ]
   );
   return task;
@@ -348,4 +362,184 @@ export async function listDailyStats(db: SQLiteDatabase, limit = 7): Promise<Dai
     [limit]
   );
   return rows.map(rowToDailyStat);
+}
+
+export async function getTask(db: SQLiteDatabase, id: string): Promise<Task | null> {
+  return db.getFirstAsync<Task>('SELECT * FROM Task WHERE id = ?', [id]);
+}
+
+// ───────────────────────── Rutinler ─────────────────────────
+
+export interface NewRoutine {
+  title: string;
+  category: RoutineCategory;
+  estimatedDuration: number;
+  cognitiveWeight: CognitiveWeight;
+  askHour: number;
+  askMinute?: number;
+  templateId?: string | null;
+}
+
+export async function createRoutine(db: SQLiteDatabase, input: NewRoutine): Promise<Routine> {
+  const title = input.title.trim();
+  if (!title) throw new Error('Rutin adı boş olamaz.');
+  const askMinute = input.askMinute ?? 0;
+  if (input.askHour < 0 || input.askHour > 23 || askMinute < 0 || askMinute > 59) {
+    throw new Error('Saat 00:00 ile 23:59 arasında olmalı.');
+  }
+  const routine: Routine = {
+    id: newId('rtn'),
+    title,
+    category: input.category,
+    estimatedDuration: Math.max(5, Math.round(input.estimatedDuration)),
+    cognitiveWeight: input.cognitiveWeight,
+    askHour: input.askHour,
+    askMinute,
+    status: 'ACTIVE',
+    createdAt: new Date().toISOString(),
+    retiredAt: null,
+    templateId: input.templateId ?? null,
+  };
+  await db.runAsync(
+    `INSERT INTO Routine (id, title, category, estimatedDuration, cognitiveWeight, askHour, askMinute,
+                          status, createdAt, retiredAt, templateId)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      routine.id,
+      routine.title,
+      routine.category,
+      routine.estimatedDuration,
+      routine.cognitiveWeight,
+      routine.askHour,
+      routine.askMinute,
+      routine.status,
+      routine.createdAt,
+      routine.retiredAt,
+      routine.templateId,
+    ]
+  );
+  return routine;
+}
+
+export async function getRoutine(db: SQLiteDatabase, id: string): Promise<Routine | null> {
+  return db.getFirstAsync<Routine>('SELECT * FROM Routine WHERE id = ?', [id]);
+}
+
+export async function listRoutines(
+  db: SQLiteDatabase,
+  status: RoutineStatus = 'ACTIVE'
+): Promise<Routine[]> {
+  return db.getAllAsync<Routine>(
+    'SELECT * FROM Routine WHERE status = ? ORDER BY askHour ASC, askMinute ASC, createdAt ASC',
+    [status]
+  );
+}
+
+export async function updateRoutine(
+  db: SQLiteDatabase,
+  id: string,
+  patch: Partial<
+    Pick<Routine, 'title' | 'category' | 'estimatedDuration' | 'cognitiveWeight' | 'askHour' | 'askMinute'>
+  >
+): Promise<void> {
+  const current = await getRoutine(db, id);
+  if (!current) throw new Error('Rutin bulunamadı.');
+  const next = { ...current, ...patch };
+  const title = next.title.trim();
+  if (!title) throw new Error('Rutin adı boş olamaz.');
+  if (next.askHour < 0 || next.askHour > 23 || next.askMinute < 0 || next.askMinute > 59) {
+    throw new Error('Saat 00:00 ile 23:59 arasında olmalı.');
+  }
+  await db.runAsync(
+    `UPDATE Routine SET title = ?, category = ?, estimatedDuration = ?, cognitiveWeight = ?,
+                        askHour = ?, askMinute = ? WHERE id = ?`,
+    [
+      title,
+      next.category,
+      Math.max(5, Math.round(next.estimatedDuration)),
+      next.cognitiveWeight,
+      next.askHour,
+      next.askMinute,
+      id,
+    ]
+  );
+}
+
+export async function setRoutineStatus(
+  db: SQLiteDatabase,
+  id: string,
+  status: RoutineStatus,
+  now: Date = new Date()
+): Promise<void> {
+  await db.runAsync('UPDATE Routine SET status = ?, retiredAt = ? WHERE id = ?', [
+    status,
+    status === 'RETIRED' ? now.toISOString() : null,
+    id,
+  ]);
+}
+
+export async function deleteRoutine(db: SQLiteDatabase, id: string): Promise<void> {
+  await db.runAsync('DELETE FROM Routine WHERE id = ?', [id]);
+}
+
+export async function addRoutineLog(
+  db: SQLiteDatabase,
+  input: {
+    routineId: string;
+    day: string;
+    outcome: RoutineOutcome;
+    taskId?: string | null;
+    snoozeUntil?: Date | null;
+    loggedAt?: Date;
+  }
+): Promise<RoutineLog> {
+  const log: RoutineLog = {
+    id: newId('rlg'),
+    routineId: input.routineId,
+    day: input.day,
+    outcome: input.outcome,
+    taskId: input.taskId ?? null,
+    snoozeUntil: input.snoozeUntil ? input.snoozeUntil.toISOString() : null,
+    loggedAt: (input.loggedAt ?? new Date()).toISOString(),
+  };
+  await db.runAsync(
+    `INSERT INTO RoutineLog (id, routineId, day, outcome, taskId, snoozeUntil, loggedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [log.id, log.routineId, log.day, log.outcome, log.taskId, log.snoozeUntil, log.loggedAt]
+  );
+  return log;
+}
+
+/** `sinceDay` (YYYY-MM-DD, dahil) ve sonrasındaki tüm rutin cevapları, eskiden yeniye. */
+export async function listRoutineLogsSince(
+  db: SQLiteDatabase,
+  sinceDay: string
+): Promise<RoutineLog[]> {
+  return db.getAllAsync<RoutineLog>(
+    'SELECT * FROM RoutineLog WHERE day >= ? ORDER BY loggedAt ASC, rowid ASC',
+    [sinceDay]
+  );
+}
+
+// ───────────────────────── Uyku ─────────────────────────
+
+export async function upsertSleepLog(db: SQLiteDatabase, log: SleepLog): Promise<void> {
+  await db.runAsync(
+    `INSERT INTO SleepLog (day, bedtime, wakeTime, durationMinutes, updatedAt)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(day) DO UPDATE SET
+       bedtime = excluded.bedtime,
+       wakeTime = excluded.wakeTime,
+       durationMinutes = excluded.durationMinutes,
+       updatedAt = excluded.updatedAt`,
+    [log.day, log.bedtime, log.wakeTime, Math.max(1, Math.round(log.durationMinutes)), new Date().toISOString()]
+  );
+}
+
+/** En yeni `limit` gece, yeniden eskiye sıralı. */
+export async function listSleepLogs(db: SQLiteDatabase, limit = 14): Promise<SleepLog[]> {
+  return db.getAllAsync<SleepLog>(
+    'SELECT day, bedtime, wakeTime, durationMinutes FROM SleepLog ORDER BY day DESC LIMIT ?',
+    [limit]
+  );
 }

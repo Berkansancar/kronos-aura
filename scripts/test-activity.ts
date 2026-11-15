@@ -192,13 +192,13 @@ async function dbTests(): Promise<void> {
   const { db, raw } = makeDb();
   await migrateDbIfNeeded(db);
   const version = (raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;
-  check('temiz kurulum son sürüme gelir', version === DATABASE_VERSION && DATABASE_VERSION === 3);
+  check('temiz kurulum son sürüme gelir', version === DATABASE_VERSION && DATABASE_VERSION === 4);
 
   // v2'den yükseltme: DailyStat yokken sürüm 2 görünür.
   raw.exec('DROP TABLE DailyStat; PRAGMA user_version = 2;');
   await migrateDbIfNeeded(db);
   const tbl = raw.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='DailyStat'").get();
-  check('v2 veritabanı v3 e yükselir', tbl !== undefined);
+  check('v2 veritabanı son sürüme yükselir', tbl !== undefined);
   await migrateDbIfNeeded(db);
   check('migrasyon tekrar çalışınca bozulmaz', true);
 

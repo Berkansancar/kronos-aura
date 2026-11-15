@@ -5,8 +5,8 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { colors, radius, spacing } from '../constants/theme';
 import { DeviceActivity } from '../modules/device-activity';
-import { listDailyStats } from '../database/repository';
-import type { DailyStat } from '../database/types';
+import { getOrCreateUser, listDailyStats, listSleepLogs } from '../database/repository';
+import type { Chronotype, DailyStat, SleepLog } from '../database/types';
 import {
   deviceActivityAvailable,
   disableTracking,
@@ -18,12 +18,15 @@ import {
 } from '../services/activity';
 import { batteryHint, formatSteps, parseDayKey } from '../services/activityLogic';
 import { formatDayTitle, formatDuration } from '../services/format';
+import { formatClockIso, sleepInsights } from '../services/sleepLogic';
 
 export default function ActivityScreen() {
   const db = useSQLiteContext();
   const router = useRouter();
   const [reading, setReading] = useState<ActivityReading | null>(null);
   const [history, setHistory] = useState<DailyStat[]>([]);
+  const [sleepLogs, setSleepLogs] = useState<SleepLog[]>([]);
+  const [chronotype, setChronotype] = useState<Chronotype>('BALANCED');
   const [share, setShare] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -33,6 +36,8 @@ export default function ActivityScreen() {
       const { reading: r } = await refreshActivity(db);
       setReading(r);
       setHistory(await listDailyStats(db, 7));
+      setSleepLogs(await listSleepLogs(db, 14));
+      setChronotype((await getOrCreateUser(db)).chronotype);
       setShare(await isSharingWithAi());
     } catch {
       // Okuma başarısızsa mevcut ekran korunur.
@@ -148,6 +153,47 @@ export default function ActivityScreen() {
             </View>
           </>
         )}
+
+        <Text style={styles.sectionTitle}>Uyku (tahmin)</Text>
+        <View style={styles.card}>
+          {!r?.usageAccess ? (
+            <Text style={styles.cardText}>
+              Uyku tahmini için aşağıdaki "Kullanım erişimi" izni gerekir. İzin verince yatış ve kalkış
+              saatini ekranın gece ne zaman kapanıp açıldığından tahmin ederim.
+            </Text>
+          ) : sleepLogs.length === 0 ? (
+            <Text style={styles.cardText}>
+              Henüz tahmin yok. Telefon gece kapalı kalıp sabah açılınca yatış ve kalkış saatin burada
+              görünecek.
+            </Text>
+          ) : (
+            <>
+              <Text style={styles.cardTitle}>
+                {formatClockIso(sleepLogs[0].bedtime)} → {formatClockIso(sleepLogs[0].wakeTime)} ·{' '}
+                {formatDuration(sleepLogs[0].durationMinutes)}
+              </Text>
+              <Text style={styles.cardText}>{formatDayTitle(parseDayKey(sleepLogs[0].day))} sabahı</Text>
+              {sleepInsights(sleepLogs, chronotype).map((line) => (
+                <Text key={line} style={styles.cardText}>
+                  {line}
+                </Text>
+              ))}
+              {sleepLogs.slice(1, 7).map((l) => (
+                <View key={l.day} style={styles.histRow}>
+                  <Text style={styles.histDay}>{formatDayTitle(parseDayKey(l.day))}</Text>
+                  <Text style={styles.histVal}>
+                    {formatClockIso(l.bedtime)} → {formatClockIso(l.wakeTime)} ·{' '}
+                    {formatDuration(l.durationMinutes)}
+                  </Text>
+                </View>
+              ))}
+            </>
+          )}
+          <Text style={styles.hint}>
+            Telefon uykuyu doğrudan ölçemez; ekranın gece en uzun kapalı kaldığı aralığa bakarım. Telefon
+            başka odadaysa ya da gece kullandıysan tahmin yanılabilir.
+          </Text>
+        </View>
 
         <Text style={styles.sectionTitle}>Kurulum</Text>
 

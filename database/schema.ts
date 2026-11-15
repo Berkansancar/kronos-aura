@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 export const DB_NAME = 'kronos-aura.db';
-export const DATABASE_VERSION = 3;
+export const DATABASE_VERSION = 4;
 
 /**
  * Not: SQLite'ın gerçek bir DATETIME tipi yoktur. Zaman alanlarını ISO-8601 (UTC) TEXT
@@ -81,6 +81,53 @@ CREATE TABLE IF NOT EXISTS DailyStat (
 );
 `;
 
+/** Sürüm 4: günlük rutinler, rutin cevapları ve tahmini uyku kayıtları. */
+const CREATE_TABLES_V4 = `
+CREATE TABLE IF NOT EXISTS Routine (
+  id                TEXT PRIMARY KEY NOT NULL,
+  title             TEXT NOT NULL,
+  category          TEXT NOT NULL CHECK (category IN ('SAGLIK', 'ZIHIN', 'ODAK', 'DUZEN')),
+  estimatedDuration INTEGER NOT NULL CHECK (estimatedDuration > 0),
+  cognitiveWeight   TEXT NOT NULL CHECK (cognitiveWeight IN ('HIGH', 'MEDIUM', 'LOW')),
+  askHour           INTEGER NOT NULL CHECK (askHour BETWEEN 0 AND 23),
+  askMinute         INTEGER NOT NULL DEFAULT 0 CHECK (askMinute BETWEEN 0 AND 59),
+  status            TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'RETIRED')),
+  createdAt         TEXT NOT NULL,
+  retiredAt         TEXT,
+  templateId        TEXT
+);
+
+CREATE TABLE IF NOT EXISTS RoutineLog (
+  id          TEXT PRIMARY KEY NOT NULL,
+  routineId   TEXT NOT NULL REFERENCES Routine(id) ON DELETE CASCADE,
+  day         TEXT NOT NULL,
+  outcome     TEXT NOT NULL CHECK (outcome IN ('ACCEPTED', 'DONE', 'SNOOZED', 'SKIPPED', 'RETIRED')),
+  taskId      TEXT,
+  snoozeUntil TEXT,
+  loggedAt    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_routinelog_routine ON RoutineLog(routineId, day);
+CREATE INDEX IF NOT EXISTS idx_routinelog_day     ON RoutineLog(day);
+
+CREATE TABLE IF NOT EXISTS SleepLog (
+  day             TEXT PRIMARY KEY NOT NULL,
+  bedtime         TEXT NOT NULL,
+  wakeTime        TEXT NOT NULL,
+  durationMinutes INTEGER NOT NULL CHECK (durationMinutes > 0),
+  updatedAt       TEXT NOT NULL
+);
+`;
+
+/** Sütun ekleme tekrar çalıştırılırsa hata verir; bu yüzden önce var mı diye bakılır. */
+const ADD_TASK_ROUTINE_ID = `
+ALTER TABLE Task ADD COLUMN routineId TEXT REFERENCES Routine(id) ON DELETE SET NULL;
+`;
+
+async function hasColumn(db: SQLiteDatabase, table: string, column: string): Promise<boolean> {
+  const cols = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${table})`);
+  return cols.some((c) => c.name === column);
+}
+
 /**
  * SQLiteProvider'ın onInit'ine verilir. Veritabanı ilk açıldığında tabloları kurar,
  * sonraki sürümlerde buraya yeni migrasyon adımları eklenir.
@@ -108,8 +155,16 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {
     current = 3;
   }
 
+  if (current === 3) {
+    await db.execAsync(CREATE_TABLES_V4);
+    if (!(await hasColumn(db, 'Task', 'routineId'))) {
+      await db.execAsync(ADD_TASK_ROUTINE_ID);
+    }
+    current = 4;
+  }
+
   // Gelecekteki migrasyonlar:
-  // if (current === 3) { await db.execAsync(`ALTER TABLE ...`); current = 4; }
+  // if (current === 4) { await db.execAsync(`ALTER TABLE ...`); current = 5; }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
 }

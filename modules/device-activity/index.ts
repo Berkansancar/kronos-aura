@@ -17,10 +17,16 @@ export interface UsageSummary {
   apps: UsageApp[];
 }
 
+export interface ScreenSessionRaw {
+  on: number;
+  off: number;
+}
+
 export interface DeviceActivityApi {
   hasUsageAccess(): boolean;
   openUsageAccessSettings(): boolean;
   getUsageSummary(startMs: number, endMs: number): Promise<UsageSummary>;
+  getScreenSessions(startMs: number, endMs: number): Promise<ScreenSessionRaw[]>;
   hasStepSensor(): boolean;
   getTodaySteps(): number;
   startTracking(): boolean;

@@ -42,6 +42,7 @@ export default function RootLayout() {
           <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
           <Stack.Screen name="chat" />
           <Stack.Screen name="activity" />
+          <Stack.Screen name="routines" />
         </Stack>
       </SQLiteProvider>
     </Suspense>

@@ -6,7 +6,9 @@
 import type { CoachId } from '../../database/types';
 import type { CoachContext, CoachMessage } from '../coachEngine';
 import { formatClock, formatDuration } from '../format';
+import { formatAskTime } from '../routineLogic';
 import { energyZoneAt } from '../scheduler';
+import { formatClockIso } from '../sleepLogic';
 import { AIError, callClaude, extractJsonObject, type ChatTurn } from './claudeClient';
 import { PERSONAS } from './personas';
 import type { AiConfig } from './settings';
@@ -19,6 +21,14 @@ const STATUS_TR = {
   IN_PROGRESS: 'şu an üzerinde çalışılıyor',
   COMPLETED: 'bitti',
   POSTPONED: 'ertelendi',
+} as const;
+const ROUTINE_STATE_TR = {
+  WAITING: 'henüz sorulma saati gelmedi',
+  DUE: 'şimdi cevap bekliyor',
+  SNOOZED: 'daha sonra sorulacak',
+  ACCEPTED: 'bugün yapacağını söyledi (planda)',
+  DONE: 'bugün yapıldı',
+  SKIPPED: 'bugün yapmayacak',
 } as const;
 const ENERGY_TR = { HIGH: 'enerjik', EXHAUSTED: 'yorgun', DISTRACTED: 'dağınık' } as const;
 
@@ -43,6 +53,22 @@ export function describeSituation(ctx: CoachContext): string {
         .join(', ');
       lines.push(
         `- ${t.title} (${WEIGHT_TR[t.cognitiveWeight]}, ${t.estimatedDuration} dk, ${STATUS_TR[t.status]}${times ? `, plan: ${times}` : ', planda yeri yok'})`
+      );
+    }
+  }
+
+  // Rutinler kullanıcının kendi eklediği veridir (görevler gibi); her zaman paylaşılır.
+  const routines = (ctx.routines ?? []).slice(0, 12);
+  if (routines.length > 0) {
+    lines.push('Günlük rutinler (kullanıcı kendi seçti; erteleme ya da bırakma bir kusur değildir):');
+    for (const b of routines) {
+      const st = b.stats;
+      const history =
+        st.closedDays > 0
+          ? `, son 14 günde ${st.closedDays} günün ${st.doneDays}'ini yaptı${st.streak >= 2 ? `, ${st.streak} gün seri` : ''}`
+          : '';
+      lines.push(
+        `- ${b.routine.title} (${formatAskTime(b.routine)}, ${b.routine.estimatedDuration} dk, ${ROUTINE_STATE_TR[b.state]}${history})`
       );
     }
   }
@@ -74,6 +100,18 @@ export function describeSituation(ctx: CoachContext): string {
     if (top.length > 0) {
       lines.push(`- En çok kullanılan uygulamalar: ${top.map((a) => `${a.label} ${formatDuration(a.minutes)}`).join(', ')}`);
     }
+  }
+  // Uyku tahmini de telefon verisinden türediği için aynı izne bağlıdır.
+  const sleep = ctx.sleep;
+  if (ctx.shareActivityWithAi && sleep && sleep.lastMinutes !== null) {
+    lines.push(
+      `Uyku (ekran hareketinden tahmin, kesin değil): son gece yaklaşık ${formatDuration(sleep.lastMinutes)}` +
+        (sleep.lastBedtime && sleep.lastWake
+          ? `, ${formatClockIso(sleep.lastBedtime)} civarı yatıp ${formatClockIso(sleep.lastWake)} civarı kalkmış`
+          : '') +
+        (sleep.avgMinutes !== null ? `; son gecelerin ortalaması ${formatDuration(sleep.avgMinutes)}` : '') +
+        '.'
+    );
   }
   return lines.join('\n');
 }

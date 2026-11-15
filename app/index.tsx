@@ -5,6 +5,8 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { CoachConsole } from '../components/CoachConsole';
 import { EnergyCheckModal } from '../components/EnergyCheckModal';
+import { RoutineCard } from '../components/RoutineCard';
+import { SnoozeModal } from '../components/SnoozeModal';
 import { TaskComposer } from '../components/TaskComposer';
 import { TaskItem } from '../components/TaskItem';
 import { colors, radius, spacing } from '../constants/theme';
@@ -19,6 +21,9 @@ import {
 import type {
   ActivitySummary,
   EnergyState,
+  Routine,
+  RoutineBrief,
+  SleepSummary,
   Task,
   TimeBlockRow,
   TimeLog,
@@ -27,6 +32,7 @@ import type {
 import {
   getAuraDriftReply,
   getAuraMessage,
+  getAuraRoutineReply,
   getKronosMessage,
   type CoachAction,
   type CoachContext,
@@ -37,11 +43,22 @@ import {
   deviceActivityAvailable,
   ensureTracking,
   isSharingWithAi,
+  loadSleepSummary,
   refreshActivity,
 } from '../services/activity';
 import { formatSteps } from '../services/activityLogic';
 import { formatClock, formatDayTitle, formatDuration } from '../services/format';
 import { DAY_END_HOUR, dayBounds, planningDay, replanDay } from '../services/planner';
+import { loadRoutineBriefs } from '../services/routineBriefs';
+import {
+  acceptRoutine,
+  markRoutineDone,
+  retireRoutine,
+  skipRoutineToday,
+  snoozeRoutine,
+} from '../services/routineFlow';
+import { dueBriefs, todayProgress, type SnoozeOption } from '../services/routineLogic';
+import { syncRoutineReminders } from '../services/routineReminders';
 import {
   addTask,
   completeTask,
@@ -75,6 +92,9 @@ export default function HomeScreen() {
   const [aiTick, setAiTick] = useState(0);
   const [activity, setActivity] = useState<ActivitySummary | undefined>(undefined);
   const [shareActivity, setShareActivity] = useState(false);
+  const [briefs, setBriefs] = useState<RoutineBrief[]>([]);
+  const [sleep, setSleep] = useState<SleepSummary | undefined>(undefined);
+  const [snoozing, setSnoozing] = useState<Routine | null>(null);
 
   const load = useCallback(async () => {
     const current = new Date();
@@ -83,6 +103,14 @@ export default function HomeScreen() {
     const t = await listVisibleTasks(db, start.toISOString());
     const b = await listDayBlocks(db, start, end);
     const l = await listRecentLogs(db, 10);
+    // Rutinlerin bugünkü durumu + hatırlatma bildirimlerinin eşitlenmesi (hata verirse atlanır)
+    try {
+      const rb = await loadRoutineBriefs(db, current);
+      setBriefs(rb);
+      syncRoutineReminders(rb, current).catch(() => undefined);
+    } catch {
+      // Rutin verisi olmadan da görevler çalışır.
+    }
     setNow(current);
     setUser(u);
     setTasks(t);
@@ -97,6 +125,7 @@ export default function HomeScreen() {
       await ensureTracking();
       const { summary } = await refreshActivity(db);
       setActivity(summary);
+      setSleep(await loadSleepSummary(db));
       setShareActivity(summary ? await isSharingWithAi() : false);
     } catch {
       // Aktivite verisi olmadan da uygulama çalışır.
@@ -122,6 +151,16 @@ export default function HomeScreen() {
     const id = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(id);
   }, []);
+
+  // Bir rutinin sorulma saati gelince kart kendiliğinden çıksın.
+  useEffect(() => {
+    const id = setInterval(() => {
+      loadRoutineBriefs(db, new Date())
+        .then(setBriefs)
+        .catch(() => undefined);
+    }, 60_000);
+    return () => clearInterval(id);
+  }, [db]);
 
   // Yapay zekâ mesajları aynı durumda bile 20 dakikada bir tazelenir.
   useEffect(() => {
@@ -204,8 +243,10 @@ export default function HomeScreen() {
       dayEndHour: DAY_END_HOUR,
       activity,
       shareActivityWithAi: shareActivity,
+      routines: briefs,
+      sleep,
     };
-  }, [now, user, tasks, blocks, logs, activity, shareActivity]);
+  }, [now, user, tasks, blocks, logs, activity, shareActivity, briefs, sleep]);
 
   const coaches = useMemo(
     () => (ctx ? { kronos: getKronosMessage(ctx), aura: getAuraMessage(ctx) } : null),
@@ -226,8 +267,10 @@ export default function HomeScreen() {
       activity
         ? `${Math.floor((activity.screenMinutes ?? 0) / 60)}:${Math.floor((activity.steps ?? 0) / 2000)}:${shareActivity ? 1 : 0}`
         : '',
+      briefs.map((b) => `${b.routine.id}:${b.state}`).join(','),
+      sleep?.lastMinutes != null ? Math.floor(sleep.lastMinutes / 60) : '',
     ].join('|');
-  }, [coaches, tasks, blocks, logs, activity, shareActivity]);
+  }, [coaches, tasks, blocks, logs, activity, shareActivity, briefs, sleep]);
 
   const ai = useAICoachMessages(ctx, coaches, situationKey, aiTick);
 
@@ -253,6 +296,26 @@ export default function HomeScreen() {
       }
     });
 
+  const answerRoutine = (routine: Routine, kind: 'ACCEPTED' | 'DONE' | 'SKIPPED' | 'RETIRED') =>
+    run(async () => {
+      const n = new Date();
+      if (kind === 'ACCEPTED') await acceptRoutine(db, routine, n);
+      else if (kind === 'DONE') await markRoutineDone(db, routine, n);
+      else if (kind === 'SKIPPED') await skipRoutineToday(db, routine, n);
+      else await retireRoutine(db, routine, n);
+      setAuraReply(getAuraRoutineReply(kind, routine.title));
+    });
+
+  const onSnoozeSelect = (option: SnoozeOption) => {
+    const routine = snoozing;
+    setSnoozing(null);
+    if (!routine) return;
+    run(async () => {
+      const until = await snoozeRoutine(db, routine, option, new Date());
+      setAuraReply(getAuraRoutineReply(until ? 'SNOOZED' : 'SKIPPED', routine.title));
+    });
+  };
+
   const onFinishWithEnergy = (energy: EnergyState) => {
     const task = finishing;
     setFinishing(null);
@@ -277,6 +340,12 @@ export default function HomeScreen() {
   }
   const activityLine =
     activityParts.length > 0 ? activityParts.join(' · ') : 'Ekran süren ve adımların için aç';
+
+  const progress = todayProgress(briefs);
+  const routineLine =
+    briefs.length === 0
+      ? 'Su içmek, yürüyüş, nefes... örnek rutinlerden seç'
+      : `${progress.done} yapıldı · ${progress.open} açık${progress.skipped > 0 ? ` · ${progress.skipped} bugünlük kapalı` : ''}`;
 
   const preset = CHRONOTYPE_PRESETS[user.chronotype];
   const planDay = planningDay(now);
@@ -331,6 +400,27 @@ export default function HomeScreen() {
           </Pressable>
         )}
 
+        {dueBriefs(briefs).map((b) => (
+          <RoutineCard
+            key={b.routine.id}
+            brief={b}
+            busy={busy}
+            onAccept={() => answerRoutine(b.routine, 'ACCEPTED')}
+            onDone={() => answerRoutine(b.routine, 'DONE')}
+            onLater={() => setSnoozing(b.routine)}
+            onSkipToday={() => answerRoutine(b.routine, 'SKIPPED')}
+            onRetire={() => answerRoutine(b.routine, 'RETIRED')}
+          />
+        ))}
+
+        <Pressable onPress={() => router.push('/routines')} style={styles.activityCard}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.activityTitle}>Rutinlerim</Text>
+            <Text style={styles.activitySub}>{routineLine}</Text>
+          </View>
+          <Text style={styles.activityArrow}>›</Text>
+        </Pressable>
+
         <Text style={styles.sectionTitle}>Görevler</Text>
         {sortedTasks.length === 0 ? (
           <View style={styles.empty}>
@@ -370,6 +460,12 @@ export default function HomeScreen() {
         taskTitle={finishing?.title ?? null}
         onSelect={onFinishWithEnergy}
         onClose={() => setFinishing(null)}
+      />
+      <SnoozeModal
+        routineTitle={snoozing?.title ?? null}
+        now={now}
+        onSelect={onSnoozeSelect}
+        onClose={() => setSnoozing(null)}
       />
     </SafeAreaView>
   );

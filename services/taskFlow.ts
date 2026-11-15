@@ -13,6 +13,7 @@ import {
 import type { CognitiveWeight, EnergyState, Task } from '../database/types';
 import { buildCompletionNotes, buildDriftNote } from './coachEngine';
 import { replanDay } from './planner';
+import { recordRoutineDoneFromTask } from './routineFlow';
 
 export async function addTask(
   db: SQLiteDatabase,
@@ -52,6 +53,7 @@ export async function completeTask(
     loggedAt: now,
   });
   await setTaskStatus(db, task.id, 'COMPLETED', now);
+  await recordRoutineDoneFromTask(db, task, now);
   await replanDay(db, now, 'TASK_COMPLETED');
 }
 
