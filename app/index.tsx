@@ -13,6 +13,7 @@ import { colors, radius, spacing } from '../constants/theme';
 import { useAICoachMessages } from '../hooks/useAICoachMessages';
 import {
   CHRONOTYPE_PRESETS,
+  getDayReview,
   getOrCreateUser,
   listDayBlocks,
   listRecentLogs,
@@ -46,7 +47,7 @@ import {
   loadSleepSummary,
   refreshActivity,
 } from '../services/activity';
-import { formatSteps } from '../services/activityLogic';
+import { dayKey, formatSteps } from '../services/activityLogic';
 import { formatClock, formatDayTitle, formatDuration } from '../services/format';
 import { DAY_END_HOUR, dayBounds, planningDay, replanDay } from '../services/planner';
 import { loadRoutineBriefs } from '../services/routineBriefs';
@@ -58,7 +59,8 @@ import {
   snoozeRoutine,
 } from '../services/routineFlow';
 import { dueBriefs, todayProgress, type SnoozeOption } from '../services/routineLogic';
-import { syncRoutineReminders } from '../services/routineReminders';
+import { refreshReminders } from '../services/reminderSync';
+import { materializePlannedRoutines, reviewAvailable, reviewDayOf } from '../services/dayReview';
 import {
   addTask,
   completeTask,
@@ -95,11 +97,14 @@ export default function HomeScreen() {
   const [briefs, setBriefs] = useState<RoutineBrief[]>([]);
   const [sleep, setSleep] = useState<SleepSummary | undefined>(undefined);
   const [snoozing, setSnoozing] = useState<Routine | null>(null);
+  const [hasReview, setHasReview] = useState(false);
 
   const load = useCallback(async () => {
     const current = new Date();
     const { start, end } = dayBounds(planningDay(current));
     const u = await getOrCreateUser(db);
+    // Dün akşam "yarın yapacağım" denen rutinler bugünün planına girer (hata verirse atlanır)
+    await materializePlannedRoutines(db, current).catch(() => 0);
     const t = await listVisibleTasks(db, start.toISOString());
     const b = await listDayBlocks(db, start, end);
     const l = await listRecentLogs(db, 10);
@@ -107,7 +112,8 @@ export default function HomeScreen() {
     try {
       const rb = await loadRoutineBriefs(db, current);
       setBriefs(rb);
-      syncRoutineReminders(rb, current).catch(() => undefined);
+      refreshReminders(db, current, rb).catch(() => undefined);
+      setHasReview((await getDayReview(db, dayKey(reviewDayOf(current)))) !== null);
     } catch {
       // Rutin verisi olmadan da görevler çalışır.
     }
@@ -390,6 +396,20 @@ export default function HomeScreen() {
           </Text>
         )}
 
+        {reviewAvailable(now) && (
+          <Pressable onPress={() => router.push('/review')} style={styles.reviewCard}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.reviewTitle}>Gün sonu değerlendirmesi</Text>
+              <Text style={styles.activitySub}>
+                {hasReview
+                  ? 'Hazır · yarın için rutinlerine bak'
+                  : 'Bugünü birlikte değerlendirelim, yarını planlayalım'}
+              </Text>
+            </View>
+            <Text style={styles.activityArrow}>›</Text>
+          </Pressable>
+        )}
+
         {deviceActivityAvailable && (
           <Pressable onPress={() => router.push('/activity')} style={styles.activityCard}>
             <View style={{ flex: 1 }}>
@@ -491,6 +511,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
   },
+  reviewCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.auraSoft,
+    borderWidth: 1,
+    borderColor: colors.aura,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  reviewTitle: { color: colors.aura, fontSize: 15, fontWeight: '800' },
   activityTitle: { color: colors.text, fontSize: 15, fontWeight: '700' },
   activitySub: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
   activityArrow: { color: colors.textMuted, fontSize: 24 },

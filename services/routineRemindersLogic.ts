@@ -21,13 +21,27 @@ export const REMINDER_DAYS = 5;
 /** Android tek uygulamanın kurabileceği alarm sayısını sınırlar; güvenli tarafta kal. */
 export const REMINDER_CAP = 60;
 
+export const REVIEW_HOUR = 21;
+export const REVIEW_MINUTE = 30;
+
+export interface ReminderExtras {
+  /** Bugünün gün sonu değerlendirmesi yapıldı mı? */
+  reviewDone?: boolean;
+  /** Yarın için "yapacağım / değil" denmiş rutin id'leri: yarın bildirimi gitmez */
+  answeredTomorrow?: Set<string>;
+  /** Gün sonu hatırlatması açık mı? (varsayılan: açık) */
+  review?: boolean;
+}
+
 export function planReminders(
   briefs: RoutineBrief[],
   now: Date,
   days: number = REMINDER_DAYS,
-  cap: number = REMINDER_CAP
+  cap: number = REMINDER_CAP,
+  extras: ReminderExtras = {}
 ): PlannedReminder[] {
   const out: PlannedReminder[] = [];
+  const answeredTomorrow = extras.answeredTomorrow ?? new Set<string>();
 
   for (const b of briefs) {
     const r = b.routine;
@@ -51,6 +65,8 @@ export function planReminders(
       if (at.getTime() <= now.getTime()) continue;
       // Bugün zaten cevap verilmiş ya da kapanmışsa bugünün bildirimi gönderilmez
       if (d === 0 && (b.state === 'DONE' || b.state === 'SKIPPED' || b.state === 'ACCEPTED')) continue;
+      // Yarın için zaten cevap verildiyse yarın bir daha sorulmaz
+      if (d === 1 && answeredTomorrow.has(r.id)) continue;
       out.push({
         id: `${REMINDER_ID_PREFIX}${r.id}-${dayKey(at)}`,
         routineId: r.id,
@@ -60,6 +76,22 @@ export function planReminders(
           b.stats.streak >= 2 && d === 0
             ? `${b.stats.streak} gündür devam ediyorsun. Bugün de yapacak mısın?`
             : 'Bugün bunu yapacak mısın? Yapacağım, sonra ya da bugün değil diyebilirsin.',
+      });
+    }
+  }
+
+  // Gün sonu değerlendirmesi hatırlatması (her akşam 21:30)
+  if (extras.review !== false) {
+    for (let d = 0; d < days; d += 1) {
+      const at = new Date(now.getFullYear(), now.getMonth(), now.getDate() + d, REVIEW_HOUR, REVIEW_MINUTE);
+      if (at.getTime() <= now.getTime()) continue;
+      if (d === 0 && extras.reviewDone) continue;
+      out.push({
+        id: `${REMINDER_ID_PREFIX}review-${dayKey(at)}`,
+        routineId: '',
+        at,
+        title: 'Günü birlikte değerlendirelim',
+        body: 'Bugün neler oldu, yarın neleri yapacaksın? Birkaç dokunuşla planı hazırlayalım.',
       });
     }
   }

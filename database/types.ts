@@ -194,3 +194,34 @@ export interface SleepSummary {
   avgMinutes: number | null;
   nights: number;
 }
+
+// ───────────────────────── Gün sonu değerlendirmesi ─────────────────────────
+
+/** Gün sonunda önerilen yeni rutin fikri. `templateId` doluysa hazır örnekten gelir. */
+export interface RoutineIdea {
+  title: string;
+  category: RoutineCategory;
+  minutes: number;
+  hour: number;
+  minute: number;
+  why: string;
+  templateId?: string | null;
+}
+
+export type ReviewSource = 'AI' | 'RULES';
+
+export interface DayReviewPayload {
+  /** Aura: günü yargılamadan yorumlar */
+  reflection: string;
+  /** Kronos: yarın için kısa strateji */
+  tomorrow: string;
+  ideas: RoutineIdea[];
+  source: ReviewSource;
+}
+
+export interface DayReview {
+  /** Değerlendirilen günün anahtarı (yyyy-mm-dd) */
+  day: string;
+  payload: DayReviewPayload;
+  createdAt: string;
+}

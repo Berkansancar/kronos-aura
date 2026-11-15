@@ -4,14 +4,34 @@
  */
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import * as SecureStore from 'expo-secure-store';
 import type { RoutineBrief } from '../database/types';
 import {
+  REMINDER_CAP,
+  REMINDER_DAYS,
   REMINDER_ID_PREFIX,
   planReminders,
   reminderSignature,
+  type ReminderExtras,
 } from './routineRemindersLogic';
 
 const CHANNEL_ID = 'rutinler';
+
+const K_REVIEW_REMINDER = 'review_reminder';
+
+/** Akşam 21:30 "günü değerlendirelim" bildirimi. Varsayılan açık. */
+export async function getReviewReminderEnabled(): Promise<boolean> {
+  try {
+    return (await SecureStore.getItemAsync(K_REVIEW_REMINDER)) !== '0';
+  } catch {
+    return true;
+  }
+}
+
+export async function setReviewReminderEnabled(on: boolean): Promise<void> {
+  if (on) await SecureStore.deleteItemAsync(K_REVIEW_REMINDER);
+  else await SecureStore.setItemAsync(K_REVIEW_REMINDER, '0');
+}
 
 export type ReminderStatus = 'ok' | 'no-permission' | 'unavailable';
 
@@ -68,7 +88,8 @@ export async function askNotificationPermission(): Promise<boolean> {
 /** Planı bildirim sistemiyle eşitler: eski rutin bildirimlerini siler, yenilerini kurar. */
 export async function syncRoutineReminders(
   briefs: RoutineBrief[],
-  now: Date = new Date()
+  now: Date = new Date(),
+  extras: ReminderExtras = {}
 ): Promise<ReminderStatus> {
   if (Platform.OS !== 'android') return 'unavailable';
   try {
@@ -76,7 +97,10 @@ export async function syncRoutineReminders(
     if (!(await hasNotificationPermission())) return 'no-permission';
     await ensureChannel();
 
-    const plan = planReminders(briefs, now);
+    const plan = planReminders(briefs, now, REMINDER_DAYS, REMINDER_CAP, {
+      ...extras,
+      review: await getReviewReminderEnabled(),
+    });
     const signature = reminderSignature(plan);
     if (signature === lastSignature) return 'ok';
 

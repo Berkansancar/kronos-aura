@@ -29,17 +29,18 @@ Bir yerde hata çıkarsa pencerede görünen kırmızı yazıyı kopyalayıp Cla
 
 ```
 app/            index.tsx (ana ekran) · chat.tsx (koç sohbeti) · settings.tsx · profile.tsx
-                activity.tsx (gün analizi, uyku) · routines.tsx (rutinlerim)
+                activity.tsx (gün analizi, uyku) · routines.tsx (rutinlerim) · review.tsx (gün sonu)
 components/     CoachConsole, CoachCard, TaskItem, TaskComposer, EnergyCheckModal
                 RoutineCard, SnoozeModal, RoutineEditor
 services/       scheduler.ts (zamanlama motoru) · coachEngine.ts (kural tabanlı koç)
                 planner.ts · taskFlow.ts · coachContext.ts
                 routineLogic.ts · routineFlow.ts · routineTemplates.ts · routineReminders.ts
                 sleepLogic.ts · activity.ts
+                dayReviewLogic.ts · dayReview.ts · reminderSync.ts · ai/reviewAI.ts
 services/ai/    claudeClient.ts · personas.ts · coachAI.ts · settings.ts
 hooks/          useAICoachMessages.ts
 database/       schema.ts · repository.ts · types.ts
-scripts/        test-scheduler.ts · test-ai.ts · test-activity.ts · test-routines.ts · test-sleep.ts
+scripts/        test-scheduler.ts · test-ai.ts · test-activity.ts · test-routines.ts · test-sleep.ts · test-review.ts
 ```
 
 ## Testler (isteğe bağlı)
@@ -50,6 +51,7 @@ npm run test:ai           yapay zekâ katmanı (gerçek API'ye gitmez), 37 kontr
 npm run test:activity     gün analizi ve veritabanı geçişleri, 51 kontrol
 npm run test:routines     rutinler, analiz, hatırlatmalar, koç entegrasyonu, 100 kontrol
 npm run test:sleep        uyku tahmini, 33 kontrol
+npm run test:review       gün sonu değerlendirmesi ve yarın planı, 77 kontrol
 ```
 
 
@@ -91,3 +93,23 @@ uzun süre kapalı kaldığı aralık (en az 3 saat, 5 dakikadan kısa gece bak�
 saati olarak alınır. Son geceler, ortalama, yatış düzeni ve kronotip önerisi gösterilir. Telefon başka
 odadaysa ya da gece kullanıldıysa tahmin yanılabilir; ekranda bu açıkça yazılır. Yapay zekâya gönderim
 "Koçlarla yapay zekâda paylaş" ayarına bağlıdır.
+
+## Gün sonu değerlendirmesi
+
+Akşam 20:00'den sonra ana ekranda "Gün sonu değerlendirmesi" kartı çıkar (21:30'da bildirim de gelir;
+Ayarlar'dan kapatılabilir). Ekran:
+
+1. Günün özeti: biten görevler, rutinler, adım, ekran süresi, uyku tahmini.
+2. **Aura** günü yargılamadan yorumlar, **Kronos** yarın için kısa bir yaklaşım önerir. API anahtarı varsa
+   yapay zekâ yazar ve "başka neler yapabilirsin" diye 3 yeni rutin fikri çıkarır; yoksa ya da hata olursa
+   aynı yapı hazır kurallarla üretilir (yetersiz adım, çok ekran, kısa uyku gibi işaretlere göre örnek
+   rutinlerden seçer). Yapay zekâ cevabı doğrulanır: yargılayıcı sözcük, geçersiz saat/süre ya da mevcut
+   bir rutinin tekrarı atılır.
+3. Fikirler tek dokunuşla (ya da "Hepsini ekle" ile) rutin olur.
+4. Her rutin için **"Yarın yapacağım"** / **"Yarın değil"** / "Bir daha yapmam". "Yapacağım" dedikleri ertesi
+   sabah (05:00 sonrası) otomatik plana yerleştirilir, "yarın değil" dedikleri yarın sorulmaz, bildirimleri de
+   gitmez.
+
+Değerlendirme `DayReview` tablosunda saklanır (gün başına bir kez; "yeniden yaz" ile tazelenir). Gece
+04:00'e kadar hâlâ "dünün" gün sonu sayılır. Yapay zekâya adım, ekran süresi ve uyku yalnızca "Koçlarla
+yapay zekâda paylaş" açıksa gider; görev ve rutin adları koç sohbetiyle aynı kapsamda her zaman gider.

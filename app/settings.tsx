@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { colors, radius, spacing } from '../constants/theme';
@@ -13,6 +13,7 @@ import {
   setApiKey,
   setModel,
 } from '../services/ai/settings';
+import { getReviewReminderEnabled, setReviewReminderEnabled } from '../services/routineReminders';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -20,12 +21,14 @@ export default function SettingsScreen() {
   const [saved, setSaved] = useState(false);
   const [model, setModelState] = useState<string>(DEFAULT_MODEL);
   const [busy, setBusy] = useState(false);
+  const [reviewReminder, setReviewReminder] = useState(true);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
 
   useEffect(() => {
     (async () => {
       setSaved((await getApiKey()) !== null);
       setModelState(await getModel());
+      setReviewReminder(await getReviewReminderEnabled());
     })();
   }, []);
 
@@ -125,6 +128,24 @@ export default function SettingsScreen() {
           </Pressable>
         )}
 
+        <View style={styles.switchRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.switchTitle}>Gün sonu hatırlatması</Text>
+            <Text style={styles.switchText}>
+              Her akşam 21:30'da "günü birlikte değerlendirelim" bildirimi gelir. Kapatırsan
+              değerlendirme ana ekrandan yine açılabilir.
+            </Text>
+          </View>
+          <Switch
+            value={reviewReminder}
+            onValueChange={async (on) => {
+              setReviewReminder(on);
+              await setReviewReminderEnabled(on);
+            }}
+            trackColor={{ true: colors.aura, false: colors.border }}
+          />
+        </View>
+
         <View style={styles.note}>
           <Text style={styles.noteTitle}>Bilmen gerekenler</Text>
           <Text style={styles.noteText}>
@@ -132,7 +153,7 @@ export default function SettingsScreen() {
             konmaz.{'\n'}• Her yapay zekâ mesajı API'den ücretlendirilir; Claude aboneliğinden
             ayrıdır. Anthropic Console'dan harcama sınırı belirleyebilirsin.{'\n'}• Koçlara görev
             adların, planın ve enerji kayıtların gönderilir. Göndermek istemediğin bir şeyi görev
-            adına yazma. Rutinlerinin adı ve bugünkü durumu da gider. Gün analizinde paylaşımı açtıysan adım, ekran süren ve uyku tahminin de gider.{'\n'}• Anahtar yoksa ya da internet kesilirse koçlar kural tabanlı
+            adına yazma. Rutinlerinin adı, bugünkü durumu ve gün sonu değerlendirmesi için günün özeti de gider. Gün analizinde paylaşımı açtıysan adım, ekran süren ve uyku tahminin de gider.{'\n'}• Anahtar yoksa ya da internet kesilirse koçlar kural tabanlı
             çalışmaya devam eder.
           </Text>
         </View>
@@ -146,6 +167,14 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginTop: spacing.md,
+  },
+  switchTitle: { color: colors.text, fontSize: 15, fontWeight: '700' },
+  switchText: { color: colors.textMuted, fontSize: 12, lineHeight: 17, marginTop: 2 },
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.xl, gap: spacing.md },
   heading: { color: colors.text, fontSize: 24, fontWeight: '800' },

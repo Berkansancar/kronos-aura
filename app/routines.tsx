@@ -17,11 +17,8 @@ import {
   retireRoutine,
 } from '../services/routineFlow';
 import { formatAskTime, todayProgress } from '../services/routineLogic';
-import {
-  askNotificationPermission,
-  hasNotificationPermission,
-  syncRoutineReminders,
-} from '../services/routineReminders';
+import { refreshReminders } from '../services/reminderSync';
+import { askNotificationPermission, hasNotificationPermission } from '../services/routineReminders';
 import { CATEGORY_LABEL, ROUTINE_TEMPLATES } from '../services/routineTemplates';
 
 const CATEGORY_ORDER: RoutineCategory[] = ['SAGLIK', 'ZIHIN', 'ODAK', 'DUZEN'];
@@ -45,7 +42,7 @@ export default function RoutinesScreen() {
     setBriefs(b);
     setRetired(await listRoutines(db, 'RETIRED'));
     setNotifOk(await hasNotificationPermission());
-    await syncRoutineReminders(b, now);
+    await refreshReminders(db, now, b);
   }, [db]);
 
   useFocusEffect(

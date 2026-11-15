@@ -39,6 +39,10 @@ import {
 import { CATEGORY_LABEL, ROUTINE_TEMPLATES } from '../services/routineTemplates';
 import { completeTask } from '../services/taskFlow';
 import { planReminders, reminderSignature } from '../services/routineRemindersLogic';
+
+/** Rutin hatırlatma testleri gün sonu bildirimini hariç tutar (o test-review.ts'de). */
+const planRoutineOnly = (b: RoutineBrief[], now: Date, days?: number, cap?: number) =>
+  planReminders(b, now, days, cap, { review: false });
 import { getAuraMessage, getKronosMessage, type CoachContext } from '../services/coachEngine';
 import { describeSituation } from '../services/ai/coachAI';
 import { makeTestDb } from './sqliteAdapter';
@@ -207,24 +211,24 @@ const rb = (id: string, hour: number, state: RoutineBrief['state'], extra: Parti
   state,
   ...extra,
 });
-const morning = planReminders([rb('a', 9, 'WAITING')], at(7), 3);
+const morning = planRoutineOnly([rb('a', 9, 'WAITING')], at(7), 3);
 check('bekleyen rutin: bugün + sonraki günler', morning.length === 3, String(morning.length));
 check('ilk bildirim bugün 09:00', morning[0].at.getTime() === at(9).getTime());
-const answeredToday = planReminders([rb('a', 9, 'DONE')], at(7), 3);
+const answeredToday = planRoutineOnly([rb('a', 9, 'DONE')], at(7), 3);
 check('bugün yapıldıysa bugünün bildirimi yok', answeredToday.length === 2 && answeredToday[0].at.getTime() === at(9, 0, 17).getTime());
-check('bugün atlandıysa bugünün bildirimi yok', planReminders([rb('a', 9, 'SKIPPED')], at(7), 3).length === 2);
-check('bugün kabul edildiyse bugünün bildirimi yok', planReminders([rb('a', 9, 'ACCEPTED')], at(7), 3).length === 2);
-check('saati geçen rutin bugün için kurulmaz', planReminders([rb('a', 9, 'DUE')], at(10), 3).length === 2);
-const snz = planReminders([rb('a', 9, 'SNOOZED', { snoozeUntil: at(15).toISOString() })], at(11), 2);
+check('bugün atlandıysa bugünün bildirimi yok', planRoutineOnly([rb('a', 9, 'SKIPPED')], at(7), 3).length === 2);
+check('bugün kabul edildiyse bugünün bildirimi yok', planRoutineOnly([rb('a', 9, 'ACCEPTED')], at(7), 3).length === 2);
+check('saati geçen rutin bugün için kurulmaz', planRoutineOnly([rb('a', 9, 'DUE')], at(10), 3).length === 2);
+const snz = planRoutineOnly([rb('a', 9, 'SNOOZED', { snoozeUntil: at(15).toISOString() })], at(11), 2);
 check('"sonra" için söz verilen saatte bildirim', snz[0].id.endsWith('-snooze') && snz[0].at.getTime() === at(15).getTime());
-check('süresi geçmiş "sonra" bildirimi kurulmaz', planReminders([rb('a', 9, 'SNOOZED', { snoozeUntil: at(10).toISOString() })], at(11), 1).length === 0);
-const many = planReminders([rb('a', 9, 'WAITING'), rb('b', 12, 'WAITING')], at(7), 5, 4);
+check('süresi geçmiş "sonra" bildirimi kurulmaz', planRoutineOnly([rb('a', 9, 'SNOOZED', { snoozeUntil: at(10).toISOString() })], at(11), 1).length === 0);
+const many = planRoutineOnly([rb('a', 9, 'WAITING'), rb('b', 12, 'WAITING')], at(7), 5, 4);
 check('üst sınır uygulanır, en yakınlar kalır', many.length === 4 && many[0].at.getTime() <= many[3].at.getTime());
-check('bildirim kimlikleri tekil', new Set(planReminders([rb('a', 9, 'WAITING'), rb('b', 9, 'WAITING')], at(7), 5).map((p) => p.id)).size === 10);
-check('aynı plan aynı parmak izi', reminderSignature(morning) === reminderSignature(planReminders([rb('a', 9, 'WAITING')], at(7), 3)));
+check('bildirim kimlikleri tekil', new Set(planRoutineOnly([rb('a', 9, 'WAITING'), rb('b', 9, 'WAITING')], at(7), 5).map((p) => p.id)).size === 10);
+check('aynı plan aynı parmak izi', reminderSignature(morning) === reminderSignature(planRoutineOnly([rb('a', 9, 'WAITING')], at(7), 3)));
 check('bildirim metni yargılamaz', !/(tembel|başarısız|disiplinsiz|yetersiz|boşa|kaybettin)/i.test(morning.map((m) => m.body).join(' ')));
 const streakBrief = rb('a', 9, 'WAITING', { stats: { ...brief.stats, streak: 4 } });
-check('seri varsa bugünkü bildirim teşvik eder', planReminders([streakBrief], at(7), 2)[0].body.includes('4 gündür'));
+check('seri varsa bugünkü bildirim teşvik eder', planRoutineOnly([streakBrief], at(7), 2)[0].body.includes('4 gündür'));
 
 // ───────────── Koç entegrasyonu ─────────────
 console.log('Koçlar');

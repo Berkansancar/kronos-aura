@@ -43,6 +43,7 @@ export default function RootLayout() {
           <Stack.Screen name="chat" />
           <Stack.Screen name="activity" />
           <Stack.Screen name="routines" />
+          <Stack.Screen name="review" />
         </Stack>
       </SQLiteProvider>
     </Suspense>

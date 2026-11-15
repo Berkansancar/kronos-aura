@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 export const DB_NAME = 'kronos-aura.db';
-export const DATABASE_VERSION = 4;
+export const DATABASE_VERSION = 5;
 
 /**
  * Not: SQLite'ın gerçek bir DATETIME tipi yoktur. Zaman alanlarını ISO-8601 (UTC) TEXT
@@ -82,6 +82,14 @@ CREATE TABLE IF NOT EXISTS DailyStat (
 `;
 
 /** Sürüm 4: günlük rutinler, rutin cevapları ve tahmini uyku kayıtları. */
+const CREATE_TABLES_V5 = `
+CREATE TABLE IF NOT EXISTS DayReview (
+  day       TEXT PRIMARY KEY NOT NULL,
+  payload   TEXT NOT NULL,
+  createdAt TEXT NOT NULL
+);
+`;
+
 const CREATE_TABLES_V4 = `
 CREATE TABLE IF NOT EXISTS Routine (
   id                TEXT PRIMARY KEY NOT NULL,
@@ -163,8 +171,13 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {
     current = 4;
   }
 
+  if (current === 4) {
+    await db.execAsync(CREATE_TABLES_V5);
+    current = 5;
+  }
+
   // Gelecekteki migrasyonlar:
-  // if (current === 4) { await db.execAsync(`ALTER TABLE ...`); current = 5; }
+  // if (current === 5) { await db.execAsync(`ALTER TABLE ...`); current = 6; }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
 }

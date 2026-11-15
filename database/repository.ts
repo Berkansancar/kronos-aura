@@ -20,6 +20,8 @@ import type {
   TimeBlockRow,
   TimeLog,
   UserProfile,
+  DayReview,
+  DayReviewPayload,
 } from './types';
 
 // ───────────────────────── Kullanıcı ─────────────────────────
@@ -542,4 +544,32 @@ export async function listSleepLogs(db: SQLiteDatabase, limit = 14): Promise<Sle
     'SELECT day, bedtime, wakeTime, durationMinutes FROM SleepLog ORDER BY day DESC LIMIT ?',
     [limit]
   );
+}
+
+// ───────────────────────── Gün sonu değerlendirmesi ─────────────────────────
+
+export async function upsertDayReview(
+  db: SQLiteDatabase,
+  day: string,
+  payload: DayReviewPayload,
+  createdAt: Date = new Date()
+): Promise<void> {
+  await db.runAsync(
+    `INSERT INTO DayReview (day, payload, createdAt) VALUES (?, ?, ?)
+     ON CONFLICT(day) DO UPDATE SET payload = excluded.payload, createdAt = excluded.createdAt`,
+    [day, JSON.stringify(payload), createdAt.toISOString()]
+  );
+}
+
+export async function getDayReview(db: SQLiteDatabase, day: string): Promise<DayReview | null> {
+  const row = await db.getFirstAsync<{ day: string; payload: string; createdAt: string }>(
+    'SELECT day, payload, createdAt FROM DayReview WHERE day = ?',
+    [day]
+  );
+  if (!row) return null;
+  try {
+    return { day: row.day, payload: JSON.parse(row.payload) as DayReviewPayload, createdAt: row.createdAt };
+  } catch {
+    return null; // bozuk kayıt varsa yeniden üretilir
+  }
 }
