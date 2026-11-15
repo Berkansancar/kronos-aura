@@ -11,6 +11,7 @@ import type {
   RoutineCategory,
   RoutineIdea,
 } from '../database/types';
+import { extractJsonObject } from './ai/claudeClient';
 import { formatDuration } from './format';
 import { ROUTINE_TEMPLATES } from './routineTemplates';
 
@@ -256,4 +257,65 @@ export function parseReviewResponse(
     ideas,
     source: 'AI',
   };
+}
+
+// ───────────────────────── Elle (ücretsiz sohbet uygulaması) yolu ─────────────────────────
+
+const MANUAL_PREAMBLE = `Sen iki rolü olan bir yaşam koçusun: AURA (sıcak, sakin, yargılamayan enerji ve denge koçu) ve KRONOS (net, stratejik zaman planlayıcı).
+Türkçe yaz, emoji kullanma, kısa cümleler kur.
+Kullanıcıyı şu sözcüklerle ASLA tanımlama: tembel, başarısız, disiplinsiz, yetersiz, boşa, kaybettin. Verilmeyen sayı ya da olay uydurma. Tıbbi tavsiye verme.
+`;
+
+/**
+ * Ücretsiz bir sohbet uygulamasına (Gemini, ChatGPT, Claude...) yapıştırılacak komut. Sohbet uygulamasında sistem
+ * metni olmadığı için kişilik ve kurallar komutun içine konur. Kullanıcı kendisi kopyaladığı için adım, ekran ve
+ * uyku bilgisi de dahildir; cevap kod bloğunda istenir (sohbet uygulamalarında tek dokunuşla kopyalanır).
+ */
+export function buildManualPrompt(f: DayFacts, existingTitles: string[]): string {
+  return [
+    MANUAL_PREAMBLE,
+    buildReviewPrompt(f, existingTitles, true),
+    '',
+    'Cevabını tek bir kod bloğu (```json) içinde ver; böylece kopyalaması kolay olur. Kod bloğunun dışına açıklama yazma.',
+  ].join('\n');
+}
+
+/**
+ * Sohbet uygulamasından yapıştırılan metinden JSON'u çıkarır. Telefonlarda sık görülen sorunlara toleranslıdır:
+ * kod bloğu çiti, açıklama metni, eğri tırnaklar ve kapanıştan önceki fazladan virgül.
+ */
+export function extractJsonLenient(text: string): Record<string, unknown> | null {
+  const direct = extractJsonObject(text);
+  if (direct) return direct;
+  const cleaned = text
+    .replace(/[\u201C\u201D\u201E\u201F\u2033]/g, '"')
+    .replace(/,\s*([}\]])/g, '$1');
+  return extractJsonObject(cleaned);
+}
+
+export type ManualParse =
+  | { ok: true; payload: DayReviewPayload }
+  | { ok: false; message: string };
+
+/** Yapıştırılan cevabı okur. Başarısızsa kullanıcıya gösterilecek açık bir Türkçe mesaj döner. */
+export function parseManualResponse(text: string, existingTitles: string[]): ManualParse {
+  const trimmed = text.trim();
+  if (!trimmed) return { ok: false, message: 'Önce yapay zekânın cevabını yapıştır.' };
+  const obj = extractJsonLenient(trimmed);
+  if (!obj) {
+    return {
+      ok: false,
+      message:
+        'Cevap okunamadı. Yapay zekânın cevabını kod bloğuyla birlikte, baştan sona kopyaladığından emin ol. Olmazsa "kod bloğu içinde JSON ver" diye tekrar iste.',
+    };
+  }
+  const payload = parseReviewResponse(obj, existingTitles);
+  if (!payload) {
+    return {
+      ok: false,
+      message:
+        'Cevapta "reflection" ve "tomorrow" alanları eksik ya da uygunsuz ifade var. Aynı komutu yeniden göndermeyi dene.',
+    };
+  }
+  return { ok: true, payload: { ...payload, source: 'MANUAL' } };
 }

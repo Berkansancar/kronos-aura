@@ -51,7 +51,7 @@ npm run test:ai           yapay zekâ katmanı (gerçek API'ye gitmez), 37 kontr
 npm run test:activity     gün analizi ve veritabanı geçişleri, 51 kontrol
 npm run test:routines     rutinler, analiz, hatırlatmalar, koç entegrasyonu, 100 kontrol
 npm run test:sleep        uyku tahmini, 33 kontrol
-npm run test:review       gün sonu değerlendirmesi ve yarın planı, 77 kontrol
+npm run test:review       gün sonu değerlendirmesi, elle yol ve yarın planı, 98 kontrol
 ```
 
 
@@ -113,3 +113,10 @@ Ayarlar'dan kapatılabilir). Ekran:
 Değerlendirme `DayReview` tablosunda saklanır (gün başına bir kez; "yeniden yaz" ile tazelenir). Gece
 04:00'e kadar hâlâ "dünün" gün sonu sayılır. Yapay zekâya adım, ekran süresi ve uyku yalnızca "Koçlarla
 yapay zekâda paylaş" açıksa gider; görev ve rutin adları koç sohbetiyle aynı kapsamda her zaman gider.
+
+**Ücretsiz yapay zekâyla, elle.** API anahtarı olmadan da yapay zekâlı değerlendirme alınabilir: Gün sonu
+ekranındaki "Özeti kopyala" günün özetini kişilik ve kurallarla birlikte hazır bir komut olarak panoya alır.
+Komut Gemini, ChatGPT ya da Claude gibi ücretsiz bir sohbet uygulamasına yapıştırılır; gelen cevap (kod bloğu
+içinde JSON) kopyalanıp "Panodan yapıştır" + "Cevabı ekle" ile uygulamaya girilir. Okuma toleranslıdır (kod
+bloğu çiti, eğri tırnak, fazladan virgül); yargılayıcı sözcük içeren ya da eksik cevap kaydedilmez, mevcut
+değerlendirme korunur. Cevaptaki yeni rutin fikirleri normal fikirler gibi tek dokunuşla eklenir.

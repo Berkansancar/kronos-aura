@@ -1,5 +1,16 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -10,10 +21,12 @@ import { isSharingWithAi } from '../services/activity';
 import { getAiConfig } from '../services/ai/settings';
 import {
   addIdeaAsRoutine,
+  buildManualReviewPrompt,
   loadOrCreateReview,
   planForTomorrow,
   reviewAvailable,
   reviewDayOf,
+  saveManualReview,
   skipForTomorrow,
   tomorrowAnswers,
   type TomorrowAnswer,
@@ -40,6 +53,9 @@ export default function ReviewScreen() {
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [answers, setAnswers] = useState<Map<string, TomorrowAnswer>>(new Map());
   const [busy, setBusy] = useState(false);
+  const [manualText, setManualText] = useState('');
+  const [manualMsg, setManualMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const loadLists = useCallback(async () => {
     const n = new Date();
@@ -125,6 +141,56 @@ export default function ReviewScreen() {
       await permissionPrompt();
     });
 
+  // Elle yol: ücretsiz bir sohbet uygulamasına yapıştırılacak özeti kopyala
+  const copyPrompt = async () => {
+    setManualMsg(null);
+    try {
+      const text = await buildManualReviewPrompt(db, new Date());
+      try {
+        await Clipboard.setStringAsync(text);
+        setCopied(true);
+      } catch {
+        // Pano açılamazsa paylaşım menüsü (içinde "Kopyala" da var) yedek olur.
+        await Share.share({ message: text });
+      }
+    } catch (e) {
+      setManualMsg({ text: e instanceof Error ? e.message : String(e), ok: false });
+    }
+  };
+
+  const pasteAnswer = async () => {
+    try {
+      const text = await Clipboard.getStringAsync();
+      if (!text.trim()) {
+        setManualMsg({ text: 'Panoda metin yok. Önce yapay zekânın cevabını kopyala.', ok: false });
+        return;
+      }
+      setManualText(text);
+      setManualMsg(null);
+    } catch {
+      setManualMsg({ text: 'Panoya erişilemedi. Kutuya basılı tutup "Yapıştır"ı seçebilirsin.', ok: false });
+    }
+  };
+
+  const applyManual = async () => {
+    setBusy(true);
+    setManualMsg(null);
+    try {
+      const saved = await saveManualReview(db, new Date(), manualText);
+      setReview(saved);
+      setAiError(null);
+      setManualText('');
+      setCopied(false);
+      setManualMsg({ text: 'Eklendi. Yorum ve fikirler yukarıda.', ok: true });
+      await loadLists();
+      await refreshReminders(db).catch(() => undefined);
+    } catch (e) {
+      setManualMsg({ text: e instanceof Error ? e.message : String(e), ok: false });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const reviewDay = reviewDayOf(now);
   const tomorrowTitle = formatDayTitle(new Date(reviewDay.getFullYear(), reviewDay.getMonth(), reviewDay.getDate() + 1));
   const existing = new Set(routines.map((r) => norm(r.title)));
@@ -175,7 +241,11 @@ export default function ReviewScreen() {
                   <Text style={styles.coachText}>{review.payload.tomorrow}</Text>
                 </View>
                 <Text style={styles.source}>
-                  {review.payload.source === 'AI' ? 'Yapay zekâ yazdı' : 'Hazır kurallarla hazırlandı'}
+                  {review.payload.source === 'AI'
+                    ? 'Yapay zekâ yazdı'
+                    : review.payload.source === 'MANUAL'
+                      ? 'Senin yapıştırdığın yapay zekâ cevabından'
+                      : 'Hazır kurallarla hazırlandı'}
                 </Text>
               </>
             )}
@@ -283,6 +353,51 @@ export default function ReviewScreen() {
               </>
             )}
 
+            <Text style={styles.section}>Ücretsiz yapay zekâyla (elle)</Text>
+            <View style={styles.card}>
+              <Text style={styles.cardText}>
+                1. "Özeti kopyala"ya bas.{'\n'}2. Gemini, ChatGPT ya da Claude uygulamasını aç, yapıştırıp
+                gönder.{'\n'}3. Gelen cevabı (kod bloğuyla birlikte) kopyala, buraya yapıştır ve "Cevabı ekle"ye
+                bas.
+              </Text>
+              <Pressable disabled={busy} onPress={copyPrompt} style={styles.addBtn}>
+                <Text style={styles.addBtnText}>{copied ? 'Kopyalandı ✓ (tekrar kopyala)' : 'Özeti kopyala'}</Text>
+              </Pressable>
+              <TextInput
+                value={manualText}
+                onChangeText={setManualText}
+                placeholder="Yapay zekânın cevabını buraya yapıştır"
+                placeholderTextColor={colors.textMuted}
+                style={styles.pasteBox}
+                multiline
+                textAlignVertical="top"
+                autoCorrect={false}
+                autoCapitalize="none"
+              />
+              <View style={styles.row}>
+                <Pressable disabled={busy} onPress={pasteAnswer} style={styles.choice}>
+                  <Text style={styles.choiceText}>Panodan yapıştır</Text>
+                </Pressable>
+                <Pressable
+                  disabled={busy || manualText.trim().length === 0}
+                  onPress={applyManual}
+                  style={[styles.choice, styles.choiceOn, (busy || manualText.trim().length === 0) && { opacity: 0.5 }]}
+                >
+                  <Text style={[styles.choiceText, styles.choiceTextOn]}>Cevabı ekle</Text>
+                </Pressable>
+              </View>
+              {manualMsg && (
+                <Text style={[styles.manualMsg, { color: manualMsg.ok ? colors.aura : colors.warning }]}>
+                  {manualMsg.text}
+                </Text>
+              )}
+              <Text style={styles.hint}>
+                Kopyalanan metinde görev ve rutin adların ile adım, ekran süresi ve uyku bilgin var. Ücretsiz
+                sohbet uygulamaları konuşmaları kendi ürünlerini geliştirmek için kullanabilir; istemediğin bir
+                şey varsa yapıştırmadan önce metinden sil.
+              </Text>
+            </View>
+
             <Pressable
               disabled={loading || busy}
               onPress={() => generate(true)}
@@ -384,6 +499,16 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   secondaryText: { color: colors.kronos, fontSize: 14, fontWeight: '700' },
+  pasteBox: {
+    backgroundColor: colors.surfaceAlt,
+    color: colors.text,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    fontSize: 13,
+    minHeight: 90,
+    maxHeight: 180,
+  },
+  manualMsg: { fontSize: 13, lineHeight: 19 },
   done: { alignItems: 'center', paddingVertical: spacing.md },
   doneText: { color: colors.textMuted, fontSize: 14, fontWeight: '600' },
 });

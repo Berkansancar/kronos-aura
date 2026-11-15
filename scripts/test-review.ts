@@ -14,6 +14,8 @@ import { dayKey } from '../services/activityLogic';
 import {
   addIdeaAsRoutine,
   answersForDay,
+  buildManualReviewPrompt,
+  saveManualReview,
   gatherDayFacts,
   loadOrCreateReview,
   materializePlannedRoutines,
@@ -25,8 +27,11 @@ import {
   tomorrowAnswers,
 } from '../services/dayReview';
 import {
+  buildManualPrompt,
   buildReviewPrompt,
   buildRulesReview,
+  extractJsonLenient,
+  parseManualResponse,
   factChips,
   hasBannedWords,
   isQuietDay,
@@ -151,6 +156,34 @@ const dirtyIdea = parseReviewResponse({ ...good, ideas: [{ title: 'Disiplinsiz o
 check('yargılayıcı fikir atılır', dirtyIdea.ideas.length === 0);
 check('fikir listesi yoksa yine geçerli', parseReviewResponse({ reflection: 'a', tomorrow: 'b' }, [])?.ideas.length === 0);
 
+// ───────────── Elle (ücretsiz sohbet uygulaması) ─────────────
+console.log('Elle yol: komut ve cevap okuma');
+const manualPrompt = buildManualPrompt(withPhone, ['Su iç']);
+check('komut kişilik ve yasak sözcükleri içerir', manualPrompt.includes('AURA') && manualPrompt.includes('KRONOS') && manualPrompt.includes('tembel'));
+check('komuta günün verileri girer', manualPrompt.includes('Rapor') && manualPrompt.includes('Adım: 8000') && manualPrompt.includes('uyku'));
+check('mevcut rutinler tekrar önerilmez denir', manualPrompt.includes('Su iç') && manualPrompt.includes('tekrar önerme'));
+check('cevap kod bloğunda istenir', manualPrompt.includes('```json'));
+
+const jsonText = JSON.stringify(good);
+check('düz JSON okunur', extractJsonLenient(jsonText) !== null);
+check('kod bloğu ve açıklama içinden okunur', extractJsonLenient('İşte cevabın:\n```json\n' + jsonText + '\n```\nUmarım yardımcı olur.') !== null);
+const curly = jsonText.replace(/"/g, '\u201C').replace(/\u201C(reflection|tomorrow|ideas|title|category|minutes|hour|minute|why)\u201C/g, '"$1"');
+check('eğri tırnaklar düzeltilir', extractJsonLenient(`{\u201Creflection\u201D: \u201CSakin bir gün.\u201D, \u201Ctomorrow\u201D: \u201CYarın tepe saatini kullan.\u201D}`)?.reflection === 'Sakin bir gün.');
+check('sondaki fazladan virgül düzeltilir', extractJsonLenient('{"reflection":"a","tomorrow":"b",}')?.tomorrow === 'b');
+check('JSON olmayan metin null', extractJsonLenient('Merhaba, bugün güzel bir gündü.') === null);
+void curly;
+
+const okManual = parseManualResponse('```json\n' + jsonText + '\n```', ['Su iç']);
+check('geçerli cevap kabul edilir, kaynak MANUAL', okManual.ok && okManual.payload.source === 'MANUAL' && okManual.payload.ideas.length === 3);
+const empty = parseManualResponse('   ', []);
+check('boş yapıştırma açıklayıcı mesaj verir', !empty.ok && empty.message.includes('yapıştır'));
+const garbage = parseManualResponse('Bu bir cevap değil', []);
+check('okunamayan cevap açıklayıcı mesaj verir', !garbage.ok && garbage.message.includes('kod bloğu'));
+const missing = parseManualResponse('{"reflection":"x"}', []);
+check('eksik alan açıklayıcı mesaj verir', !missing.ok && missing.message.includes('tomorrow'));
+const judgy = parseManualResponse('{"reflection":"Tembel bir gündü","tomorrow":"b"}', []);
+check('yargılayıcı cevap reddedilir', !judgy.ok);
+
 // ───────────── Veritabanı ─────────────
 async function dbTests(): Promise<void> {
   console.log('Veritabanı');
@@ -256,6 +289,27 @@ async function dbTests(): Promise<void> {
   const planned = (await import('../database/repository')).listDayBlocks;
   const { start, end } = dayBounds(planningDay(at(8, 0, 17)));
   check('yerleşen görev planda blok alır', (await planned(db, start, end)).some((b) => b.taskId === tasks[0].id));
+
+  // Elle yol: veritabanı
+  console.log('Elle yol: kaydetme');
+  const manualPromptDb = await buildManualReviewPrompt(db, at(21, 30));
+  check('komuta rutin adları ve günün verisi girer', manualPromptDb.includes('Bir bardak su iç') && manualPromptDb.includes('Rapor yaz') && manualPromptDb.includes('3200'));
+  const storedBefore = await getDayReview(db, "2026-11-16");
+  let rejected = '';
+  try {
+    await saveManualReview(db, at(22, 0), 'anlamsız metin');
+  } catch (e) {
+    rejected = e instanceof Error ? e.message : String(e);
+  }
+  check('okunamayan cevap hata verir', rejected.includes('okunamadı'));
+  check('hata mevcut değerlendirmeye dokunmaz', (await getDayReview(db, '2026-11-16'))?.createdAt === storedBefore?.createdAt);
+  const saved = await saveManualReview(db, at(22, 5), '```json\n' + JSON.stringify({ ...good, ideas: [{ title: 'Akşam yürüyüşü', category: 'SAGLIK', minutes: 20, hour: 18, minute: 30, why: 'Gün sonu hareketi.' }, { title: 'Bir bardak su iç', category: 'SAGLIK', minutes: 5, hour: 9, minute: 0, why: 'Zaten var.' }] }) + '\n```');
+  check('yapıştırılan cevap kaydedilir', saved.payload.source === 'MANUAL' && (await getDayReview(db, '2026-11-16'))?.payload.source === 'MANUAL');
+  check('mevcut rutin fikirden atılır', saved.payload.ideas.length === 1 && saved.payload.ideas[0].title === 'Akşam yürüyüşü');
+  const manualRoutine = await addIdeaAsRoutine(db, saved.payload.ideas[0]);
+  check('elle gelen fikir rutin olur', manualRoutine.title === 'Akşam yürüyüşü' && manualRoutine.askHour === 18 && manualRoutine.askMinute === 30);
+  const reuse = await loadOrCreateReview(db, at(22, 10), { cfg: null, shareActivity: false });
+  check('kaydedilen elle değerlendirme yeniden açılınca korunur', reuse.review.payload.source === 'MANUAL');
 
   // Bildirim ayarları
   console.log('Bildirim bilgisi');

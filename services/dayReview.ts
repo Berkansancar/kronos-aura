@@ -22,7 +22,9 @@ import {
 import type { DayReview, Routine, RoutineIdea, TaskStatus } from '../database/types';
 import { dayKey } from './activityLogic';
 import {
+  buildManualPrompt,
   buildRulesReview,
+  parseManualResponse,
   type DayFacts,
 } from './dayReviewLogic';
 import { generateAiReview } from './ai/reviewAI';
@@ -164,6 +166,36 @@ export async function loadOrCreateReview(
 
   await upsertDayReview(db, facts.day, payload, now);
   return { facts, review: { day: facts.day, payload, createdAt: now.toISOString() }, aiError };
+}
+
+// ───────────────────────── Elle (ücretsiz sohbet uygulaması) ─────────────────────────
+
+async function allRoutineTitles(db: SQLiteDatabase): Promise<string[]> {
+  const active = await listRoutines(db, 'ACTIVE');
+  const retired = await listRoutines(db, 'RETIRED');
+  return [...active, ...retired].map((r) => r.title);
+}
+
+/** Kopyalanıp ücretsiz sohbet uygulamasına yapıştırılacak günün özeti ve komut. */
+export async function buildManualReviewPrompt(db: SQLiteDatabase, now: Date): Promise<string> {
+  const facts = await gatherDayFacts(db, now);
+  return buildManualPrompt(facts, await allRoutineTitles(db));
+}
+
+/**
+ * Sohbet uygulamasından yapıştırılan cevabı okur ve günün değerlendirmesi olarak kaydeder.
+ * Cevap okunamazsa fırlatır ve mevcut değerlendirmeye dokunmaz.
+ */
+export async function saveManualReview(
+  db: SQLiteDatabase,
+  now: Date,
+  pastedText: string
+): Promise<DayReview> {
+  const facts = await gatherDayFacts(db, now);
+  const parsed = parseManualResponse(pastedText, await allRoutineTitles(db));
+  if (!parsed.ok) throw new Error(parsed.message);
+  await upsertDayReview(db, facts.day, parsed.payload, now);
+  return { day: facts.day, payload: parsed.payload, createdAt: now.toISOString() };
 }
 
 // ───────────────────────── Yarın cevapları ─────────────────────────

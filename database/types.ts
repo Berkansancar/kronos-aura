@@ -208,7 +208,8 @@ export interface RoutineIdea {
   templateId?: string | null;
 }
 
-export type ReviewSource = 'AI' | 'RULES';
+/** AI: API anahtarıyla, MANUAL: ücretsiz sohbet uygulamasından elle yapıştırılan cevap, RULES: hazır kurallar */
+export type ReviewSource = 'AI' | 'MANUAL' | 'RULES';
 
 export interface DayReviewPayload {
   /** Aura: günü yargılamadan yorumlar */
