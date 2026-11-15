@@ -3,6 +3,7 @@
  * Eylem düğmeleri (Günü planla, Ertele...) her zaman kural motorundan gelir; yapay zekâ yalnızca
  * mesajın metnini zenginleştirir ve sohbette konuşur. Böylece model hata yapsa bile plan bozulmaz.
  */
+import { nutritionPromptLines } from '../nutritionLogic';
 import type { CoachId } from '../../database/types';
 import type { CoachContext, CoachMessage } from '../coachEngine';
 import { formatClock, formatDuration } from '../format';
@@ -41,6 +42,12 @@ export function describeSituation(ctx: CoachContext): string {
     `Şu an saat ${formatClock(ctx.now)}.`,
     `Kronotip: ${CHRONO_TR[ctx.user.chronotype]}; tepe enerji penceresi ${pad(ctx.user.peakStartHour)}:00–${pad(ctx.user.peakEndHour)}:00. Şu anki enerji penceresi: ${ZONE_TR[zone]}.`,
   ];
+
+  if (ctx.hardDay) {
+    lines.push(
+      'ZOR GÜN MODU AÇIK: Kullanıcı bugün zor bir gün geçiriyor. Plan bilerek hafifletildi. Hiçbir şey beklenmiyor; baskı, hedef ya da "daha fazlası" önerme. Sakin, kısa ve destekleyici ol.'
+    );
+  }
 
   if (ctx.tasks.length === 0) {
     lines.push('Görev listesi boş.');
@@ -112,6 +119,12 @@ export function describeSituation(ctx: CoachContext): string {
         (sleep.avgMinutes !== null ? `; son gecelerin ortalaması ${formatDuration(sleep.avgMinutes)}` : '') +
         '.'
     );
+  }
+  // Su ve yemek de aynı izne bağlıdır; yalnızca toplu özet gider, yemek adları asla.
+  const nutrition = ctx.nutrition;
+  if (ctx.shareActivityWithAi && nutrition && !nutrition.quiet) {
+    lines.push('Bugünkü su ve yemek kayıtları (kullanıcı paylaşmayı kabul etti; yargılama, kalori hesabı yapma, yalnızca veri):');
+    lines.push(...nutritionPromptLines(nutrition));
   }
   return lines.join('\n');
 }

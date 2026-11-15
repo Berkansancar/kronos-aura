@@ -8,12 +8,27 @@
     "userInterfaceStyle": "dark",
     "backgroundColor": "#0B0D12",
     "android": {
-      "package": "com.kronosaura.app"
+      "package": "com.kronosaura.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0B0D12"
+      }
     },
     "ios": {
       "bundleIdentifier": "com.kronosaura.app",
       "supportsTablet": false
     },
-    "plugins": ["expo-router", "expo-sqlite", "expo-notifications"]
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#5FD6B4"
+        }
+      ]
+    ],
+    "icon": "./assets/icon.png"
   }
 }

@@ -190,7 +190,7 @@ async function dbTests(): Promise<void> {
   const { db, raw } = makeTestDb();
   await migrateDbIfNeeded(db);
   const ver = (raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;
-  check('temiz kurulum sürüm 5', ver === 5 && DATABASE_VERSION === 5);
+  check('temiz kurulum son sürüm', ver === DATABASE_VERSION && DATABASE_VERSION === 7);
 
   // v4 -> v5 yükseltme
   raw.exec('DROP TABLE DayReview');
@@ -250,6 +250,47 @@ async function dbTests(): Promise<void> {
   (globalThis as { fetch: unknown }).fetch = async () => ({ status: 500, text: async () => 'hata' });
   const failed = await loadOrCreateReview(db, at(21, 55), { cfg, shareActivity: false, force: true });
   check('yapay zekâ hata verirse kurallara düşer', failed.review.payload.source === 'RULES' && failed.aiError !== null);
+
+  // Ücretsiz sağlayıcı (Gemini / Groq): sıra ücretsiz -> Claude -> kurallar
+  const free = { provider: 'GEMINI' as const, apiKey: 'AIza-test' };
+  const urls: string[] = [];
+  let freeStatus = 200;
+  let claudeStatus = 200;
+  (globalThis as { fetch: unknown }).fetch = async (u: string, init: { body: string }) => {
+    urls.push(u);
+    lastBody = init.body;
+    if (u.includes('generativelanguage')) {
+      return freeStatus === 200
+        ? { status: 200, text: async () => JSON.stringify({ candidates: [{ content: { parts: [{ text: aiText }] } }] }) }
+        : { status: freeStatus, text: async () => 'hata' };
+    }
+    return claudeStatus === 200
+      ? { status: 200, text: async () => JSON.stringify({ content: [{ type: 'text', text: aiText }] }) }
+      : { status: claudeStatus, text: async () => 'hata' };
+  };
+  const viaFree = await loadOrCreateReview(db, at(22, 0), { cfg: null, free, shareActivity: false, force: true });
+  check('ücretsiz anahtarla değerlendirme gelir', viaFree.review.payload.source === 'FREE' && viaFree.aiError === null && urls.length === 1);
+  check('ücretsiz kaynak saklanır', (await getDayReview(db, '2026-11-16'))?.payload.source === 'FREE');
+  check('ücretsiz yolda adım gönderilmez (paylaşım kapalı)', !lastBody.includes('3200'));
+  urls.length = 0;
+  const both = await loadOrCreateReview(db, at(22, 1), { cfg, free, shareActivity: false, force: true });
+  check('ikisi de varsa önce ücretsiz denenir, Claude\'a gidilmez', both.review.payload.source === 'FREE' && urls.every((u) => u.includes('generativelanguage')));
+  freeStatus = 500;
+  urls.length = 0;
+  const fallbackClaude = await loadOrCreateReview(db, at(22, 2), { cfg, free, shareActivity: false, force: true });
+  check('ücretsiz hata verirse Claude denenir', fallbackClaude.review.payload.source === 'AI' && fallbackClaude.aiError === null && urls.some((u) => u.includes('anthropic')));
+  const freeOnlyFail = await loadOrCreateReview(db, at(22, 3), { cfg: null, free, shareActivity: false, force: true });
+  check('yalnız ücretsiz var ve hata verirse kurallara düşer, sağlayıcı adı hatada görünür',
+    freeOnlyFail.review.payload.source === 'RULES' && !!freeOnlyFail.aiError && freeOnlyFail.aiError.includes('Gemini'), String(freeOnlyFail.aiError));
+  claudeStatus = 500;
+  const bothFail = await loadOrCreateReview(db, at(22, 4), { cfg, free, shareActivity: false, force: true });
+  check('ikisi de hata verirse kurallara düşer ve iki hata da söylenir',
+    bothFail.review.payload.source === 'RULES' && !!bothFail.aiError && bothFail.aiError.includes('Gemini') && bothFail.aiError.includes('·'), String(bothFail.aiError));
+  freeStatus = 200;
+  claudeStatus = 200;
+  urls.length = 0;
+  const storedFree = await loadOrCreateReview(db, at(22, 5), { cfg, free, shareActivity: false });
+  check('kayıtlı değerlendirme varken ücretsiz servis de çağrılmaz', urls.length === 0 && storedFree.review.payload.source === 'RULES');
 
   // Fikri rutine çevir
   const idea = parsed.ideas[0];

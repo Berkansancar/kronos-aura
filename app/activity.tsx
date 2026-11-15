@@ -265,8 +265,9 @@ export default function ActivityScreen() {
             <View style={{ flex: 1 }}>
               <Text style={styles.cardTitle}>Koçlarla yapay zekâda paylaş</Text>
               <Text style={styles.cardText}>
-                Açıksa, yapay zekâ anahtarı varken koçlara bugünkü adım, ekran süresi ve en çok
-                kullanılan 5 uygulamanın adı gönderilir. Kapalıyken veriler telefonda kalır ve yalnızca
+                Açıksa, yapay zekâ anahtarı varken koçlara bugünkü adım, ekran süresi, en çok
+                kullanılan 5 uygulamanın adı ve su/yemek özeti (miktar, kayıt sayısı, yaklaşık kalori;
+                yemek adları değil) gönderilir. Kapalıyken veriler telefonda kalır ve yalnızca
                 hazır kural mesajlarında kullanılır.
               </Text>
             </View>

@@ -18,7 +18,9 @@ import { colors, radius, spacing } from '../constants/theme';
 import { listRoutines } from '../database/repository';
 import type { DayReview, Routine, RoutineIdea } from '../database/types';
 import { isSharingWithAi } from '../services/activity';
+import { getFreeConfig } from '../services/ai/freeSettings';
 import { getAiConfig } from '../services/ai/settings';
+import { getNutritionOptions } from '../services/nutritionSettings';
 import {
   addIdeaAsRoutine,
   buildManualReviewPrompt,
@@ -71,9 +73,11 @@ export default function ReviewScreen() {
       setAiError(null);
       try {
         const cfg = await getAiConfig();
-        setHasKey(cfg !== null);
+        const free = await getFreeConfig();
+        setHasKey(cfg !== null || free !== null);
         const share = await isSharingWithAi();
-        const result = await loadOrCreateReview(db, n, { cfg, shareActivity: share, force });
+        const nutritionOpts = await getNutritionOptions();
+        const result = await loadOrCreateReview(db, n, { cfg, free, shareActivity: share, force, nutritionOpts });
         setFacts(result.facts);
         setReview(result.review);
         setAiError(result.aiError);
@@ -145,7 +149,7 @@ export default function ReviewScreen() {
   const copyPrompt = async () => {
     setManualMsg(null);
     try {
-      const text = await buildManualReviewPrompt(db, new Date());
+      const text = await buildManualReviewPrompt(db, new Date(), await getNutritionOptions());
       try {
         await Clipboard.setStringAsync(text);
         setCopied(true);
@@ -243,9 +247,11 @@ export default function ReviewScreen() {
                 <Text style={styles.source}>
                   {review.payload.source === 'AI'
                     ? 'Yapay zekâ yazdı'
-                    : review.payload.source === 'MANUAL'
-                      ? 'Senin yapıştırdığın yapay zekâ cevabından'
-                      : 'Hazır kurallarla hazırlandı'}
+                    : review.payload.source === 'FREE'
+                      ? 'Ücretsiz yapay zekâ yazdı'
+                      : review.payload.source === 'MANUAL'
+                        ? 'Senin yapıştırdığın yapay zekâ cevabından'
+                        : 'Hazır kurallarla hazırlandı'}
                 </Text>
               </>
             )}
@@ -259,7 +265,8 @@ export default function ReviewScreen() {
             {!hasKey && (
               <Pressable onPress={() => router.push('/settings')}>
                 <Text style={styles.hint}>
-                  Daha kişisel bir yorum ve "başka neler yapabilirsin" fikirleri için API anahtarını ekle ›
+                  Kopyala-yapıştır yeterli. İstersen Ayarlar'dan ücretsiz bir anahtar ekle; yorum ve fikirler
+                  kendiliğinden gelsin ›
                 </Text>
               </Pressable>
             )}

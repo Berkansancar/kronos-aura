@@ -22,6 +22,9 @@ import type {
   UserProfile,
   DayReview,
   DayReviewPayload,
+  MealKind,
+  MealLog,
+  WaterLog,
 } from './types';
 
 // ───────────────────────── Kullanıcı ─────────────────────────
@@ -572,4 +575,166 @@ export async function getDayReview(db: SQLiteDatabase, day: string): Promise<Day
   } catch {
     return null; // bozuk kayıt varsa yeniden üretilir
   }
+}
+
+// ───────────────────────── Zor gün modu ─────────────────────────
+
+export async function getHardDay(db: SQLiteDatabase, day: string): Promise<{ postponedIds: string[] } | null> {
+  const row = await db.getFirstAsync<{ postponedIds: string }>(
+    "SELECT postponedIds FROM DayMode WHERE day = ? AND mode = 'HARD'",
+    [day]
+  );
+  if (!row) return null;
+  try {
+    const ids: unknown = JSON.parse(row.postponedIds);
+    return { postponedIds: Array.isArray(ids) ? ids.filter((x): x is string => typeof x === 'string') : [] };
+  } catch {
+    return { postponedIds: [] };
+  }
+}
+
+export async function isHardDay(db: SQLiteDatabase, day: string): Promise<boolean> {
+  return (await getHardDay(db, day)) !== null;
+}
+
+/** Açarken ertelenen görev id'leri öncekilerle birleştirilir; kapatınca kayıt silinir. */
+export async function setHardDay(
+  db: SQLiteDatabase,
+  day: string,
+  on: boolean,
+  now: Date = new Date(),
+  postponedIds: string[] = []
+): Promise<void> {
+  if (!on) {
+    await db.runAsync('DELETE FROM DayMode WHERE day = ?', [day]);
+    return;
+  }
+  const existing = (await getHardDay(db, day))?.postponedIds ?? [];
+  const merged = Array.from(new Set([...existing, ...postponedIds]));
+  await db.runAsync(
+    `INSERT INTO DayMode (day, mode, postponedIds, createdAt) VALUES (?, 'HARD', ?, ?)
+     ON CONFLICT(day) DO UPDATE SET mode = 'HARD', postponedIds = excluded.postponedIds`,
+    [day, JSON.stringify(merged), now.toISOString()]
+  );
+}
+
+// ───────────────────────── Haftalık özet için sorgular ─────────────────────────
+
+export type TimeLogWithRoutine = TimeLog & { routineId: string | null };
+
+/** `sinceISO` sonrasındaki zaman kayıtları; görev bir rutinden geldiyse routineId dolu. */
+export async function listTimeLogsSince(db: SQLiteDatabase, sinceISO: string): Promise<TimeLogWithRoutine[]> {
+  return db.getAllAsync<TimeLogWithRoutine>(
+    `SELECT l.*, t.routineId AS routineId
+     FROM TimeLog l LEFT JOIN Task t ON t.id = l.taskId
+     WHERE l.loggedAt >= ?
+     ORDER BY l.loggedAt ASC`,
+    [sinceISO]
+  );
+}
+
+/** `sinceDay` (yyyy-mm-dd) ve sonrasındaki zor gün kayıtları. */
+export async function listHardDaysSince(db: SQLiteDatabase, sinceDay: string): Promise<string[]> {
+  const rows = await db.getAllAsync<{ day: string }>(
+    "SELECT day FROM DayMode WHERE mode = 'HARD' AND day >= ? ORDER BY day ASC",
+    [sinceDay]
+  );
+  return rows.map((r) => r.day);
+}
+
+
+// ───────────────────────── Su ve yemek ─────────────────────────
+
+export async function addWaterLog(db: SQLiteDatabase, day: string, amountMl: number, at: Date): Promise<WaterLog> {
+  const row: WaterLog = {
+    id: newId('wtr'),
+    day,
+    amountMl: Math.max(1, Math.min(5000, Math.round(amountMl))),
+    loggedAt: at.toISOString(),
+  };
+  await db.runAsync('INSERT INTO WaterLog (id, day, amountMl, loggedAt) VALUES (?, ?, ?, ?)', [
+    row.id,
+    row.day,
+    row.amountMl,
+    row.loggedAt,
+  ]);
+  return row;
+}
+
+export async function listWaterLogs(db: SQLiteDatabase, day: string): Promise<WaterLog[]> {
+  return db.getAllAsync<WaterLog>(
+    'SELECT id, day, amountMl, loggedAt FROM WaterLog WHERE day = ? ORDER BY loggedAt ASC, rowid ASC',
+    [day]
+  );
+}
+
+export async function listWaterLogsSince(db: SQLiteDatabase, sinceDay: string): Promise<WaterLog[]> {
+  return db.getAllAsync<WaterLog>(
+    'SELECT id, day, amountMl, loggedAt FROM WaterLog WHERE day >= ? ORDER BY loggedAt ASC, rowid ASC',
+    [sinceDay]
+  );
+}
+
+export async function deleteWaterLog(db: SQLiteDatabase, id: string): Promise<void> {
+  await db.runAsync('DELETE FROM WaterLog WHERE id = ?', [id]);
+}
+
+export interface NewMeal {
+  day: string;
+  kind: MealKind;
+  note: string;
+  groups: string[];
+  kcal: number | null;
+  eatenAt: Date;
+}
+
+export async function addMealLog(db: SQLiteDatabase, m: NewMeal): Promise<MealLog> {
+  const kcal = m.kcal === null || !Number.isFinite(m.kcal) ? null : Math.max(0, Math.min(6000, Math.round(m.kcal)));
+  const row: MealLog = {
+    id: newId('mel'),
+    day: m.day,
+    kind: m.kind,
+    note: m.note.trim().slice(0, 200),
+    groups: Array.from(new Set(m.groups)),
+    kcal,
+    eatenAt: m.eatenAt.toISOString(),
+  };
+  await db.runAsync(
+    'INSERT INTO MealLog (id, day, kind, note, groups, kcal, eatenAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [row.id, row.day, row.kind, row.note, JSON.stringify(row.groups), row.kcal, row.eatenAt]
+  );
+  return row;
+}
+
+type MealRow = Omit<MealLog, 'groups'> & { groups: string };
+
+function parseMeal(r: MealRow): MealLog {
+  let groups: string[] = [];
+  try {
+    const g: unknown = JSON.parse(r.groups);
+    if (Array.isArray(g)) groups = g.filter((x): x is string => typeof x === 'string');
+  } catch {
+    groups = [];
+  }
+  return { ...r, groups };
+}
+
+export async function listMealLogs(db: SQLiteDatabase, day: string): Promise<MealLog[]> {
+  const rows = await db.getAllAsync<MealRow>(
+    'SELECT id, day, kind, note, groups, kcal, eatenAt FROM MealLog WHERE day = ? ORDER BY eatenAt ASC, rowid ASC',
+    [day]
+  );
+  return rows.map(parseMeal);
+}
+
+export async function listMealLogsSince(db: SQLiteDatabase, sinceDay: string): Promise<MealLog[]> {
+  const rows = await db.getAllAsync<MealRow>(
+    'SELECT id, day, kind, note, groups, kcal, eatenAt FROM MealLog WHERE day >= ? ORDER BY eatenAt ASC, rowid ASC',
+    [sinceDay]
+  );
+  return rows.map(parseMeal);
+}
+
+export async function deleteMealLog(db: SQLiteDatabase, id: string): Promise<void> {
+  await db.runAsync('DELETE FROM MealLog WHERE id = ?', [id]);
 }

@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 export const DB_NAME = 'kronos-aura.db';
-export const DATABASE_VERSION = 5;
+export const DATABASE_VERSION = 7;
 
 /**
  * Not: SQLite'ın gerçek bir DATETIME tipi yoktur. Zaman alanlarını ISO-8601 (UTC) TEXT
@@ -82,6 +82,39 @@ CREATE TABLE IF NOT EXISTS DailyStat (
 `;
 
 /** Sürüm 4: günlük rutinler, rutin cevapları ve tahmini uyku kayıtları. */
+/** Zor gün modu: o gün için kullanıcı Aura'dan planı hafifletmesini istedi. Gün başına tek kayıt. */
+const CREATE_TABLES_V6 = `
+CREATE TABLE IF NOT EXISTS DayMode (
+  day       TEXT PRIMARY KEY NOT NULL,
+  mode      TEXT NOT NULL CHECK (mode IN ('HARD')),
+  /** Zor gün modu açılırken ertelenen görevlerin id listesi (JSON); kapanınca geri alınır */
+  postponedIds TEXT NOT NULL DEFAULT '[]',
+  createdAt TEXT NOT NULL
+);
+`;
+
+/** Sürüm 7: su ve yemek kayıtları. `day` yerel gün anahtarıdır (gece 04:00'e kadar önceki güne yazılır). */
+const CREATE_TABLES_V7 = `
+CREATE TABLE IF NOT EXISTS WaterLog (
+  id       TEXT PRIMARY KEY NOT NULL,
+  day      TEXT NOT NULL,
+  amountMl INTEGER NOT NULL CHECK (amountMl > 0 AND amountMl <= 5000),
+  loggedAt TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_waterlog_day ON WaterLog(day);
+
+CREATE TABLE IF NOT EXISTS MealLog (
+  id       TEXT PRIMARY KEY NOT NULL,
+  day      TEXT NOT NULL,
+  kind     TEXT NOT NULL CHECK (kind IN ('KAHVALTI', 'OGLE', 'AKSAM', 'ARA', 'ICECEK')),
+  note     TEXT NOT NULL DEFAULT '',
+  groups   TEXT NOT NULL DEFAULT '[]',
+  kcal     INTEGER CHECK (kcal IS NULL OR (kcal >= 0 AND kcal <= 6000)),
+  eatenAt  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_meallog_day ON MealLog(day);
+`;
+
 const CREATE_TABLES_V5 = `
 CREATE TABLE IF NOT EXISTS DayReview (
   day       TEXT PRIMARY KEY NOT NULL,
@@ -176,8 +209,18 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {
     current = 5;
   }
 
+  if (current === 5) {
+    await db.execAsync(CREATE_TABLES_V6);
+    current = 6;
+  }
+
+  if (current === 6) {
+    await db.execAsync(CREATE_TABLES_V7);
+    current = 7;
+  }
+
   // Gelecekteki migrasyonlar:
-  // if (current === 5) { await db.execAsync(`ALTER TABLE ...`); current = 6; }
+  // if (current === 7) { await db.execAsync(`ALTER TABLE ...`); current = 8; }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
 }

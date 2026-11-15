@@ -33,6 +33,34 @@ export async function setReviewReminderEnabled(on: boolean): Promise<void> {
   else await SecureStore.setItemAsync(K_REVIEW_REMINDER, '0');
 }
 
+const K_MORNING = 'morning_reminder';
+const K_MORNING_HOUR = 'morning_hour';
+export const MORNING_HOURS = [7, 8, 9, 10] as const;
+export const DEFAULT_MORNING_HOUR = 8;
+
+export interface MorningSettings {
+  enabled: boolean;
+  hour: number;
+}
+
+/** Sabah brifingi bildirimi. Varsayılan: açık, 08:00. */
+export async function getMorningSettings(): Promise<MorningSettings> {
+  try {
+    const off = (await SecureStore.getItemAsync(K_MORNING)) === '0';
+    const h = Number(await SecureStore.getItemAsync(K_MORNING_HOUR));
+    const hour = (MORNING_HOURS as readonly number[]).includes(h) ? h : DEFAULT_MORNING_HOUR;
+    return { enabled: !off, hour };
+  } catch {
+    return { enabled: true, hour: DEFAULT_MORNING_HOUR };
+  }
+}
+
+export async function setMorningSettings(s: MorningSettings): Promise<void> {
+  if (s.enabled) await SecureStore.deleteItemAsync(K_MORNING);
+  else await SecureStore.setItemAsync(K_MORNING, '0');
+  await SecureStore.setItemAsync(K_MORNING_HOUR, String(s.hour));
+}
+
 export type ReminderStatus = 'ok' | 'no-permission' | 'unavailable';
 
 let handlerSet = false;
@@ -97,9 +125,11 @@ export async function syncRoutineReminders(
     if (!(await hasNotificationPermission())) return 'no-permission';
     await ensureChannel();
 
+    const morning = await getMorningSettings();
     const plan = planReminders(briefs, now, REMINDER_DAYS, REMINDER_CAP, {
       ...extras,
       review: await getReviewReminderEnabled(),
+      morning: morning.enabled ? { hour: morning.hour, minute: 0 } : null,
     });
     const signature = reminderSignature(plan);
     if (signature === lastSignature) return 'ok';
@@ -113,7 +143,7 @@ export async function syncRoutineReminders(
     for (const p of plan) {
       await Notifications.scheduleNotificationAsync({
         identifier: p.id,
-        content: { title: p.title, body: p.body },
+        content: { title: p.title, body: p.body, data: p.route ? { route: p.route } : {} },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
           date: p.at,

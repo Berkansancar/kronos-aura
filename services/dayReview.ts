@@ -11,6 +11,7 @@ import {
   getDailyStat,
   getDayReview,
   getOrCreateUser,
+  isHardDay,
   getTask,
   listRecentLogs,
   listRoutineLogsSince,
@@ -19,7 +20,7 @@ import {
   listVisibleTasks,
   upsertDayReview,
 } from '../database/repository';
-import type { DayReview, Routine, RoutineIdea, TaskStatus } from '../database/types';
+import type { DayReview, DayReviewPayload, Routine, RoutineIdea, TaskStatus } from '../database/types';
 import { dayKey } from './activityLogic';
 import {
   buildManualPrompt,
@@ -27,8 +28,10 @@ import {
   parseManualResponse,
   type DayFacts,
 } from './dayReviewLogic';
-import { generateAiReview } from './ai/reviewAI';
+import { FREE_PROVIDERS, type FreeConfig } from './ai/freeClient';
+import { generateAiReview, generateFreeReview } from './ai/reviewAI';
 import type { AiConfig } from './ai/settings';
+import { loadDayNutrition, type NutritionOptions } from './nutrition';
 import { DAY_END_HOUR } from './planner';
 import { acceptRoutine, addCustomRoutine, addRoutineFromTemplate } from './routineFlow';
 import { routineDayState } from './routineLogic';
@@ -52,7 +55,11 @@ function nextDay(d: Date): Date {
 
 // ───────────────────────── Gerçekleri topla ─────────────────────────
 
-export async function gatherDayFacts(db: SQLiteDatabase, now: Date): Promise<DayFacts> {
+export async function gatherDayFacts(
+  db: SQLiteDatabase,
+  now: Date,
+  nutritionOpts?: NutritionOptions
+): Promise<DayFacts> {
   const day = reviewDayOf(now);
   const key = dayKey(day);
   const start = day.toISOString();
@@ -120,6 +127,7 @@ export async function gatherDayFacts(db: SQLiteDatabase, now: Date): Promise<Day
     sleepWake: sleep ? formatClockIso(sleep.wakeTime) : null,
     peakStartHour: user.peakStartHour,
     peakEndHour: user.peakEndHour,
+    nutrition: nutritionOpts ? await loadDayNutrition(db, now, nutritionOpts, key).catch(() => null) : null,
   };
 }
 
@@ -140,9 +148,15 @@ export interface ReviewResult {
 export async function loadOrCreateReview(
   db: SQLiteDatabase,
   now: Date,
-  opts: { cfg: AiConfig | null; shareActivity: boolean; force?: boolean }
+  opts: {
+    cfg: AiConfig | null;
+    free?: FreeConfig | null;
+    shareActivity: boolean;
+    force?: boolean;
+    nutritionOpts?: NutritionOptions;
+  }
 ): Promise<ReviewResult> {
-  const facts = await gatherDayFacts(db, now);
+  const facts = await gatherDayFacts(db, now, opts.nutritionOpts);
   if (!opts.force) {
     const stored = await getDayReview(db, facts.day);
     if (stored) return { facts, review: stored, aiError: null };
@@ -155,14 +169,26 @@ export async function loadOrCreateReview(
   const activeTemplateIds = active.map((r) => r.templateId).filter((x): x is string => !!x);
 
   let payload = buildRulesReview(facts, existingTitles, activeTemplateIds);
-  let aiError: string | null = null;
-  if (opts.cfg) {
+  // Sıra: ücretsiz anahtar (kullanıcı özellikle bunun için eklediyse) -> Claude anahtarı -> hazır kurallar.
+  const errors: string[] = [];
+  let generated: DayReviewPayload | null = null;
+  if (opts.free) {
     try {
-      payload = await generateAiReview(facts, existingTitles, opts.shareActivity, opts.cfg);
+      generated = await generateFreeReview(facts, existingTitles, opts.shareActivity, opts.free);
     } catch (e) {
-      aiError = e instanceof Error ? e.message : String(e);
+      const label = FREE_PROVIDERS[opts.free.provider].label;
+      errors.push(`${label}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
+  if (!generated && opts.cfg) {
+    try {
+      generated = await generateAiReview(facts, existingTitles, opts.shareActivity, opts.cfg);
+    } catch (e) {
+      errors.push(e instanceof Error ? e.message : String(e));
+    }
+  }
+  if (generated) payload = generated;
+  const aiError: string | null = generated || errors.length === 0 ? null : errors.join(' · ');
 
   await upsertDayReview(db, facts.day, payload, now);
   return { facts, review: { day: facts.day, payload, createdAt: now.toISOString() }, aiError };
@@ -177,8 +203,12 @@ async function allRoutineTitles(db: SQLiteDatabase): Promise<string[]> {
 }
 
 /** Kopyalanıp ücretsiz sohbet uygulamasına yapıştırılacak günün özeti ve komut. */
-export async function buildManualReviewPrompt(db: SQLiteDatabase, now: Date): Promise<string> {
-  const facts = await gatherDayFacts(db, now);
+export async function buildManualReviewPrompt(
+  db: SQLiteDatabase,
+  now: Date,
+  nutritionOpts?: NutritionOptions
+): Promise<string> {
+  const facts = await gatherDayFacts(db, now, nutritionOpts);
   return buildManualPrompt(facts, await allRoutineTitles(db));
 }
 
@@ -289,10 +319,14 @@ export async function addIdeaAsRoutine(db: SQLiteDatabase, idea: RoutineIdea): P
 export async function reminderExtras(
   db: SQLiteDatabase,
   now: Date
-): Promise<{ reviewDone: boolean; answeredTomorrow: Set<string> }> {
+): Promise<{ reviewDone: boolean; answeredTomorrow: Set<string>; hardDayToday: boolean }> {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const reviewDone = (await getDayReview(db, dayKey(today))) !== null;
   const answers = await answersForDay(db, nextDay(today));
-  return { reviewDone, answeredTomorrow: new Set(answers.keys()) };
+  return {
+    reviewDone,
+    answeredTomorrow: new Set(answers.keys()),
+    hardDayToday: await isHardDay(db, dayKey(today)),
+  };
 }
 

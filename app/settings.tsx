@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useSQLiteContext } from 'expo-sqlite';
 import { colors, radius, spacing } from '../constants/theme';
 import { AIError, callClaude } from '../services/ai/claudeClient';
 import {
@@ -13,22 +14,56 @@ import {
   setApiKey,
   setModel,
 } from '../services/ai/settings';
-import { getReviewReminderEnabled, setReviewReminderEnabled } from '../services/routineReminders';
+import { callFreeAI, FREE_PROVIDERS, type FreeProvider } from '../services/ai/freeClient';
+import {
+  clearFreeKey,
+  getFreeKey,
+  getFreeProvider,
+  setFreeKey,
+  setFreeProvider,
+} from '../services/ai/freeSettings';
+import { refreshReminders } from '../services/reminderSync';
+import { KCAL_TARGET_MAX, KCAL_TARGET_MIN, WATER_GOALS, formatWater } from '../services/nutritionLogic';
+import { getKcalTarget, getWaterGoal, saveKcalTarget, setWaterGoal } from '../services/nutritionSettings';
+import {
+  getMorningSettings,
+  getReviewReminderEnabled,
+  MORNING_HOURS,
+  setMorningSettings,
+  setReviewReminderEnabled,
+} from '../services/routineReminders';
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const db = useSQLiteContext();
+  const [morning, setMorning] = useState({ enabled: true, hour: 8 });
+  const [waterGoal, setWaterGoalState] = useState(2000);
+  const [kcalInput, setKcalInput] = useState('');
+  const [kcalMessage, setKcalMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const [key, setKey] = useState('');
   const [saved, setSaved] = useState(false);
   const [model, setModelState] = useState<string>(DEFAULT_MODEL);
   const [busy, setBusy] = useState(false);
   const [reviewReminder, setReviewReminder] = useState(true);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
+  const [freeProvider, setFreeProviderState] = useState<FreeProvider>('GEMINI');
+  const [freeKey, setFreeKeyInput] = useState('');
+  const [freeSaved, setFreeSaved] = useState(false);
+  const [freeBusy, setFreeBusy] = useState(false);
+  const [freeMessage, setFreeMessage] = useState<{ text: string; ok: boolean } | null>(null);
 
   useEffect(() => {
     (async () => {
+      const fp = await getFreeProvider();
+      setFreeProviderState(fp);
+      setFreeSaved((await getFreeKey(fp)) !== null);
       setSaved((await getApiKey()) !== null);
       setModelState(await getModel());
       setReviewReminder(await getReviewReminderEnabled());
+      setMorning(await getMorningSettings());
+      setWaterGoalState(await getWaterGoal());
+      const kt = await getKcalTarget();
+      setKcalInput(kt === null ? '' : String(kt));
     })();
   }, []);
 
@@ -72,6 +107,61 @@ export default function SettingsScreen() {
     setKey('');
     setMessage({ text: 'Anahtar silindi. Koçlar kural tabanlı çalışmaya döndü.', ok: true });
   };
+
+  const pickFreeProvider = async (p: FreeProvider) => {
+    setFreeProviderState(p);
+    setFreeKeyInput('');
+    setFreeMessage(null);
+    await setFreeProvider(p);
+    setFreeSaved((await getFreeKey(p)) !== null);
+  };
+
+  const saveFree = async () => {
+    if (!freeKey.trim()) {
+      setFreeMessage({ text: freeSaved ? 'Kayıtlı anahtar zaten var.' : 'Önce anahtarı yapıştır.', ok: freeSaved });
+      return;
+    }
+    await setFreeKey(freeProvider, freeKey);
+    await setFreeProvider(freeProvider);
+    setFreeKeyInput('');
+    setFreeSaved(true);
+    setFreeMessage({ text: 'Kaydedildi. Gün sonu ekranı artık yorumu kendisi yazacak.', ok: true });
+  };
+
+  const testFree = async () => {
+    const apiKey = freeKey.trim() || (await getFreeKey(freeProvider));
+    if (!apiKey) {
+      setFreeMessage({ text: 'Önce anahtarı yapıştır.', ok: false });
+      return;
+    }
+    setFreeBusy(true);
+    setFreeMessage(null);
+    try {
+      await callFreeAI({
+        provider: freeProvider,
+        apiKey,
+        system: 'Çok kısa yanıt ver.',
+        prompt: 'Merhaba de.',
+        maxTokens: 512,
+        json: false,
+        timeoutMs: 30_000,
+      });
+      setFreeMessage({ text: 'Bağlantı başarılı. Anahtar çalışıyor.', ok: true });
+    } catch (e) {
+      setFreeMessage({ text: e instanceof AIError ? e.message : 'Test başarısız oldu.', ok: false });
+    } finally {
+      setFreeBusy(false);
+    }
+  };
+
+  const removeFree = async () => {
+    await clearFreeKey(freeProvider);
+    setFreeSaved(false);
+    setFreeKeyInput('');
+    setFreeMessage({ text: 'Anahtar silindi. Kopyala-yapıştır yolu aynen duruyor.', ok: true });
+  };
+
+  const info = FREE_PROVIDERS[freeProvider];
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -128,6 +218,80 @@ export default function SettingsScreen() {
           </Pressable>
         )}
 
+        <View style={styles.sectionDivider} />
+        <Text style={styles.heading2}>Ücretsiz yapay zekâ (isteğe bağlı)</Text>
+        <Text style={styles.sub}>
+          Gün sonu yorumunu kopyala-yapıştır yapmadan uygulama kendisi alsın istersen. Ücretsiz planda kart
+          girmezsin; sınır aşılırsa ücret çıkmaz, bir süre beklersin. İstemezsen boş bırak: gün sonu ekranındaki
+          kopyala-yapıştır yolu aynen çalışır.
+        </Text>
+
+        <View style={styles.models}>
+          {(Object.keys(FREE_PROVIDERS) as FreeProvider[]).map((id) => {
+            const active = id === freeProvider;
+            return (
+              <Pressable
+                key={id}
+                onPress={() => pickFreeProvider(id)}
+                style={[styles.model, active && { borderColor: colors.aura }]}
+              >
+                <Text style={[styles.modelName, active && { color: colors.aura }]}>
+                  {FREE_PROVIDERS[id].label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <View style={styles.note}>
+          <Text style={styles.noteTitle}>Anahtarı nereden alırım?</Text>
+          <Text style={styles.noteText}>
+            1. Aşağıdaki düğmeyle {info.keyHost} sayfasını aç ve hesabınla giriş yap.{'\n'}2. "Create API key"
+            (anahtar oluştur) düğmesine bas.{'\n'}3. Çıkan uzun metni kopyala, aşağıdaki kutuya yapıştır ve
+            Kaydet'e bas.
+          </Text>
+          <Pressable onPress={() => Linking.openURL(info.keyUrl).catch(() => undefined)} hitSlop={6}>
+            <Text style={styles.linkText}>{info.keyHost} sayfasını aç ›</Text>
+          </Pressable>
+        </View>
+
+        <Text style={styles.label}>{info.label} anahtarı</Text>
+        <TextInput
+          value={freeKey}
+          onChangeText={setFreeKeyInput}
+          placeholder={freeSaved ? 'Kayıtlı (değiştirmek için yenisini yapıştır)' : info.keyPlaceholder}
+          placeholderTextColor={colors.textMuted}
+          style={styles.input}
+          secureTextEntry
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        {freeMessage && (
+          <Text style={[styles.message, { color: freeMessage.ok ? colors.aura : colors.warning }]}>
+            {freeMessage.text}
+          </Text>
+        )}
+        <Pressable onPress={saveFree} style={styles.primary}>
+          <Text style={styles.primaryText}>Ücretsiz anahtarı kaydet</Text>
+        </Pressable>
+        <Pressable onPress={testFree} disabled={freeBusy} style={[styles.secondary, freeBusy && { opacity: 0.5 }]}>
+          <Text style={styles.secondaryText}>{freeBusy ? 'Deneniyor…' : 'Bağlantıyı test et'}</Text>
+        </Pressable>
+        {freeSaved && (
+          <Pressable onPress={removeFree} hitSlop={8} style={styles.remove}>
+            <Text style={styles.removeText}>Kayıtlı ücretsiz anahtarı sil</Text>
+          </Pressable>
+        )}
+        <View style={styles.note}>
+          <Text style={styles.noteTitle}>Gizlilik</Text>
+          <Text style={styles.noteText}>
+            {info.privacy}
+            {'\n'}Bu anahtar yalnızca gün sonu değerlendirmesi için kullanılır; koçlarla sohbet Claude anahtarınla
+            yapılır. İkisi de varsa gün sonunda önce ücretsiz olan denenir. Adım, ekran, uyku ve su/yemek özeti
+            (yemek adları asla) yalnızca gün analizi paylaşımını açtıysan gider.
+          </Text>
+        </View>
+
         <View style={styles.switchRow}>
           <View style={{ flex: 1 }}>
             <Text style={styles.switchTitle}>Gün sonu hatırlatması</Text>
@@ -141,10 +305,116 @@ export default function SettingsScreen() {
             onValueChange={async (on) => {
               setReviewReminder(on);
               await setReviewReminderEnabled(on);
+              await refreshReminders(db).catch(() => undefined);
             }}
             trackColor={{ true: colors.aura, false: colors.border }}
           />
         </View>
+
+        <View style={styles.switchRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.switchTitle}>Sabah brifingi</Text>
+            <Text style={styles.switchText}>
+              Her sabah seçtiğin saatte bildirim gelir; dokununca günün planı, en önemli işin ve rutinlerin açılır.
+              Kapatırsan brifing ana ekrandan yine açılabilir.
+            </Text>
+          </View>
+          <Switch
+            value={morning.enabled}
+            onValueChange={async (on) => {
+              const next = { ...morning, enabled: on };
+              setMorning(next);
+              await setMorningSettings(next);
+              await refreshReminders(db).catch(() => undefined);
+            }}
+            trackColor={{ true: colors.kronos, false: colors.border }}
+          />
+        </View>
+        {morning.enabled && (
+          <View style={styles.hourRow}>
+            {MORNING_HOURS.map((h) => {
+              const active = h === morning.hour;
+              return (
+                <Pressable
+                  key={h}
+                  onPress={async () => {
+                    const next = { ...morning, hour: h };
+                    setMorning(next);
+                    await setMorningSettings(next);
+                    await refreshReminders(db).catch(() => undefined);
+                  }}
+                  style={[styles.hourChip, active && { borderColor: colors.kronos }]}
+                >
+                  <Text style={[styles.hourText, active && { color: colors.kronos }]}>
+                    {String(h).padStart(2, '0')}:00
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
+
+        <View style={styles.sectionDivider} />
+        <Text style={styles.heading2}>Su ve beslenme</Text>
+        <Text style={styles.sub}>
+          Günlük su hedefin. Gerçek ihtiyaç kişiden kişiye değişir; sağlık durumun için bir doktora danışabilirsin.
+        </Text>
+        <View style={styles.hourRow}>
+          {WATER_GOALS.map((g) => {
+            const active = g === waterGoal;
+            return (
+              <Pressable
+                key={g}
+                onPress={async () => {
+                  setWaterGoalState(g);
+                  await setWaterGoal(g);
+                }}
+                style={[styles.hourChip, active && { borderColor: colors.aura }]}
+              >
+                <Text style={[styles.hourText, active && { color: colors.aura }]}>{formatWater(g)}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Text style={styles.label}>Günlük kalori hedefi (isteğe bağlı)</Text>
+        <TextInput
+          value={kcalInput}
+          onChangeText={(t) => {
+            setKcalInput(t.replace(/[^0-9.,]/g, ''));
+            setKcalMessage(null);
+          }}
+          placeholder="Boş bırakırsan hedef gösterilmez"
+          placeholderTextColor={colors.textMuted}
+          keyboardType="numeric"
+          maxLength={5}
+          style={styles.input}
+        />
+        <Text style={styles.switchText}>
+          Kalori sayıları yaklaşıktır ve yalnızca bilgi içindir. Hedefi sen belirlersin ({KCAL_TARGET_MIN}–{KCAL_TARGET_MAX} kcal);
+          kendine uygun değeri bir diyetisyenden öğrenebilirsin. Yemek takibi seni germeye başlarsa kapatmak ya da ara vermek serbest.
+        </Text>
+        <Pressable
+          onPress={async () => {
+            const r = await saveKcalTarget(kcalInput);
+            if (!r.ok) setKcalMessage({ text: r.message, ok: false });
+            else {
+              setKcalInput(r.value === null ? '' : String(r.value));
+              setKcalMessage({ text: r.value === null ? 'Kalori hedefi kapalı.' : 'Hedef kaydedildi.', ok: true });
+            }
+          }}
+          style={styles.secondary}
+        >
+          <Text style={styles.secondaryText}>Kalori hedefini kaydet</Text>
+        </Pressable>
+        {kcalMessage && (
+          <Text style={[styles.message, { color: kcalMessage.ok ? colors.aura : colors.danger }]}>{kcalMessage.text}</Text>
+        )}
+        <Pressable onPress={() => router.push('/goals')} hitSlop={8}>
+          <Text style={styles.switchText}>
+            Hedefler ekranında kalori hedefini hesaplatabilir; yemek saati, ekran süresi, yatış saati ve hatırlatma hedefleri koyabilirsin ›
+          </Text>
+        </Pressable>
 
         <View style={styles.note}>
           <Text style={styles.noteTitle}>Bilmen gerekenler</Text>
@@ -153,7 +423,7 @@ export default function SettingsScreen() {
             konmaz.{'\n'}• Her yapay zekâ mesajı API'den ücretlendirilir; Claude aboneliğinden
             ayrıdır. Anthropic Console'dan harcama sınırı belirleyebilirsin.{'\n'}• Koçlara görev
             adların, planın ve enerji kayıtların gönderilir. Göndermek istemediğin bir şeyi görev
-            adına yazma. Rutinlerinin adı, bugünkü durumu ve gün sonu değerlendirmesi için günün özeti de gider. Gün analizinde paylaşımı açtıysan adım, ekran süren ve uyku tahminin de gider.{'\n'}• Anahtar yoksa ya da internet kesilirse koçlar kural tabanlı
+            adına yazma. Rutinlerinin adı, bugünkü durumu ve gün sonu değerlendirmesi için günün özeti de gider. Gün analizinde paylaşımı açtıysan adım, ekran süren, uyku tahminin ve su/yemek özetin (miktar, sayı, yaklaşık kalori; yemek adları değil) de gider.{'\n'}• Anahtar yoksa ya da internet kesilirse koçlar kural tabanlı
             çalışmaya devam eder.
           </Text>
         </View>
@@ -167,6 +437,20 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
+  hourRow: { flexDirection: 'row', gap: spacing.sm },
+  hourChip: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    paddingVertical: 9,
+    alignItems: 'center',
+  },
+  hourText: { color: colors.textMuted, fontSize: 13, fontWeight: '700' },
+  sectionDivider: { height: 1, backgroundColor: colors.border, marginTop: spacing.lg },
+  heading2: { color: colors.text, fontSize: 18, fontWeight: '800' },
+  heading2: { color: colors.text, fontSize: 18, fontWeight: '800' },
+  linkText: { color: colors.kronos, fontSize: 13, fontWeight: '700' },
   switchRow: {
     flexDirection: 'row',
     alignItems: 'center',

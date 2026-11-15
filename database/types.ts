@@ -209,7 +209,7 @@ export interface RoutineIdea {
 }
 
 /** AI: API anahtarıyla, MANUAL: ücretsiz sohbet uygulamasından elle yapıştırılan cevap, RULES: hazır kurallar */
-export type ReviewSource = 'AI' | 'MANUAL' | 'RULES';
+export type ReviewSource = 'AI' | 'FREE' | 'MANUAL' | 'RULES';
 
 export interface DayReviewPayload {
   /** Aura: günü yargılamadan yorumlar */
@@ -225,4 +225,29 @@ export interface DayReview {
   day: string;
   payload: DayReviewPayload;
   createdAt: string;
+}
+
+
+// ───────────────────────── Su ve yemek ─────────────────────────
+
+export type MealKind = 'KAHVALTI' | 'OGLE' | 'AKSAM' | 'ARA' | 'ICECEK';
+
+export interface WaterLog {
+  id: string;
+  /** yyyy-mm-dd */
+  day: string;
+  amountMl: number;
+  loggedAt: string;
+}
+
+export interface MealLog {
+  id: string;
+  day: string;
+  kind: MealKind;
+  note: string;
+  /** Besin grubu kimlikleri (JSON'dan çözülmüş) */
+  groups: string[];
+  /** Yaklaşık kalori; bilinmiyorsa null */
+  kcal: number | null;
+  eatenAt: string;
 }

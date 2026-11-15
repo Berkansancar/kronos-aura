@@ -12,6 +12,7 @@ import type {
   RoutineIdea,
 } from '../database/types';
 import { extractJsonObject } from './ai/claudeClient';
+import { nutritionPromptLines, type DayNutrition } from './nutritionLogic';
 import { formatDuration } from './format';
 import { ROUTINE_TEMPLATES } from './routineTemplates';
 
@@ -39,6 +40,8 @@ export interface DayFacts {
   sleepWake: string | null;
   peakStartHour: number;
   peakEndHour: number;
+  /** Günün su ve yemek özeti (kayıt tutulduysa) */
+  nutrition?: DayNutrition | null;
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -53,6 +56,7 @@ export function factChips(f: DayFacts): string[] {
   if (f.screenMinutes !== null) chips.push(`${formatDuration(f.screenMinutes)} ekran`);
   if (f.sleepMinutes !== null) chips.push(`uyku ~${formatDuration(f.sleepMinutes)}`);
   if (f.driftMinutes > 0) chips.push(`${formatDuration(f.driftMinutes)} akıp giden`);
+  if (f.nutrition && !f.nutrition.quiet) chips.push(...f.nutrition.chips.slice(0, 3));
   return chips;
 }
 
@@ -185,6 +189,8 @@ export function buildReviewPrompt(
     if (f.steps !== null) lines.push(`- Adım: ${f.steps}${f.stepsReliable ? '' : ' (eksik olabilir)'}`);
     if (f.screenMinutes !== null) lines.push(`- Ekran süresi: ${formatDuration(f.screenMinutes)}`);
     if (f.sleepMinutes !== null) lines.push(`- Dün geceki uyku (tahmin, kesin değil): ${formatDuration(f.sleepMinutes)}`);
+    // Su ve yemek: yalnızca toplu özet; yemek adları asla gitmez. Yargısız, kalori hesabı yapılmaz.
+    if (f.nutrition) lines.push(...nutritionPromptLines(f.nutrition));
   }
   lines.push(`- Tepe enerji penceresi: ${pad(f.peakStartHour)}:00–${pad(f.peakEndHour)}:00`);
   lines.push(
@@ -261,7 +267,7 @@ export function parseReviewResponse(
 
 // ───────────────────────── Elle (ücretsiz sohbet uygulaması) yolu ─────────────────────────
 
-const MANUAL_PREAMBLE = `Sen iki rolü olan bir yaşam koçusun: AURA (sıcak, sakin, yargılamayan enerji ve denge koçu) ve KRONOS (net, stratejik zaman planlayıcı).
+export const MANUAL_PREAMBLE = `Sen iki rolü olan bir yaşam koçusun: AURA (sıcak, sakin, yargılamayan enerji ve denge koçu) ve KRONOS (net, stratejik zaman planlayıcı).
 Türkçe yaz, emoji kullanma, kısa cümleler kur.
 Kullanıcıyı şu sözcüklerle ASLA tanımlama: tembel, başarısız, disiplinsiz, yetersiz, boşa, kaybettin. Verilmeyen sayı ya da olay uydurma. Tıbbi tavsiye verme.
 `;
