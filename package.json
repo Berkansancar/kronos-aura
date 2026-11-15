@@ -13,7 +13,8 @@
     "test:activity": "tsx scripts/test-activity.ts",
     "test:routines": "tsx scripts/test-routines.ts",
     "test:sleep": "tsx scripts/test-sleep.ts",
-    "test:review": "tsx scripts/test-review.ts"
+    "test:review": "tsx scripts/test-review.ts",
+    "test:free": "tsx scripts/test-free.ts"
   },
   "dependencies": {
     "expo": "~58.0.0"

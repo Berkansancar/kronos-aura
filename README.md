@@ -51,7 +51,8 @@ npm run test:ai           yapay zekâ katmanı (gerçek API'ye gitmez), 37 kontr
 npm run test:activity     gün analizi ve veritabanı geçişleri, 51 kontrol
 npm run test:routines     rutinler, analiz, hatırlatmalar, koç entegrasyonu, 100 kontrol
 npm run test:sleep        uyku tahmini, 33 kontrol
-npm run test:review       gün sonu değerlendirmesi, elle yol ve yarın planı, 98 kontrol
+npm run test:review       gün sonu değerlendirmesi, elle yol, ücretsiz anahtar sırası ve yarın planı, 106 kontrol
+npm run test:free         Gemini ve Groq istemcisi (model yedeği, hata eşleme), 33 kontrol
 ```
 
 
@@ -120,3 +121,12 @@ Komut Gemini, ChatGPT ya da Claude gibi ücretsiz bir sohbet uygulamasına yapı
 içinde JSON) kopyalanıp "Panodan yapıştır" + "Cevabı ekle" ile uygulamaya girilir. Okuma toleranslıdır (kod
 bloğu çiti, eğri tırnak, fazladan virgül); yargılayıcı sözcük içeren ya da eksik cevap kaydedilmez, mevcut
 değerlendirme korunur. Cevaptaki yeni rutin fikirleri normal fikirler gibi tek dokunuşla eklenir.
+
+**Ücretsiz anahtarla, otomatik (isteğe bağlı).** Ayarlar'dan ücretsiz bir Gemini (aistudio.google.com) ya da
+Groq (console.groq.com) anahtarı eklenirse gün sonu yorumu kopyala-yapıştır olmadan uygulamanın kendisi
+tarafından yazılır. Kart istenmez; sınır aşılırsa servis 429 döner, ücret çıkmaz. Anahtar eklenmezse hiçbir şey
+değişmez ve elle yol aynen çalışır. Sıra: ücretsiz anahtar, Claude anahtarı, hazır kurallar. Her sağlayıcıda
+model adı bulunamaz ya da sınırına takılırsa sıradaki model denenir (`services/ai/freeClient.ts`); anahtar
+hatasında ya da ağ sorununda denenmez. Anahtarlar Claude anahtarı gibi yalnızca telefonun güvenli deposunda
+tutulur. Gemini'nin ücretsiz planında içerik Google'ın ürün geliştirmesinde kullanılabilir; Ayarlar'da açıkça
+yazılıdır. Adım, ekran ve uyku bilgisi yine yalnızca paylaşım açıksa gönderilir.

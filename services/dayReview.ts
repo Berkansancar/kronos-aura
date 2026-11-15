@@ -19,7 +19,7 @@ import {
   listVisibleTasks,
   upsertDayReview,
 } from '../database/repository';
-import type { DayReview, Routine, RoutineIdea, TaskStatus } from '../database/types';
+import type { DayReview, DayReviewPayload, Routine, RoutineIdea, TaskStatus } from '../database/types';
 import { dayKey } from './activityLogic';
 import {
   buildManualPrompt,
@@ -27,7 +27,8 @@ import {
   parseManualResponse,
   type DayFacts,
 } from './dayReviewLogic';
-import { generateAiReview } from './ai/reviewAI';
+import { FREE_PROVIDERS, type FreeConfig } from './ai/freeClient';
+import { generateAiReview, generateFreeReview } from './ai/reviewAI';
 import type { AiConfig } from './ai/settings';
 import { DAY_END_HOUR } from './planner';
 import { acceptRoutine, addCustomRoutine, addRoutineFromTemplate } from './routineFlow';
@@ -140,7 +141,7 @@ export interface ReviewResult {
 export async function loadOrCreateReview(
   db: SQLiteDatabase,
   now: Date,
-  opts: { cfg: AiConfig | null; shareActivity: boolean; force?: boolean }
+  opts: { cfg: AiConfig | null; free?: FreeConfig | null; shareActivity: boolean; force?: boolean }
 ): Promise<ReviewResult> {
   const facts = await gatherDayFacts(db, now);
   if (!opts.force) {
@@ -155,14 +156,26 @@ export async function loadOrCreateReview(
   const activeTemplateIds = active.map((r) => r.templateId).filter((x): x is string => !!x);
 
   let payload = buildRulesReview(facts, existingTitles, activeTemplateIds);
-  let aiError: string | null = null;
-  if (opts.cfg) {
+  // Sıra: ücretsiz anahtar (kullanıcı özellikle bunun için eklediyse) -> Claude anahtarı -> hazır kurallar.
+  const errors: string[] = [];
+  let generated: DayReviewPayload | null = null;
+  if (opts.free) {
     try {
-      payload = await generateAiReview(facts, existingTitles, opts.shareActivity, opts.cfg);
+      generated = await generateFreeReview(facts, existingTitles, opts.shareActivity, opts.free);
     } catch (e) {
-      aiError = e instanceof Error ? e.message : String(e);
+      const label = FREE_PROVIDERS[opts.free.provider].label;
+      errors.push(`${label}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
+  if (!generated && opts.cfg) {
+    try {
+      generated = await generateAiReview(facts, existingTitles, opts.shareActivity, opts.cfg);
+    } catch (e) {
+      errors.push(e instanceof Error ? e.message : String(e));
+    }
+  }
+  if (generated) payload = generated;
+  const aiError: string | null = generated || errors.length === 0 ? null : errors.join(' · ');
 
   await upsertDayReview(db, facts.day, payload, now);
   return { facts, review: { day: facts.day, payload, createdAt: now.toISOString() }, aiError };

@@ -3,8 +3,15 @@
  * değerlendirmeye döner. Yeni rutin fikirleri de burada üretilir ve doğrulanır.
  */
 import type { DayReviewPayload } from '../../database/types';
-import { buildReviewPrompt, parseReviewResponse, type DayFacts } from '../dayReviewLogic';
+import {
+  buildReviewPrompt,
+  extractJsonLenient,
+  MANUAL_PREAMBLE,
+  parseReviewResponse,
+  type DayFacts,
+} from '../dayReviewLogic';
 import { AIError, callClaude, extractJsonObject } from './claudeClient';
+import { callFreeAI, type FreeConfig } from './freeClient';
 import { PERSONAS } from './personas';
 import type { AiConfig } from './settings';
 
@@ -33,4 +40,30 @@ export async function generateAiReview(
     throw new AIError('BAD_RESPONSE', 'Yapay zekâ beklenen biçimde yanıt vermedi.');
   }
   return parsed;
+}
+
+/**
+ * Ücretsiz sağlayıcıyla (Gemini ya da Groq) değerlendirme yazdırır. Kişilik ve kurallar sistem metni olarak
+ * gider. Telefondaki paylaşım ayarı burada da geçerlidir: kapalıysa adım, ekran ve uyku bilgisi gönderilmez.
+ */
+export async function generateFreeReview(
+  facts: DayFacts,
+  existingTitles: string[],
+  shareActivity: boolean,
+  free: FreeConfig
+): Promise<DayReviewPayload> {
+  const text = await callFreeAI({
+    provider: free.provider,
+    apiKey: free.apiKey,
+    system: MANUAL_PREAMBLE,
+    prompt: `${buildReviewPrompt(facts, existingTitles, shareActivity)}\n\nSadece tek bir JSON nesnesi döndür.`,
+    maxTokens: 2048,
+    timeoutMs: 45_000,
+  });
+  const obj = extractJsonLenient(text);
+  const parsed = obj ? parseReviewResponse(obj, existingTitles) : null;
+  if (!parsed) {
+    throw new AIError('BAD_RESPONSE', 'Yapay zekâ beklenen biçimde yanıt vermedi.');
+  }
+  return { ...parsed, source: 'FREE' };
 }

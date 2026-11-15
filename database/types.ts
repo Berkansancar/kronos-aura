@@ -209,7 +209,7 @@ export interface RoutineIdea {
 }
 
 /** AI: API anahtarıyla, MANUAL: ücretsiz sohbet uygulamasından elle yapıştırılan cevap, RULES: hazır kurallar */
-export type ReviewSource = 'AI' | 'MANUAL' | 'RULES';
+export type ReviewSource = 'AI' | 'FREE' | 'MANUAL' | 'RULES';
 
 export interface DayReviewPayload {
   /** Aura: günü yargılamadan yorumlar */

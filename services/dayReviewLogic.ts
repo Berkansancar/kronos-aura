@@ -261,7 +261,7 @@ export function parseReviewResponse(
 
 // ───────────────────────── Elle (ücretsiz sohbet uygulaması) yolu ─────────────────────────
 
-const MANUAL_PREAMBLE = `Sen iki rolü olan bir yaşam koçusun: AURA (sıcak, sakin, yargılamayan enerji ve denge koçu) ve KRONOS (net, stratejik zaman planlayıcı).
+export const MANUAL_PREAMBLE = `Sen iki rolü olan bir yaşam koçusun: AURA (sıcak, sakin, yargılamayan enerji ve denge koçu) ve KRONOS (net, stratejik zaman planlayıcı).
 Türkçe yaz, emoji kullanma, kısa cümleler kur.
 Kullanıcıyı şu sözcüklerle ASLA tanımlama: tembel, başarısız, disiplinsiz, yetersiz, boşa, kaybettin. Verilmeyen sayı ya da olay uydurma. Tıbbi tavsiye verme.
 `;
