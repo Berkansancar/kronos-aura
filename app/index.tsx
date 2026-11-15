@@ -16,7 +16,14 @@ import {
   listRecentLogs,
   listVisibleTasks,
 } from '../database/repository';
-import type { EnergyState, Task, TimeBlockRow, TimeLog, UserProfile } from '../database/types';
+import type {
+  ActivitySummary,
+  EnergyState,
+  Task,
+  TimeBlockRow,
+  TimeLog,
+  UserProfile,
+} from '../database/types';
 import {
   getAuraDriftReply,
   getAuraMessage,
@@ -26,7 +33,14 @@ import {
   type CoachId,
   type CoachMessage,
 } from '../services/coachEngine';
-import { formatClock, formatDayTitle } from '../services/format';
+import {
+  deviceActivityAvailable,
+  ensureTracking,
+  isSharingWithAi,
+  refreshActivity,
+} from '../services/activity';
+import { formatSteps } from '../services/activityLogic';
+import { formatClock, formatDayTitle, formatDuration } from '../services/format';
 import { DAY_END_HOUR, dayBounds, planningDay, replanDay } from '../services/planner';
 import {
   addTask,
@@ -59,6 +73,8 @@ export default function HomeScreen() {
   const [busy, setBusy] = useState(false);
   const [auraReply, setAuraReply] = useState<CoachMessage | null>(null);
   const [aiTick, setAiTick] = useState(0);
+  const [activity, setActivity] = useState<ActivitySummary | undefined>(undefined);
+  const [shareActivity, setShareActivity] = useState(false);
 
   const load = useCallback(async () => {
     const current = new Date();
@@ -74,12 +90,32 @@ export default function HomeScreen() {
     setLogs(l);
   }, [db]);
 
+  // Telefon aktivitesi (ekran süresi, adım): Android'de okunur, hata verirse sessizce atlanır.
+  const loadActivity = useCallback(async () => {
+    if (!deviceActivityAvailable) return;
+    try {
+      await ensureTracking();
+      const { summary } = await refreshActivity(db);
+      setActivity(summary);
+      setShareActivity(summary ? await isSharingWithAi() : false);
+    } catch {
+      // Aktivite verisi olmadan da uygulama çalışır.
+    }
+  }, [db]);
+
   // Ekrana her dönüldüğünde (ör. profil ayarından sonra) yeniden yükle.
   useFocusEffect(
     useCallback(() => {
       load();
-    }, [load])
+      loadActivity();
+    }, [load, loadActivity])
   );
+
+  // Aktivite verisi beş dakikada bir tazelenir.
+  useEffect(() => {
+    const id = setInterval(loadActivity, 5 * 60_000);
+    return () => clearInterval(id);
+  }, [loadActivity]);
 
   // Koç mesajları zamana bağlı: yarım dakikada bir saati tazele.
   useEffect(() => {
@@ -166,8 +202,10 @@ export default function HomeScreen() {
       })),
       recentLogs: logs,
       dayEndHour: DAY_END_HOUR,
+      activity,
+      shareActivityWithAi: shareActivity,
     };
-  }, [now, user, tasks, blocks, logs]);
+  }, [now, user, tasks, blocks, logs, activity, shareActivity]);
 
   const coaches = useMemo(
     () => (ctx ? { kronos: getKronosMessage(ctx), aura: getAuraMessage(ctx) } : null),
@@ -184,8 +222,12 @@ export default function HomeScreen() {
       logs[0]?.id ?? '',
       stripNumbers(coaches.kronos.headline),
       stripNumbers(coaches.aura.headline),
+      // Ekran süresi saat, adım 2000'lik dilim değiştiğinde yapay zekâ mesajı tazelenir.
+      activity
+        ? `${Math.floor((activity.screenMinutes ?? 0) / 60)}:${Math.floor((activity.steps ?? 0) / 2000)}:${shareActivity ? 1 : 0}`
+        : '',
     ].join('|');
-  }, [coaches, tasks, blocks, logs]);
+  }, [coaches, tasks, blocks, logs, activity, shareActivity]);
 
   const ai = useAICoachMessages(ctx, coaches, situationKey, aiTick);
 
@@ -225,6 +267,16 @@ export default function HomeScreen() {
       </View>
     );
   }
+
+  const activityParts: string[] = [];
+  if (activity?.steps !== null && activity?.steps !== undefined) {
+    activityParts.push(`${formatSteps(activity.steps)} adım`);
+  }
+  if (activity?.screenMinutes !== null && activity?.screenMinutes !== undefined) {
+    activityParts.push(`${formatDuration(activity.screenMinutes)} ekran`);
+  }
+  const activityLine =
+    activityParts.length > 0 ? activityParts.join(' · ') : 'Ekran süren ve adımların için aç';
 
   const preset = CHRONOTYPE_PRESETS[user.chronotype];
   const planDay = planningDay(now);
@@ -267,6 +319,16 @@ export default function HomeScreen() {
           <Text style={styles.aiHint}>
             {ai.error ?? 'Yapay zekâ yanıt vermedi.'} Şimdilik kural tabanlı mesajlar gösteriliyor.
           </Text>
+        )}
+
+        {deviceActivityAvailable && (
+          <Pressable onPress={() => router.push('/activity')} style={styles.activityCard}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.activityTitle}>Gün analizi</Text>
+              <Text style={styles.activitySub}>{activityLine}</Text>
+            </View>
+            <Text style={styles.activityArrow}>›</Text>
+          </Pressable>
         )}
 
         <Text style={styles.sectionTitle}>Görevler</Text>
@@ -322,6 +384,20 @@ const styles = StyleSheet.create({
   subtitle: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
   gear: { color: colors.textMuted, fontSize: 22 },
   aiHint: { color: colors.textMuted, fontSize: 12, lineHeight: 17 },
+  activityCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  activityTitle: { color: colors.text, fontSize: 15, fontWeight: '700' },
+  activitySub: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
+  activityArrow: { color: colors.textMuted, fontSize: 24 },
   profileChip: {
     borderWidth: 1,
     borderColor: colors.border,

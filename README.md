@@ -44,3 +44,19 @@ scripts/        test-scheduler.ts · test-ai.ts
 npm run test:scheduler    zamanlama motoru, 48 kontrol
 npm run test:ai           yapay zekâ katmanı (gerçek API'ye gitmez), 37 kontrol
 ```
+
+
+## Gün analizi (yalnızca Android)
+
+Uygulama ekran süreni, adımlarını ve arka plan takibini destekler. Kod `modules/device-activity`
+klasöründeki yerel Android modülündedir (Kotlin); `npx expo prebuild` ve GitHub Actions derlemesi
+bunu otomatik bağlar. Expo Go'da çalışmaz, APK gerekir.
+
+- **Ekran süresi:** Android'in "Kullanım erişimi" izniyle okunur (Ayarlar'dan bir kez verilir).
+- **Adımlar:** Telefonun adım sensöründen, küçük bir arka plan servisiyle sayılır; takibi açtığın andan
+  itibaren günlük toplam tutulur. Telefon yeniden başlasa bile gün toplamı korunur.
+- **Arka plan:** Bildirim çubuğunda sessiz bir bildirim görünür. "Zorla durdur" yapılırsa takip durur;
+  uygulamayı açmak yeterlidir. Pil kısıtlaması muafiyeti ve markaya özel ipuçları Gün analizi ekranındadır.
+- **Gizlilik:** Veriler telefonda (SQLite `DailyStat`) kalır. Yapay zekâya gönderim ayrı bir ayarla,
+  varsayılan olarak kapalıdır.
+- Test: `npm run test:activity`

@@ -5,6 +5,7 @@ import type {
   Chronotype,
   CoachId,
   CognitiveWeight,
+  DailyStat,
   DurationSample,
   EnergyState,
   PlannedSlot,
@@ -286,4 +287,65 @@ export async function listChatMessages(
 
 export async function clearChat(db: SQLiteDatabase, coach: CoachId): Promise<void> {
   await db.runAsync('DELETE FROM CoachChat WHERE coach = ?', [coach]);
+}
+
+// ───────────────────────── Günlük aktivite ─────────────────────────
+
+interface DailyStatRow {
+  day: string;
+  steps: number;
+  screenMinutes: number | null;
+  topApps: string;
+  updatedAt: string;
+}
+
+function rowToDailyStat(r: DailyStatRow): DailyStat {
+  let topApps: DailyStat['topApps'] = [];
+  try {
+    const parsed = JSON.parse(r.topApps);
+    if (Array.isArray(parsed)) topApps = parsed;
+  } catch {
+    topApps = [];
+  }
+  return { day: r.day, steps: r.steps, screenMinutes: r.screenMinutes, topApps, updatedAt: r.updatedAt };
+}
+
+/**
+ * Günün özetini yazar. Adım sayısı gün içinde yalnızca artabilir (en büyük değer korunur);
+ * ekran süresi okunamadıysa (null) önceki değer ve uygulama listesi bozulmaz.
+ */
+export async function upsertDailyStat(
+  db: SQLiteDatabase,
+  stat: Omit<DailyStat, 'updatedAt'>
+): Promise<void> {
+  await db.runAsync(
+    `INSERT INTO DailyStat (day, steps, screenMinutes, topApps, updatedAt)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(day) DO UPDATE SET
+       steps = MAX(DailyStat.steps, excluded.steps),
+       screenMinutes = COALESCE(excluded.screenMinutes, DailyStat.screenMinutes),
+       topApps = CASE WHEN excluded.screenMinutes IS NULL THEN DailyStat.topApps ELSE excluded.topApps END,
+       updatedAt = excluded.updatedAt`,
+    [
+      stat.day,
+      Math.max(0, Math.round(stat.steps)),
+      stat.screenMinutes === null ? null : Math.max(0, Math.round(stat.screenMinutes)),
+      JSON.stringify(stat.topApps),
+      new Date().toISOString(),
+    ]
+  );
+}
+
+export async function getDailyStat(db: SQLiteDatabase, day: string): Promise<DailyStat | null> {
+  const r = await db.getFirstAsync<DailyStatRow>('SELECT * FROM DailyStat WHERE day = ?', [day]);
+  return r ? rowToDailyStat(r) : null;
+}
+
+/** En yeni `limit` gün, yeniden eskiye sıralı. */
+export async function listDailyStats(db: SQLiteDatabase, limit = 7): Promise<DailyStat[]> {
+  const rows = await db.getAllAsync<DailyStatRow>(
+    'SELECT * FROM DailyStat ORDER BY day DESC LIMIT ?',
+    [limit]
+  );
+  return rows.map(rowToDailyStat);
 }

@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 export const DB_NAME = 'kronos-aura.db';
-export const DATABASE_VERSION = 2;
+export const DATABASE_VERSION = 3;
 
 /**
  * Not: SQLite'ın gerçek bir DATETIME tipi yoktur. Zaman alanlarını ISO-8601 (UTC) TEXT
@@ -70,6 +70,17 @@ CREATE TABLE IF NOT EXISTS CoachChat (
 CREATE INDEX IF NOT EXISTS idx_coachchat_coach ON CoachChat(coach, createdAt);
 `;
 
+/** Sürüm 3: günlük adım ve ekran süresi özetleri (Gün analizi). */
+const CREATE_TABLES_V3 = `
+CREATE TABLE IF NOT EXISTS DailyStat (
+  day           TEXT PRIMARY KEY NOT NULL,
+  steps         INTEGER NOT NULL DEFAULT 0 CHECK (steps >= 0),
+  screenMinutes INTEGER CHECK (screenMinutes IS NULL OR screenMinutes >= 0),
+  topApps       TEXT NOT NULL DEFAULT '[]',
+  updatedAt     TEXT NOT NULL
+);
+`;
+
 /**
  * SQLiteProvider'ın onInit'ine verilir. Veritabanı ilk açıldığında tabloları kurar,
  * sonraki sürümlerde buraya yeni migrasyon adımları eklenir.
@@ -92,8 +103,13 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {
     current = 2;
   }
 
+  if (current === 2) {
+    await db.execAsync(CREATE_TABLES_V3);
+    current = 3;
+  }
+
   // Gelecekteki migrasyonlar:
-  // if (current === 2) { await db.execAsync(`ALTER TABLE ...`); current = 3; }
+  // if (current === 3) { await db.execAsync(`ALTER TABLE ...`); current = 4; }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
 }

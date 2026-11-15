@@ -1,0 +1,41 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+  xmlns:tools="http://schemas.android.com/tools">
+
+  <!-- Adim sayaci -->
+  <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+  <!-- Arka planda calisan takip servisi ve kalici bildirimi -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+  <!-- Telefon yeniden acilinca takibi surdurmek -->
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+  <!-- Pil kisitlamasindan muaf olmayi istemek -->
+  <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+  <!-- Ekran suresi: kullanici Ayarlar'dan "Kullanim erisimi" izni verir -->
+  <uses-permission
+    android:name="android.permission.PACKAGE_USAGE_STATS"
+    tools:ignore="ProtectedPermissions" />
+
+  <!-- Android 11+: uygulama adlarini okuyabilmek icin -->
+  <queries>
+    <intent>
+      <action android:name="android.intent.action.MAIN" />
+      <category android:name="android.intent.category.LAUNCHER" />
+    </intent>
+  </queries>
+
+  <application>
+    <service
+      android:name="expo.modules.deviceactivity.StepTrackingService"
+      android:exported="false"
+      android:foregroundServiceType="health" />
+
+    <receiver
+      android:name="expo.modules.deviceactivity.BootReceiver"
+      android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+      </intent-filter>
+    </receiver>
+  </application>
+</manifest>

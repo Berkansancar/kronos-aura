@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "test:scheduler": "tsx scripts/test-scheduler.ts",
     "build:apk": "eas build -p android --profile preview",
-    "test:ai": "tsx scripts/test-ai.ts"
+    "test:ai": "tsx scripts/test-ai.ts",
+    "test:activity": "tsx scripts/test-activity.ts"
   },
   "dependencies": {
     "expo": "~58.0.0"

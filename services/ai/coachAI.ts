@@ -5,7 +5,7 @@
  */
 import type { CoachId } from '../../database/types';
 import type { CoachContext, CoachMessage } from '../coachEngine';
-import { formatClock } from '../format';
+import { formatClock, formatDuration } from '../format';
 import { energyZoneAt } from '../scheduler';
 import { AIError, callClaude, extractJsonObject, type ChatTurn } from './claudeClient';
 import { PERSONAS } from './personas';
@@ -55,6 +55,24 @@ export function describeSituation(ctx: CoachContext): string {
       lines.push(
         `- ${formatClock(new Date(l.loggedAt))}: ${title ? `"${title}" bitti, ${l.actualDuration} dk` : `${l.actualDuration} dk zaman akıp gitti (görevden bağımsız not)`}; hissi: ${ENERGY_TR[l.energyStateAtCompletion]}`
       );
+    }
+  }
+
+  // Telefon kullanımı yalnızca kullanıcı paylaşmaya izin verdiyse yapay zekâya gider.
+  const act = ctx.activity;
+  if (ctx.shareActivityWithAi && act) {
+    lines.push('Bugünkü telefon kullanımı (kullanıcı paylaşmayı kabul etti; yargılamadan, yalnızca veri olarak kullan):');
+    if (act.steps !== null) {
+      lines.push(
+        `- Adım: ${act.steps}${act.stepsReliable ? '' : ' (takip bugün geç açıldı, eksik olabilir)'}`
+      );
+    }
+    if (act.screenMinutes !== null) {
+      lines.push(`- Ekran süresi: ${formatDuration(act.screenMinutes)}`);
+    }
+    const top = act.topApps.slice(0, 5);
+    if (top.length > 0) {
+      lines.push(`- En çok kullanılan uygulamalar: ${top.map((a) => `${a.label} ${formatDuration(a.minutes)}`).join(', ')}`);
     }
   }
   return lines.join('\n');

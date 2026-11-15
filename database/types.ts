@@ -73,3 +73,24 @@ export interface ChatMessage {
   content: string;
   createdAt: string;
 }
+
+/** Bir günün telefon kullanım özeti (telefonda saklanır). `day` yerel tarihtir: YYYY-MM-DD. */
+export interface DailyStat {
+  day: string;
+  steps: number;
+  /** null = ekran süresi okunamadı (Kullanım erişimi izni yok) */
+  screenMinutes: number | null;
+  topApps: { label: string; minutes: number }[];
+  updatedAt: string;
+}
+
+/** Koç motorunun kullandığı, bugüne ait kısa aktivite özeti. */
+export interface ActivitySummary {
+  /** null = adım takibi kapalı */
+  steps: number | null;
+  /** Adım sayısı gün boyu izlenmiş mi? (Takip öğleden sonra açıldıysa eksik sayılır.) */
+  stepsReliable: boolean;
+  /** null = ekran süresi okunamıyor */
+  screenMinutes: number | null;
+  topApps: { label: string; minutes: number }[];
+}

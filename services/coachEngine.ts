@@ -9,7 +9,14 @@
  *  - Aura:   empatik, sakin. Suçluluğu söndürür; "boşa geçen" zamanı yargılamadan veriye çevirir.
  *            Aura'nın dilinde "boşa", "kaybettin", "tembellik" gibi yargılayıcı sözler yoktur.
  */
-import type { CoachId, EnergyState, Task, TimeLog, UserProfile } from '../database/types';
+import type {
+  ActivitySummary,
+  CoachId,
+  EnergyState,
+  Task,
+  TimeLog,
+  UserProfile,
+} from '../database/types';
 import { formatClock, formatDuration } from './format';
 import { energyZoneAt, type EnergyZone } from './scheduler';
 
@@ -50,6 +57,10 @@ export interface CoachContext {
   blocks: BlockView[];
   recentLogs: TimeLog[];
   dayEndHour: number;
+  /** Bugünkü ekran süresi ve adımlar (Android'de, kullanıcı açtıysa). Yoksa koçlar bunu kullanmaz. */
+  activity?: ActivitySummary;
+  /** Kullanıcı aktivite verisinin yapay zekâya da gönderilmesine izin verdi mi? */
+  shareActivityWithAi?: boolean;
 }
 
 const ZONE_LABEL: Record<EnergyZone, string> = {
@@ -280,6 +291,32 @@ export function getAuraMessage(ctx: CoachContext): CoachMessage {
       headline: 'Enerji çukurundasın',
       body: 'Şu an doğal düşüş saatin. Ağır işe girmeden önce 10 dakikalık bir mola iyi gelir.',
     };
+  }
+
+  // Telefon kullanımı: yargısız, yalnızca veri olarak
+  const act = ctx.activity;
+  if (act) {
+    if (act.screenMinutes !== null && act.screenMinutes >= 240) {
+      return {
+        ...base,
+        tone: 'CALM',
+        headline: 'Ekran uzun süredir açık',
+        body: `Bugün ekranda ${formatDuration(act.screenMinutes)} geçti. Bu bir suçlama değil, sadece veri. Gözlerine 5-10 dakikalık bir ara ve uzağa bakmak iyi gelir.`,
+      };
+    }
+    if (
+      act.stepsReliable &&
+      act.steps !== null &&
+      act.steps < 2000 &&
+      ctx.now.getHours() >= 15
+    ) {
+      return {
+        ...base,
+        tone: 'CALM',
+        headline: 'Biraz hareket iyi gelir',
+        body: `Bugün ${act.steps} adım atıldı. Kısa bir yürüyüş zihni tazeler; şu an belki sadece buna ihtiyacın vardır.`,
+      };
+    }
   }
 
   const byZone: Record<EnergyZone, { headline: string; body: string }> = {
