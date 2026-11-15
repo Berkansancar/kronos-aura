@@ -11,6 +11,7 @@ import {
   getDailyStat,
   getDayReview,
   getOrCreateUser,
+  isHardDay,
   getTask,
   listRecentLogs,
   listRoutineLogsSince,
@@ -302,10 +303,14 @@ export async function addIdeaAsRoutine(db: SQLiteDatabase, idea: RoutineIdea): P
 export async function reminderExtras(
   db: SQLiteDatabase,
   now: Date
-): Promise<{ reviewDone: boolean; answeredTomorrow: Set<string> }> {
+): Promise<{ reviewDone: boolean; answeredTomorrow: Set<string>; hardDayToday: boolean }> {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const reviewDone = (await getDayReview(db, dayKey(today))) !== null;
   const answers = await answersForDay(db, nextDay(today));
-  return { reviewDone, answeredTomorrow: new Set(answers.keys()) };
+  return {
+    reviewDone,
+    answeredTomorrow: new Set(answers.keys()),
+    hardDayToday: await isHardDay(db, dayKey(today)),
+  };
 }
 

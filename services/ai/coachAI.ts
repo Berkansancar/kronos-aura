@@ -42,6 +42,12 @@ export function describeSituation(ctx: CoachContext): string {
     `Kronotip: ${CHRONO_TR[ctx.user.chronotype]}; tepe enerji penceresi ${pad(ctx.user.peakStartHour)}:00–${pad(ctx.user.peakEndHour)}:00. Şu anki enerji penceresi: ${ZONE_TR[zone]}.`,
   ];
 
+  if (ctx.hardDay) {
+    lines.push(
+      'ZOR GÜN MODU AÇIK: Kullanıcı bugün zor bir gün geçiriyor. Plan bilerek hafifletildi. Hiçbir şey beklenmiyor; baskı, hedef ya da "daha fazlası" önerme. Sakin, kısa ve destekleyici ol.'
+    );
+  }
+
   if (ctx.tasks.length === 0) {
     lines.push('Görev listesi boş.');
   } else {

@@ -573,3 +573,44 @@ export async function getDayReview(db: SQLiteDatabase, day: string): Promise<Day
     return null; // bozuk kayıt varsa yeniden üretilir
   }
 }
+
+// ───────────────────────── Zor gün modu ─────────────────────────
+
+export async function getHardDay(db: SQLiteDatabase, day: string): Promise<{ postponedIds: string[] } | null> {
+  const row = await db.getFirstAsync<{ postponedIds: string }>(
+    "SELECT postponedIds FROM DayMode WHERE day = ? AND mode = 'HARD'",
+    [day]
+  );
+  if (!row) return null;
+  try {
+    const ids: unknown = JSON.parse(row.postponedIds);
+    return { postponedIds: Array.isArray(ids) ? ids.filter((x): x is string => typeof x === 'string') : [] };
+  } catch {
+    return { postponedIds: [] };
+  }
+}
+
+export async function isHardDay(db: SQLiteDatabase, day: string): Promise<boolean> {
+  return (await getHardDay(db, day)) !== null;
+}
+
+/** Açarken ertelenen görev id'leri öncekilerle birleştirilir; kapatınca kayıt silinir. */
+export async function setHardDay(
+  db: SQLiteDatabase,
+  day: string,
+  on: boolean,
+  now: Date = new Date(),
+  postponedIds: string[] = []
+): Promise<void> {
+  if (!on) {
+    await db.runAsync('DELETE FROM DayMode WHERE day = ?', [day]);
+    return;
+  }
+  const existing = (await getHardDay(db, day))?.postponedIds ?? [];
+  const merged = Array.from(new Set([...existing, ...postponedIds]));
+  await db.runAsync(
+    `INSERT INTO DayMode (day, mode, postponedIds, createdAt) VALUES (?, 'HARD', ?, ?)
+     ON CONFLICT(day) DO UPDATE SET mode = 'HARD', postponedIds = excluded.postponedIds`,
+    [day, JSON.stringify(merged), now.toISOString()]
+  );
+}

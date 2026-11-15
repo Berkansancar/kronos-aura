@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 export const DB_NAME = 'kronos-aura.db';
-export const DATABASE_VERSION = 5;
+export const DATABASE_VERSION = 6;
 
 /**
  * Not: SQLite'ın gerçek bir DATETIME tipi yoktur. Zaman alanlarını ISO-8601 (UTC) TEXT
@@ -82,6 +82,17 @@ CREATE TABLE IF NOT EXISTS DailyStat (
 `;
 
 /** Sürüm 4: günlük rutinler, rutin cevapları ve tahmini uyku kayıtları. */
+/** Zor gün modu: o gün için kullanıcı Aura'dan planı hafifletmesini istedi. Gün başına tek kayıt. */
+const CREATE_TABLES_V6 = `
+CREATE TABLE IF NOT EXISTS DayMode (
+  day       TEXT PRIMARY KEY NOT NULL,
+  mode      TEXT NOT NULL CHECK (mode IN ('HARD')),
+  /** Zor gün modu açılırken ertelenen görevlerin id listesi (JSON); kapanınca geri alınır */
+  postponedIds TEXT NOT NULL DEFAULT '[]',
+  createdAt TEXT NOT NULL
+);
+`;
+
 const CREATE_TABLES_V5 = `
 CREATE TABLE IF NOT EXISTS DayReview (
   day       TEXT PRIMARY KEY NOT NULL,
@@ -176,8 +187,13 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {
     current = 5;
   }
 
+  if (current === 5) {
+    await db.execAsync(CREATE_TABLES_V6);
+    current = 6;
+  }
+
   // Gelecekteki migrasyonlar:
-  // if (current === 5) { await db.execAsync(`ALTER TABLE ...`); current = 6; }
+  // if (current === 6) { await db.execAsync(`ALTER TABLE ...`); current = 7; }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
 }

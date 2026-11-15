@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useSQLiteContext } from 'expo-sqlite';
 import { colors, radius, spacing } from '../constants/theme';
 import { AIError, callClaude } from '../services/ai/claudeClient';
 import {
@@ -21,10 +22,19 @@ import {
   setFreeKey,
   setFreeProvider,
 } from '../services/ai/freeSettings';
-import { getReviewReminderEnabled, setReviewReminderEnabled } from '../services/routineReminders';
+import { refreshReminders } from '../services/reminderSync';
+import {
+  getMorningSettings,
+  getReviewReminderEnabled,
+  MORNING_HOURS,
+  setMorningSettings,
+  setReviewReminderEnabled,
+} from '../services/routineReminders';
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const db = useSQLiteContext();
+  const [morning, setMorning] = useState({ enabled: true, hour: 8 });
   const [key, setKey] = useState('');
   const [saved, setSaved] = useState(false);
   const [model, setModelState] = useState<string>(DEFAULT_MODEL);
@@ -45,6 +55,7 @@ export default function SettingsScreen() {
       setSaved((await getApiKey()) !== null);
       setModelState(await getModel());
       setReviewReminder(await getReviewReminderEnabled());
+      setMorning(await getMorningSettings());
     })();
   }, []);
 
@@ -286,10 +297,54 @@ export default function SettingsScreen() {
             onValueChange={async (on) => {
               setReviewReminder(on);
               await setReviewReminderEnabled(on);
+              await refreshReminders(db).catch(() => undefined);
             }}
             trackColor={{ true: colors.aura, false: colors.border }}
           />
         </View>
+
+        <View style={styles.switchRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.switchTitle}>Sabah brifingi</Text>
+            <Text style={styles.switchText}>
+              Her sabah seçtiğin saatte bildirim gelir; dokununca günün planı, en önemli işin ve rutinlerin açılır.
+              Kapatırsan brifing ana ekrandan yine açılabilir.
+            </Text>
+          </View>
+          <Switch
+            value={morning.enabled}
+            onValueChange={async (on) => {
+              const next = { ...morning, enabled: on };
+              setMorning(next);
+              await setMorningSettings(next);
+              await refreshReminders(db).catch(() => undefined);
+            }}
+            trackColor={{ true: colors.kronos, false: colors.border }}
+          />
+        </View>
+        {morning.enabled && (
+          <View style={styles.hourRow}>
+            {MORNING_HOURS.map((h) => {
+              const active = h === morning.hour;
+              return (
+                <Pressable
+                  key={h}
+                  onPress={async () => {
+                    const next = { ...morning, hour: h };
+                    setMorning(next);
+                    await setMorningSettings(next);
+                    await refreshReminders(db).catch(() => undefined);
+                  }}
+                  style={[styles.hourChip, active && { borderColor: colors.kronos }]}
+                >
+                  <Text style={[styles.hourText, active && { color: colors.kronos }]}>
+                    {String(h).padStart(2, '0')}:00
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
 
         <View style={styles.note}>
           <Text style={styles.noteTitle}>Bilmen gerekenler</Text>
@@ -312,6 +367,16 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
+  hourRow: { flexDirection: 'row', gap: spacing.sm },
+  hourChip: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    paddingVertical: 9,
+    alignItems: 'center',
+  },
+  hourText: { color: colors.textMuted, fontSize: 13, fontWeight: '700' },
   sectionDivider: { height: 1, backgroundColor: colors.border, marginTop: spacing.lg },
   heading2: { color: colors.text, fontSize: 18, fontWeight: '800' },
   linkText: { color: colors.kronos, fontSize: 13, fontWeight: '700' },

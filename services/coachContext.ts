@@ -1,5 +1,12 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
-import { getOrCreateUser, listDayBlocks, listRecentLogs, listVisibleTasks } from '../database/repository';
+import {
+  getOrCreateUser,
+  isHardDay,
+  listDayBlocks,
+  listRecentLogs,
+  listVisibleTasks,
+} from '../database/repository';
+import { dayKey } from './activityLogic';
 import { isSharingWithAi, loadActivitySummary, loadSleepSummary } from './activity';
 import type { CoachContext } from './coachEngine';
 import { DAY_END_HOUR, dayBounds, planningDay } from './planner';
@@ -31,5 +38,6 @@ export async function loadCoachContext(db: SQLiteDatabase, now: Date): Promise<C
     shareActivityWithAi,
     routines,
     sleep,
+    hardDay: await isHardDay(db, dayKey(planningDay(now))),
   };
 }

@@ -67,6 +67,8 @@ export interface CoachContext {
   routines?: RoutineBrief[];
   /** Ekran hareketinden tahmin edilen uyku (yatış, kalkış, süre). Kesin ölçüm değildir. */
   sleep?: SleepSummary;
+  /** Zor gün modu açık: koçlar baskı kurmaz, yalnızca hafifletilmiş planı destekler. */
+  hardDay?: boolean;
 }
 
 const ZONE_LABEL: Record<EnergyZone, string> = {
@@ -145,6 +147,21 @@ export function getKronosMessage(ctx: CoachContext): CoachMessage {
   const active = ctx.tasks.filter((t) => t.status === 'PENDING' || t.status === 'IN_PROGRESS');
   const done = ctx.tasks.filter((t) => t.status === 'COMPLETED');
   const postponed = ctx.tasks.filter((t) => t.status === 'POSTPONED');
+
+  // Zor gün: net ve hafif. Baskı, tepe saati ya da "sığmadı" uyarısı yok.
+  if (ctx.hardDay) {
+    const titles = active.map((t) => `"${t.title}"`).join(' ve ');
+    return {
+      coach: 'KRONOS',
+      tone: 'STRATEGIC',
+      headline: 'Hafif plan',
+      body:
+        active.length > 0
+          ? `Bugünün hedefi yalnızca ${titles}. Gerisini bekletiyorum; geri almak istediğinde tek dokunuş yeter.`
+          : 'Bugünün hafif planı tamam. Kalan zaman dinlenmeye ait.',
+      actions: [],
+    };
+  }
 
   if (active.length === 0 && done.length === 0 && postponed.length === 0) {
     const nudge = kronosRoutineMessage(ctx);
@@ -278,6 +295,16 @@ function recentLog(ctx: CoachContext, hours: number): TimeLog | undefined {
 
 export function getAuraMessage(ctx: CoachContext): CoachMessage {
   const base = { coach: 'AURA' as const, hint: DRIFT_HINT, actions: DRIFT_ACTIONS };
+
+  // Zor gün: yargı yok, beklenti yok.
+  if (ctx.hardDay) {
+    return {
+      ...base,
+      tone: 'CALM',
+      headline: 'Bugün zor bir gün, sorun değil',
+      body: 'Plan hafifletildi. Yapabildiğin kadarı yeterli; dinlenmek de bugünün işinin bir parçası.',
+    };
+  }
 
   // Gün bitti
   if (ctx.now.getHours() >= ctx.dayEndHour) {

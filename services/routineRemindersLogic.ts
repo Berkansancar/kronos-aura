@@ -14,6 +14,8 @@ export interface PlannedReminder {
   at: Date;
   title: string;
   body: string;
+  /** Bildirime dokununca açılacak ekran (ör. '/morning'); yoksa ana ekran açılır */
+  route?: string;
 }
 
 export const REMINDER_ID_PREFIX = 'rtn-';
@@ -31,7 +33,16 @@ export interface ReminderExtras {
   answeredTomorrow?: Set<string>;
   /** Gün sonu hatırlatması açık mı? (varsayılan: açık) */
   review?: boolean;
+  /** Sabah brifingi bildirimi: saat ve dakika; null ya da yoksa gönderilmez */
+  morning?: { hour: number; minute: number } | null;
+  /** Zor gün modu açıksa bugünün sıradan rutin bildirimleri gönderilmez (yalnızca temel rutinler) */
+  hardDayToday?: boolean;
 }
+
+/** Zor günde yalnızca kısa (en çok 10 dk) rutinler sorulur; diğerleri sessizce beklemeye alınır. */
+export const ESSENTIAL_MAX_MINUTES = 10;
+export const isEssentialRoutine = (r: { estimatedDuration: number }): boolean =>
+  r.estimatedDuration <= ESSENTIAL_MAX_MINUTES;
 
 export function planReminders(
   briefs: RoutineBrief[],
@@ -67,6 +78,8 @@ export function planReminders(
       if (d === 0 && (b.state === 'DONE' || b.state === 'SKIPPED' || b.state === 'ACCEPTED')) continue;
       // Yarın için zaten cevap verildiyse yarın bir daha sorulmaz
       if (d === 1 && answeredTomorrow.has(r.id)) continue;
+      // Zor gün: bugünün temel olmayan rutinleri için bildirim gitmez
+      if (d === 0 && extras.hardDayToday && !isEssentialRoutine(r)) continue;
       out.push({
         id: `${REMINDER_ID_PREFIX}${r.id}-${dayKey(at)}`,
         routineId: r.id,
@@ -92,6 +105,29 @@ export function planReminders(
         at,
         title: 'Günü birlikte değerlendirelim',
         body: 'Bugün neler oldu, yarın neleri yapacaksın? Birkaç dokunuşla planı hazırlayalım.',
+        route: '/review',
+      });
+    }
+  }
+
+  // Sabah brifingi (her sabah, seçilen saatte). Dokununca /morning açılır.
+  if (extras.morning) {
+    for (let d = 0; d < days; d += 1) {
+      const at = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() + d,
+        extras.morning.hour,
+        extras.morning.minute
+      );
+      if (at.getTime() <= now.getTime()) continue;
+      out.push({
+        id: `${REMINDER_ID_PREFIX}morning-${dayKey(at)}`,
+        routineId: '',
+        at,
+        title: 'Günaydın, planın hazır',
+        body: 'Bugünün en önemli işi, rutinlerin ve Kronos\'un notu seni bekliyor.',
+        route: '/morning',
       });
     }
   }

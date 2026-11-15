@@ -15,6 +15,7 @@ import {
   CHRONOTYPE_PRESETS,
   getDayReview,
   getOrCreateUser,
+  isHardDay,
   listDayBlocks,
   listRecentLogs,
   listVisibleTasks,
@@ -48,6 +49,10 @@ import {
   refreshActivity,
 } from '../services/activity';
 import { dayKey, formatSteps } from '../services/activityLogic';
+import { confirmEndHardDay, confirmStartHardDay } from '../components/hardDayAlert';
+import { endHardDay, startHardDay } from '../services/hardDay';
+import { countExhaustedSince, shouldSuggestHardDay } from '../services/hardDayLogic';
+import { isEssentialRoutine } from '../services/routineRemindersLogic';
 import { formatClock, formatDayTitle, formatDuration } from '../services/format';
 import { DAY_END_HOUR, dayBounds, planningDay, replanDay } from '../services/planner';
 import { loadRoutineBriefs } from '../services/routineBriefs';
@@ -98,6 +103,7 @@ export default function HomeScreen() {
   const [sleep, setSleep] = useState<SleepSummary | undefined>(undefined);
   const [snoozing, setSnoozing] = useState<Routine | null>(null);
   const [hasReview, setHasReview] = useState(false);
+  const [hardDay, setHardDayOn] = useState(false);
 
   const load = useCallback(async () => {
     const current = new Date();
@@ -117,6 +123,7 @@ export default function HomeScreen() {
     } catch {
       // Rutin verisi olmadan da görevler çalışır.
     }
+    setHardDayOn(await isHardDay(db, dayKey(planningDay(current))).catch(() => false));
     setNow(current);
     setUser(u);
     setTasks(t);
@@ -251,8 +258,9 @@ export default function HomeScreen() {
       shareActivityWithAi: shareActivity,
       routines: briefs,
       sleep,
+      hardDay,
     };
-  }, [now, user, tasks, blocks, logs, activity, shareActivity, briefs, sleep]);
+  }, [now, user, tasks, blocks, logs, activity, shareActivity, briefs, sleep, hardDay]);
 
   const coaches = useMemo(
     () => (ctx ? { kronos: getKronosMessage(ctx), aura: getAuraMessage(ctx) } : null),
@@ -275,8 +283,9 @@ export default function HomeScreen() {
         : '',
       briefs.map((b) => `${b.routine.id}:${b.state}`).join(','),
       sleep?.lastMinutes != null ? Math.floor(sleep.lastMinutes / 60) : '',
+      hardDay ? 'hard' : '',
     ].join('|');
-  }, [coaches, tasks, blocks, logs, activity, shareActivity, briefs, sleep]);
+  }, [coaches, tasks, blocks, logs, activity, shareActivity, briefs, sleep, hardDay]);
 
   const ai = useAICoachMessages(ctx, coaches, situationKey, aiTick);
 
@@ -322,6 +331,14 @@ export default function HomeScreen() {
     });
   };
 
+  const toggleHardDay = () => {
+    if (hardDay) {
+      confirmEndHardDay(() => run(async () => void (await endHardDay(db, new Date()))));
+    } else {
+      confirmStartHardDay(() => run(async () => void (await startHardDay(db, new Date()))));
+    }
+  };
+
   const onFinishWithEnergy = (energy: EnergyState) => {
     const task = finishing;
     setFinishing(null);
@@ -352,6 +369,15 @@ export default function HomeScreen() {
     briefs.length === 0
       ? 'Su içmek, yürüyüş, nefes... örnek rutinlerden seç'
       : `${progress.done} yapıldı · ${progress.open} açık${progress.skipped > 0 ? ` · ${progress.skipped} bugünlük kapalı` : ''}`;
+
+  const suggestHardDay = shouldSuggestHardDay({
+    hardDay,
+    // Uyku yalnızca sabah yarısında bir ipucudur; akşam "uykun kısa" demenin anlamı yok.
+    sleepMinutes: now.getHours() < 14 ? (sleep?.lastMinutes ?? null) : null,
+    exhaustedToday: countExhaustedSince(logs, dayBounds(planningDay(now)).start),
+  });
+  const visibleDue = dueBriefs(briefs).filter((b) => !hardDay || isEssentialRoutine(b.routine));
+  const morningWindow = now.getHours() >= 5 && now.getHours() < 12;
 
   const preset = CHRONOTYPE_PRESETS[user.chronotype];
   const planDay = planningDay(now);
@@ -396,6 +422,46 @@ export default function HomeScreen() {
           </Text>
         )}
 
+        {hardDay ? (
+          <View style={styles.hardCard}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.reviewTitle}>Zor gün modu açık</Text>
+              <Text style={styles.activitySub}>
+                Plan hafifletildi; uzun rutinler bugün sorulmaz. Bugün senden fazlası beklenmiyor.
+              </Text>
+            </View>
+            <Pressable disabled={busy} onPress={toggleHardDay} style={styles.hardBtn} hitSlop={6}>
+              <Text style={styles.hardBtnText}>Normal güne dön</Text>
+            </Pressable>
+          </View>
+        ) : suggestHardDay ? (
+          <View style={styles.hardCard}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.reviewTitle}>Bugün hafif gidelim mi?</Text>
+              <Text style={styles.activitySub}>
+                Aura planı hafifletsin: birkaç küçük iş kalsın, gerisi bekleyebilir.
+              </Text>
+            </View>
+            <Pressable disabled={busy} onPress={toggleHardDay} style={styles.hardBtn} hitSlop={6}>
+              <Text style={styles.hardBtnText}>Zor gün modu</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable disabled={busy} onPress={toggleHardDay} hitSlop={6}>
+            <Text style={styles.aiHint}>Zor bir gün mü? Planı hafiflet ›</Text>
+          </Pressable>
+        )}
+
+        {morningWindow && (
+          <Pressable onPress={() => router.push('/morning')} style={styles.activityCard}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.activityTitle}>Sabah brifingi</Text>
+              <Text style={styles.activitySub}>Günün planı, en önemli iş ve rutinlerin</Text>
+            </View>
+            <Text style={styles.activityArrow}>›</Text>
+          </Pressable>
+        )}
+
         {reviewAvailable(now) && (
           <Pressable onPress={() => router.push('/review')} style={styles.reviewCard}>
             <View style={{ flex: 1 }}>
@@ -420,7 +486,7 @@ export default function HomeScreen() {
           </Pressable>
         )}
 
-        {dueBriefs(briefs).map((b) => (
+        {visibleDue.map((b) => (
           <RoutineCard
             key={b.routine.id}
             brief={b}
@@ -523,6 +589,25 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   reviewTitle: { color: colors.aura, fontSize: 15, fontWeight: '800' },
+  hardCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.auraSoft,
+    borderWidth: 1,
+    borderColor: colors.aura,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  hardBtn: {
+    borderWidth: 1,
+    borderColor: colors.aura,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+  },
+  hardBtnText: { color: colors.aura, fontSize: 12, fontWeight: '800' },
   activityTitle: { color: colors.text, fontSize: 15, fontWeight: '700' },
   activitySub: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
   activityArrow: { color: colors.textMuted, fontSize: 24 },
