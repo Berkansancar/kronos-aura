@@ -614,3 +614,27 @@ export async function setHardDay(
     [day, JSON.stringify(merged), now.toISOString()]
   );
 }
+
+// ───────────────────────── Haftalık özet için sorgular ─────────────────────────
+
+export type TimeLogWithRoutine = TimeLog & { routineId: string | null };
+
+/** `sinceISO` sonrasındaki zaman kayıtları; görev bir rutinden geldiyse routineId dolu. */
+export async function listTimeLogsSince(db: SQLiteDatabase, sinceISO: string): Promise<TimeLogWithRoutine[]> {
+  return db.getAllAsync<TimeLogWithRoutine>(
+    `SELECT l.*, t.routineId AS routineId
+     FROM TimeLog l LEFT JOIN Task t ON t.id = l.taskId
+     WHERE l.loggedAt >= ?
+     ORDER BY l.loggedAt ASC`,
+    [sinceISO]
+  );
+}
+
+/** `sinceDay` (yyyy-mm-dd) ve sonrasındaki zor gün kayıtları. */
+export async function listHardDaysSince(db: SQLiteDatabase, sinceDay: string): Promise<string[]> {
+  const rows = await db.getAllAsync<{ day: string }>(
+    "SELECT day FROM DayMode WHERE mode = 'HARD' AND day >= ? ORDER BY day ASC",
+    [sinceDay]
+  );
+  return rows.map((r) => r.day);
+}

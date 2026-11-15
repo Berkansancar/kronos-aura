@@ -507,6 +507,14 @@ export default function HomeScreen() {
           <Text style={styles.activityArrow}>›</Text>
         </Pressable>
 
+        <Pressable onPress={() => router.push('/weekly')} style={styles.activityCard}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.activityTitle}>Haftalık özet</Text>
+            <Text style={styles.activitySub}>Son 7 günün görev, rutin, uyku ve enerji özeti</Text>
+          </View>
+          <Text style={styles.activityArrow}>›</Text>
+        </Pressable>
+
         <Text style={styles.sectionTitle}>Görevler</Text>
         {sortedTasks.length === 0 ? (
           <View style={styles.empty}>

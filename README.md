@@ -53,6 +53,9 @@ npm run test:routines     rutinler, analiz, hatırlatmalar, koç entegrasyonu, 1
 npm run test:sleep        uyku tahmini, 33 kontrol
 npm run test:review       gün sonu değerlendirmesi, elle yol, ücretsiz anahtar sırası ve yarın planı, 106 kontrol
 npm run test:free         Gemini ve Groq istemcisi (model yedeği, hata eşleme), 33 kontrol
+npm run test:morning      sabah brifingi, bildirim planı, veritabanı v6, 62 kontrol
+npm run test:hardday      zor gün modu (hangi işler kalır, aç/kapat, koç mesajları), 40 kontrol
+npm run test:weekly       haftalık özet (toplamlar, kıyas, metinler, veritabanı), 52 kontrol
 ```
 
 
@@ -130,3 +133,40 @@ model adı bulunamaz ya da sınırına takılırsa sıradaki model denenir (`ser
 hatasında ya da ağ sorununda denenmez. Anahtarlar Claude anahtarı gibi yalnızca telefonun güvenli deposunda
 tutulur. Gemini'nin ücretsiz planında içerik Google'ın ürün geliştirmesinde kullanılabilir; Ayarlar'da açıkça
 yazılıdır. Adım, ekran ve uyku bilgisi yine yalnızca paylaşım açıksa gönderilir.
+
+
+## Sabah brifingi
+
+Ana ekrandaki "Sabah brifingi" kartı (05:00–12:00) ya da sabah bildirimi `/morning` ekranını açar: selamlama,
+Aura'nın uykuya göre sıcak cümlesi, Kronos'un günün özeti (açık görev sayısı ve toplam süre, en önemli iş,
+tepe saati), dünkü gün sonu değerlendirmesindeki Kronos notu, planlı görevler ve bugünkü rutinler. Hepsi
+telefondaki veriden ve kurallardan gelir; internet ya da anahtar gerekmez. Mantık `services/morningLogic.ts`,
+veri toplama `services/morning.ts`.
+
+Bildirim Ayarlar'daki "Sabah brifingi" anahtarıyla açılıp kapanır (varsayılan açık, 08:00; 07/08/09/10
+seçilebilir). Her sabah için tek seferlik yerel bildirim kurulur; bildirime dokunmak ilgili ekranı açar
+(bildirimin `data.route` alanı, `app/_layout.tsx` içinde karşılanır; gün sonu bildirimi de `/review` açar).
+
+## Zor gün modu
+
+Ana ekrandaki "Zor bir gün mü? Planı hafiflet" bağlantısıyla (ya da sabah brifinginden) açılır. Kısa uyku
+(5,5 saatten az) ya da bugün iki "tükendim" kaydı varsa kart kendiliğinden önerilir. Açılınca:
+
+- Planda en fazla 2 hafif iş ve toplam 90 dakika kalır (başlamış iş her zaman kalır); diğerleri bugünlük
+  ertelenir. Normal güne dönülünce yalnızca zor gün modunun ertelediği işler geri gelir (kullanıcının sildiği ya
+  da elle geri aldığı işlere dokunulmaz).
+- 10 dakikadan uzun rutinler o gün sorulmaz (kart ve bildirim yok) ve kaçırılmış sayılmaz; istatistikleri bozmaz.
+- Kronos "Hafif plan", Aura "Bugün zor bir gün, sorun değil" der; yapay zekâya da bu mod bildirilir ve baskı
+  kurmaması istenir.
+
+Kayıt `DayMode` tablosundadır (veritabanı v6; gün anahtarı + ertelenen görev kimlikleri).
+Mantık `services/hardDayLogic.ts`, aç/kapat `services/hardDay.ts`.
+
+## Haftalık özet
+
+Ana ekrandaki "Haftalık özet" satırı `/weekly` ekranını açar: son 7 günün biten görev ve süresi, rutinlerin
+yapılma oranı, ortalama uyku, adım ve ekran süresi, zor gün sayısı, günlere göre çubuk grafik, rutin başına
+ilerleme ve önceki haftayla kıyas. Aura haftayı yargılamadan yorumlar; Kronos en tutarlı rutini, ayarlanması
+gereken rutini (3+ şansta %40'ın altı) ve gelecek hafta için tepe saati önerisini söyler. Rutinden gelen görevler
+ikinci kez "görev" sayılmaz; sabah bakınca henüz bitmemiş gün rutin oranını düşürmez. Yapay zekâ gerekmez
+(`services/weeklyLogic.ts`, veri `services/weekly.ts`).

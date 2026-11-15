@@ -84,6 +84,7 @@ export default function RootLayout() {
           <Stack.Screen name="routines" />
           <Stack.Screen name="review" />
           <Stack.Screen name="morning" />
+          <Stack.Screen name="weekly" />
         </Stack>
       </SQLiteProvider>
     </Suspense>
