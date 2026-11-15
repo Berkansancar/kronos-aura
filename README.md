@@ -231,3 +231,11 @@ hepsi isteğe bağlıdır; konmayan hedef hiçbir yerde gösterilmez ve hepsi ka
   eşitlenir.
 
 Yapay zekâ gerekmez; tüm hesaplar telefonda yapılır. Hedefler SecureStore'da (`goals_v1`, `body_profile`) durur.
+
+## Logo ve ikon
+
+Logo özgündür: koyu arka planda, mavi (Kronos, zaman) ve nane yeşili (Aura, enerji) iki yaydan oluşan bir saat; akrep
+mavi, yelkovan ise Aura'yı temsil eden bir yaprak. Dosyalar `assets/` klasöründe:
+`icon.png` (uygulama ikonu), `adaptive-icon.png` (Android uyarlanabilir ikon ön planı, arka plan `#0B0D12`),
+`notification-icon.png` (bildirim simgesi, beyaz silüet), `logo.png` / `logo.svg` (yuvarlatılmış logo),
+`logo-wordmark.png` (yazılı yatay logo). `app.json` bunları kullanır.
