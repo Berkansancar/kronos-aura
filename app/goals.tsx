@@ -34,6 +34,8 @@ import { refreshReminders } from '../services/reminderSync';
 import { askNotificationPermission } from '../services/routineReminders';
 import { KCAL_TARGET_MAX, KCAL_TARGET_MIN, WATER_GOALS, clockOfMinute, formatKcal, formatWater } from '../services/nutritionLogic';
 import { saveKcalTarget, setWaterGoal } from '../services/nutritionSettings';
+import { getWork, saveWork } from '../services/workSettings';
+import { DEFAULT_WORK, WORK_DAYS, WORK_END_CHOICES, WORK_START_CHOICES, workSummary, type WorkSchedule } from '../services/workLogic';
 
 const STATUS_COLOR: Record<GoalStatus, string> = {
   DONE: colors.aura,
@@ -95,6 +97,7 @@ export default function GoalsScreen() {
   const [settings, setSettings] = useState<GoalSettings | null>(null);
   const [waterGoal, setWaterGoalState] = useState(2000);
   const [kcalTarget, setKcalTargetState] = useState<number | null>(null);
+  const [work, setWork] = useState<WorkSchedule>(DEFAULT_WORK);
 
   // Kalori hedefi formları
   const [mode, setMode] = useState<KcalMode>('manual');
@@ -116,6 +119,7 @@ export default function GoalsScreen() {
     setSettings(bundle.settings);
     setWaterGoalState(bundle.waterGoalMl);
     setKcalTargetState(bundle.kcalTarget);
+    setWork(await getWork(db));
     setState(await loadGoalState(db, now, bundle));
     const body = await getBody();
     setProfile(body);
@@ -151,6 +155,13 @@ export default function GoalsScreen() {
   };
 
   const patch = (p: Partial<GoalSettings>) => void run(async () => void (await saveGoals(p)));
+
+  // İş saatleri değişince bugünün planı hemen yeniden dizilir
+  const applyWork = (p: Partial<WorkSchedule>) =>
+    void run(async () => {
+      await saveWork(db, p);
+      await replanDay(db, new Date(), 'MANUAL');
+    });
 
   const toggleReminders = (on: boolean) =>
     void run(async () => {
@@ -302,6 +313,61 @@ export default function GoalsScreen() {
 
             {/* ───── Düzenle ───── */}
             <Text style={styles.section}>Hedeflerini düzenle</Text>
+
+            <View style={styles.card}>
+              <View style={styles.rowBetween}>
+                <Text style={styles.itemTitle}>İş saatleri</Text>
+                <Switch
+                  value={work.enabled}
+                  disabled={busy}
+                  onValueChange={(on) => applyWork({ enabled: on })}
+                  trackColor={{ true: colors.aura, false: colors.border }}
+                />
+              </View>
+              <Text style={styles.muted}>
+                {work.enabled
+                  ? `Çalışma saatlerin: ${workSummary(work)}. Planlayıcı, "iş vaktinde de yapılabilir" demediğin işleri bu saatlere koymaz.`
+                  : 'Gündüz çalışıyorsan aç: planlayıcı işleri iş saatlerinin dışına yerleştirsin, iş vaktinde yapılabilenleri ayrıca işaretlersin.'}
+              </Text>
+              {work.enabled && (
+                <>
+                  <Text style={styles.label}>Başlangıç</Text>
+                  <Choices
+                    options={WORK_START_CHOICES}
+                    value={work.startMin}
+                    label={hhmm}
+                    onPick={(v) => v !== null && applyWork({ startMin: v })}
+                  />
+                  <Text style={styles.label}>Bitiş</Text>
+                  <Choices
+                    options={WORK_END_CHOICES}
+                    value={work.endMin}
+                    label={hhmm}
+                    onPick={(v) => v !== null && applyWork({ endMin: v })}
+                  />
+                  <Text style={styles.label}>Günler</Text>
+                  <View style={styles.chipRow}>
+                    {WORK_DAYS.map((d) => {
+                      const on = work.days.includes(d.day);
+                      return (
+                        <Pressable
+                          key={d.day}
+                          disabled={busy}
+                          onPress={() => {
+                            // En az bir iş günü kalmalı
+                            if (on && work.days.length <= 1) return;
+                            applyWork({ days: on ? work.days.filter((x) => x !== d.day) : [...work.days, d.day] });
+                          }}
+                          style={[styles.chip, on && { borderColor: colors.aura, backgroundColor: colors.surface }]}
+                        >
+                          <Text style={[styles.chipText, on && { color: colors.aura }]}>{d.label}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </>
+              )}
+            </View>
 
             <View style={styles.card}>
               <Text style={styles.itemTitle}>Su</Text>
@@ -513,8 +579,9 @@ export default function GoalsScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.itemTitle}>Hedef hatırlatmaları</Text>
                   <Text style={styles.hint}>
-                    Öğle ve ikindi saatlerinde su hatırlatması (hedefe ulaşınca susar) ve yatış saatine 45 dk kala hazırlık
-                    hatırlatması. Varsayılan kapalı.
+                    Sabah uyanınca (Gün akışı'ndaki saatlerine göre) ve öğle ile ikindi saatlerinde su hatırlatması
+                    (hedefe ulaşınca susar), iş saatlerin açıksa işin bitiminden 15 dk sonra "günü işaretleyelim mi?"
+                    ve yatış saatine 45 dk kala hazırlık hatırlatması. Varsayılan kapalı.
                   </Text>
                 </View>
                 <Switch

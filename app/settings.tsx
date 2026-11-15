@@ -287,8 +287,8 @@ export default function SettingsScreen() {
           <Text style={styles.noteText}>
             {info.privacy}
             {'\n'}Bu anahtar yalnızca gün sonu değerlendirmesi için kullanılır; koçlarla sohbet Claude anahtarınla
-            yapılır. İkisi de varsa gün sonunda önce ücretsiz olan denenir. Adım, ekran, uyku ve su/yemek özeti
-            (yemek adları asla) yalnızca gün analizi paylaşımını açtıysan gider.
+            yapılır. İkisi de varsa gün sonunda önce ücretsiz olan denenir. Adım, ekran, uyku, su/yemek özeti
+            (yemek adları asla) ve sigara sayacının yalnızca toplamı yalnızca gün analizi paylaşımını açtıysan gider.
           </Text>
         </View>
 
@@ -423,7 +423,7 @@ export default function SettingsScreen() {
             konmaz.{'\n'}• Her yapay zekâ mesajı API'den ücretlendirilir; Claude aboneliğinden
             ayrıdır. Anthropic Console'dan harcama sınırı belirleyebilirsin.{'\n'}• Koçlara görev
             adların, planın ve enerji kayıtların gönderilir. Göndermek istemediğin bir şeyi görev
-            adına yazma. Rutinlerinin adı, bugünkü durumu ve gün sonu değerlendirmesi için günün özeti de gider. Gün analizinde paylaşımı açtıysan adım, ekran süren, uyku tahminin ve su/yemek özetin (miktar, sayı, yaklaşık kalori; yemek adları değil) de gider.{'\n'}• Anahtar yoksa ya da internet kesilirse koçlar kural tabanlı
+            adına yazma. Rutinlerinin adı, bugünkü durumu ve gün sonu değerlendirmesi için günün özeti de gider. Gün analizinde paylaşımı açtıysan adım, ekran süren, uyku tahminin, su/yemek özetin (miktar, sayı, yaklaşık kalori; yemek adları değil) ve sigara sayacının toplamı ile ortalama aralığı da gider. Görev sonuçların (yaptım, yapmadım, yapamadım) ve iş saatlerin gün sonu değerlendirmesiyle gider.{'\n'}• Anahtar yoksa ya da internet kesilirse koçlar kural tabanlı
             çalışmaya devam eder.
           </Text>
         </View>

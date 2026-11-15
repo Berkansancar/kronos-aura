@@ -16,7 +16,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { colors, radius, spacing } from '../constants/theme';
 import { listRoutines } from '../database/repository';
-import type { DayReview, Routine, RoutineIdea } from '../database/types';
+import type { DayReview, Routine, RoutineIdea, ScreenAlternative } from '../database/types';
 import { isSharingWithAi } from '../services/activity';
 import { getFreeConfig } from '../services/ai/freeSettings';
 import { getAiConfig } from '../services/ai/settings';
@@ -34,7 +34,8 @@ import {
   type TomorrowAnswer,
 } from '../services/dayReview';
 import { factChips, type DayFacts } from '../services/dayReviewLogic';
-import { formatDayTitle } from '../services/format';
+import { formatDayTitle, formatDuration } from '../services/format';
+import { addTask } from '../services/taskFlow';
 import { refreshReminders } from '../services/reminderSync';
 import { retireRoutine } from '../services/routineFlow';
 import { formatAskTime } from '../services/routineLogic';
@@ -137,6 +138,14 @@ export default function ReviewScreen() {
     run(async () => {
       await addIdeaAsRoutine(db, idea);
       await permissionPrompt();
+    });
+
+  // Ekran yerine önerilen bir şeyi yarının planına ekler (iş vaktinde yapılmaz, hafif)
+  const [addedAlts, setAddedAlts] = useState<Set<string>>(new Set());
+  const addAlternative = (a: ScreenAlternative) =>
+    run(async () => {
+      await addTask(db, { title: a.title, estimatedDuration: a.minutes, cognitiveWeight: 'LOW', workOk: false });
+      setAddedAlts((prev) => new Set(prev).add(norm(a.title)));
     });
 
   const addAll = (ideas: RoutineIdea[]) =>
@@ -255,6 +264,60 @@ export default function ReviewScreen() {
                 </Text>
               </>
             )}
+
+            {review && (Boolean(review.payload.timeUse) || (facts?.timeUse?.chips.length ?? 0) > 0) && (
+              <>
+                <Text style={styles.section}>Zaman nereye gitti?</Text>
+                <View style={[styles.coach, { borderColor: colors.aura, backgroundColor: colors.auraSoft }]}>
+                  <Text style={[styles.coachName, { color: colors.aura }]}>AURA · zaman</Text>
+                  {review.payload.timeUse ? <Text style={styles.coachText}>{review.payload.timeUse}</Text> : null}
+                  {facts?.timeUse && facts.timeUse.chips.length > 0 && (
+                    <View style={styles.chips}>
+                      {facts.timeUse.chips.map((c) => (
+                        <View key={c} style={styles.chip}>
+                          <Text style={styles.chipText}>{c}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              </>
+            )}
+
+            {review && review.payload.screenAlternatives && review.payload.screenAlternatives.length > 0 && (
+              <>
+                <Text style={styles.section}>Ekran yerine</Text>
+                {review.payload.screenNote ? <Text style={styles.hint}>{review.payload.screenNote}</Text> : null}
+                {review.payload.screenAlternatives.map((a) => {
+                  const added = addedAlts.has(norm(a.title));
+                  return (
+                    <View key={a.title} style={styles.card}>
+                      <View style={styles.rowBetween}>
+                        <Text style={styles.cardTitle}>{a.title}</Text>
+                        <Text style={styles.time}>{formatDuration(a.minutes)}</Text>
+                      </View>
+                      <Text style={styles.cardText}>{a.why}</Text>
+                      {a.kind === 'IDEA' && (
+                        <Pressable
+                          disabled={added || busy}
+                          onPress={() => addAlternative(a)}
+                          style={[styles.addBtn, added && styles.addBtnDone]}
+                        >
+                          <Text style={[styles.addBtnText, added && { color: colors.textMuted }]}>
+                            {added ? 'Plana eklendi' : 'Yarın plana ekle'}
+                          </Text>
+                        </Pressable>
+                      )}
+                      {a.kind === 'TASK' && <Text style={styles.hint}>Bu iş zaten listende; yarın plana döner.</Text>}
+                    </View>
+                  );
+                })}
+              </>
+            )}
+
+            <Pressable onPress={() => router.push('/mark')} hitSlop={6}>
+              <Text style={styles.hint}>Gündüz işaretleyemediğin işler mi var? Günü işaretle ›</Text>
+            </Pressable>
 
             {aiError && (
               <Text style={styles.warn}>

@@ -22,6 +22,8 @@ import {
 } from './goalsLogic';
 import { loadDayNutrition } from './nutrition';
 import { nutritionDay, type DayNutrition } from './nutritionLogic';
+import { getWork } from './workSettings';
+import { workWindowFor } from './workLogic';
 import { dayBounds, planningDay } from './planner';
 
 export interface GoalBundle {
@@ -92,6 +94,8 @@ export async function loadGoalState(db: SQLiteDatabase, now: Date, cfg: GoalBund
     lastBedMinute: lastBed,
     doneMinutes: done,
   });
+  // İş saatleri açıksa o saatler boş pencere sayılmaz
+  const work = workWindowFor(dayStart, await getWork(db));
   const balance = buildTimeBalance({
     now,
     wakeMinute: wake,
@@ -101,6 +105,7 @@ export async function loadGoalState(db: SQLiteDatabase, now: Date, cfg: GoalBund
     blocks,
     unplanned: { count: open.length, minutes: open.reduce((a, t) => a + t.estimatedDuration, 0) },
     focusMin: cfg.settings.focusMin,
+    busy: work ? [work] : [],
   });
   return { day, nutrition, progress, balance };
 }

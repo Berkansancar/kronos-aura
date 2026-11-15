@@ -182,7 +182,7 @@ async function dbTests(): Promise<void> {
   const { db, raw } = makeTestDb();
   await migrateDbIfNeeded(db);
   const ver = (raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;
-  check('temiz kurulum son sürüm (7)', ver === DATABASE_VERSION && DATABASE_VERSION === 7);
+  check('temiz kurulum son sürüm (8)', ver === DATABASE_VERSION && DATABASE_VERSION === 8);
   raw.exec('DROP TABLE WaterLog; DROP TABLE MealLog; PRAGMA user_version = 6;');
   await migrateDbIfNeeded(db);
   check("v6 veritabanı v7'ye yükselir", (raw.prepare("SELECT name FROM sqlite_master WHERE name IN ('WaterLog','MealLog')").all() as unknown[]).length === 2);

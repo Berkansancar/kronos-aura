@@ -5,6 +5,7 @@ import {
   Platform,
   Pressable,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -22,26 +23,31 @@ const WEIGHTS: { value: CognitiveWeight; label: string; hint: string; color: str
 interface Props {
   visible: boolean;
   onClose: () => void;
+  /** İş saatleri açıksa "iş vaktinde de yapılabilir" anahtarı gösterilir */
+  workEnabled?: boolean;
   onSubmit: (input: {
     title: string;
     estimatedDuration: number;
     cognitiveWeight: CognitiveWeight;
+    workOk: boolean;
   }) => void;
 }
 
-export function TaskComposer({ visible, onClose, onSubmit }: Props) {
+export function TaskComposer({ visible, onClose, onSubmit, workEnabled }: Props) {
   const [title, setTitle] = useState('');
   const [duration, setDuration] = useState(30);
   const [weight, setWeight] = useState<CognitiveWeight>('MEDIUM');
+  const [workOk, setWorkOk] = useState(false);
 
   const canSubmit = title.trim().length > 0;
 
   const submit = () => {
     if (!canSubmit) return;
-    onSubmit({ title: title.trim(), estimatedDuration: duration, cognitiveWeight: weight });
+    onSubmit({ title: title.trim(), estimatedDuration: duration, cognitiveWeight: weight, workOk: workEnabled ? workOk : false });
     setTitle('');
     setDuration(30);
     setWeight('MEDIUM');
+    setWorkOk(false);
   };
 
   return (
@@ -97,6 +103,22 @@ export function TaskComposer({ visible, onClose, onSubmit }: Props) {
               );
             })}
           </View>
+
+          {workEnabled && (
+            <View style={styles.workRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.weightLabel}>İş vaktinde de yapılabilir</Text>
+                <Text style={styles.weightHint}>
+                  Kapalıysa bu iş yalnızca iş saatleri dışına yerleşir
+                </Text>
+              </View>
+              <Switch
+                value={workOk}
+                onValueChange={setWorkOk}
+                trackColor={{ true: colors.aura, false: colors.border }}
+              />
+            </View>
+          )}
 
           <Pressable
             onPress={submit}
@@ -155,6 +177,15 @@ const styles = StyleSheet.create({
   dot: { width: 10, height: 10, borderRadius: 5 },
   weightLabel: { color: colors.text, fontSize: 14, fontWeight: '600' },
   weightHint: { color: colors.textMuted, fontSize: 12 },
+  workRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   submit: {
     backgroundColor: colors.kronos,
     borderRadius: radius.pill,

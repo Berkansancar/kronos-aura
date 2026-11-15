@@ -9,7 +9,7 @@ import { DB_NAME, migrateDbIfNeeded } from '../database/schema';
 import { ensureTracking } from '../services/activity';
 
 /** Bildirime dokunulunca bildirimin belirttiği ekranı (sabah brifingi, gün sonu) açar. */
-const ALLOWED_ROUTES = new Set(['/morning', '/review', '/nutrition', '/goals']);
+const ALLOWED_ROUTES = new Set(['/morning', '/review', '/nutrition', '/goals', '/mark', '/day']);
 
 function openFromNotification(response: Notifications.NotificationResponse | null | undefined): void {
   const route = response?.notification.request.content.data?.route;
@@ -17,7 +17,7 @@ function openFromNotification(response: Notifications.NotificationResponse | nul
   // Uygulama yeni açılıyorsa gezinme hazır olana kadar kısa bekle
   setTimeout(() => {
     try {
-      router.push(route as '/morning' | '/review' | '/nutrition' | '/goals');
+      router.push(route as '/morning' | '/review' | '/nutrition' | '/goals' | '/mark' | '/day');
     } catch {
       // Gezinme hazır değilse ana ekran açık kalır; kullanıcı kartlardan girebilir.
     }
@@ -87,6 +87,8 @@ export default function RootLayout() {
           <Stack.Screen name="weekly" />
           <Stack.Screen name="nutrition" />
           <Stack.Screen name="goals" />
+          <Stack.Screen name="mark" />
+          <Stack.Screen name="day" />
         </Stack>
       </SQLiteProvider>
     </Suspense>

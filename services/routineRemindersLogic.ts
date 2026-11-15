@@ -46,7 +46,20 @@ export interface GoalReminders {
   waterGoalReached: boolean;
   /** Yatış saati, gün başından dakika (örn. 23:00 = 1380, 00:30 = 1470); yoksa null */
   bedtime: number | null;
+  /**
+   * Tipik uyanış dakikası (son "Uyandım" damgalarının ortancası). Alan verilirse (null dahil) sabah su
+   * hatırlatması kurulur; null ya da makul olmayan değer varsayılan saati kullanır. Alan yoksa kurulmaz.
+   */
+  wakeMinute?: number | null;
+  /** İş saatleri açıksa: bitişten sonra "günü işaretleyelim" hatırlatması (gün başından dakika, hafta günleri 0=Pazar) */
+  work?: { endMin: number; days: number[] } | null;
 }
+
+/** Uyanıştan kaç dakika sonra su hatırlatması gelsin, ve uyanış bilinmiyorsa varsayılan saat (07:45) */
+export const WAKE_NUDGE_DELAY = 10;
+export const DEFAULT_WAKE_NUDGE_MINUTE = 7 * 60 + 45;
+/** İş bitişinden kaç dakika sonra işaretleme hatırlatması gelsin */
+export const MARK_AFTER_WORK_MINUTES = 15;
 
 /** Su hatırlatmaları: öğle ve ikindi (saat, dakika) */
 export const WATER_NUDGES: readonly { hour: number; minute: number; title: string; body: string }[] = [
@@ -157,6 +170,20 @@ export function planReminders(
       if (d === 0 && extras.hardDayToday) continue;
       const base = new Date(now.getFullYear(), now.getMonth(), now.getDate() + d);
       if (!(d === 0 && g.waterGoalReached)) {
+        if (g.wakeMinute !== undefined) {
+          const wake = g.wakeMinute !== null && g.wakeMinute >= 240 && g.wakeMinute <= 660 ? g.wakeMinute + WAKE_NUDGE_DELAY : DEFAULT_WAKE_NUDGE_MINUTE;
+          const at = new Date(base.getFullYear(), base.getMonth(), base.getDate(), 0, wake);
+          if (at.getTime() > now.getTime()) {
+            out.push({
+              id: `${REMINDER_ID_PREFIX}water-${dayKey(at)}-wake`,
+              routineId: '',
+              at,
+              title: 'Günaydın, bir bardak su',
+              body: 'Uyandıktan sonra bir bardak su iyi gelir. Gün akışı ekranında "Uyandım"a dokunursan suyu da oradan kaydedebilirsin.',
+              route: '/day',
+            });
+          }
+        }
         for (const n of WATER_NUDGES) {
           const at = new Date(base.getFullYear(), base.getMonth(), base.getDate(), n.hour, n.minute);
           if (at.getTime() <= now.getTime()) continue;
@@ -167,6 +194,19 @@ export function planReminders(
             title: n.title,
             body: n.body,
             route: '/nutrition',
+          });
+        }
+      }
+      if (g.work && g.work.days.includes(base.getDay())) {
+        const at = new Date(base.getFullYear(), base.getMonth(), base.getDate(), 0, g.work.endMin + MARK_AFTER_WORK_MINUTES);
+        if (at.getTime() > now.getTime()) {
+          out.push({
+            id: `${REMINDER_ID_PREFIX}mark-${dayKey(base)}`,
+            routineId: '',
+            at,
+            title: 'İş bitti, günü işaretleyelim mi?',
+            body: 'Gündüz bakamadıysan şimdi topluca işaretle: yaptım, yapmadım, yapamadım.',
+            route: '/mark',
           });
         }
       }

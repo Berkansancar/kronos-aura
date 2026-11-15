@@ -10,11 +10,17 @@ import type {
   DayReviewPayload,
   RoutineCategory,
   RoutineIdea,
+  ScreenAlternative,
+  TaskOutcomeKind,
+  TaskOutcomeReason,
 } from '../database/types';
 import { extractJsonObject } from './ai/claudeClient';
 import { nutritionPromptLines, type DayNutrition } from './nutritionLogic';
 import { formatDuration } from './format';
 import { ROUTINE_TEMPLATES } from './routineTemplates';
+import { smokePromptLine, type SmokeStats } from './smokeLogic';
+import { reasonLabel } from './taskOutcomeLogic';
+import { screenAlternatives, timeUsePromptLines, type OpenTaskInfo, type TimeUse } from './timeUseLogic';
 
 // ───────────────────────── Gerçekler ─────────────────────────
 
@@ -42,6 +48,15 @@ export interface DayFacts {
   peakEndHour: number;
   /** Günün su ve yemek özeti (kayıt tutulduysa) */
   nutrition?: DayNutrition | null;
+  /** Kullanıcının işaretlediği görev sonuçları (Yaptım / Yapmadım / Yapamadım) */
+  outcomes?: { title: string; outcome: TaskOutcomeKind; reason: TaskOutcomeReason | null; workOk: boolean }[];
+  /** Hâlâ açık ya da bugün yapılamayan işler (ekran süresi yerine önerilerin kaynağı) */
+  openTasks?: OpenTaskInfo[];
+  /** İş penceresi (gün başından dakika) */
+  workWindow?: { startMin: number; endMin: number; source: 'STAMP' | 'SETTING' } | null;
+  /** "Zaman nereye gitti" dökümü */
+  timeUse?: TimeUse | null;
+  smoke?: SmokeStats | null;
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -57,6 +72,9 @@ export function factChips(f: DayFacts): string[] {
   if (f.sleepMinutes !== null) chips.push(`uyku ~${formatDuration(f.sleepMinutes)}`);
   if (f.driftMinutes > 0) chips.push(`${formatDuration(f.driftMinutes)} akıp giden`);
   if (f.nutrition && !f.nutrition.quiet) chips.push(...f.nutrition.chips.slice(0, 3));
+  const missed = (f.outcomes ?? []).filter((o) => o.outcome !== 'DONE').length;
+  if (missed > 0) chips.push(`${missed} iş yapılamadı/yapılmadı`);
+  if (f.smoke && f.smoke.count > 0) chips.push(`${f.smoke.count} sigara`);
   return chips;
 }
 
@@ -140,21 +158,47 @@ export function buildRulesReview(
   if (f.sleepMinutes !== null && f.sleepMinutes < 360) {
     parts.push('Dünkü uykun kısa görünüyor; bu gece erken kapanmak iyi gelir.');
   }
+  // Görev sonuçları: yapamadığın işler bir borç değil, yarına devreden veridir
+  const outs = f.outcomes ?? [];
+  const couldNot = outs.filter((o) => o.outcome === 'COULD_NOT');
+  const notDone = outs.filter((o) => o.outcome === 'NOT_DONE');
+  if (couldNot.length + notDone.length > 0) {
+    const n = couldNot.length + notDone.length;
+    parts.push(`${n} iş bugün olmadı; bunlar yarın yeniden plana girer, bir borç oluşmadı.`);
+  }
   const reflection = parts.join(' ');
 
   const peak = `${pad(f.peakStartHour)}:00–${pad(f.peakEndHour)}:00`;
   const open = f.routinesOpen.length;
-  const tomorrow =
+  let tomorrow =
     open > 0
       ? `Yarın ağır işi ${peak} tepe saatine koy. Aşağıdan "yarın yapacağım" dediğin rutinleri sabah plana yerleştiririm; ${open} rutin bugün açık kaldı, istersen saatini ya da süresini ayarlayalım.`
       : `Yarın ağır işi ${peak} tepe saatine koy. Aşağıdan "yarın yapacağım" dediğin rutinleri sabah plana yerleştiririm.`;
+  const byWork = couldNot.filter((o) => o.reason === 'WORK' && !o.workOk);
+  if (byWork.length > 0) {
+    tomorrow += ` ${byWork.length} iş iş vaktine denk geldiği için olmadı; iş vaktinde yapılabilecek olanları öyle işaretlersen gün içine de yer ayırırım.`;
+  }
 
-  return {
+  const payload: DayReviewPayload = {
     reflection,
     tomorrow,
     ideas: ruleBasedIdeas(f, existingTitles, activeTemplateIds),
     source: 'RULES',
   };
+  return { ...payload, ...ruleTimeUse(f) };
+}
+
+/** Kural tabanlı "zaman nereye gitti" ve "ekran yerine" alanları; veri yoksa boş döner. */
+export function ruleTimeUse(f: DayFacts): Pick<DayReviewPayload, 'timeUse' | 'screenNote' | 'screenAlternatives'> {
+  const out: Pick<DayReviewPayload, 'timeUse' | 'screenNote' | 'screenAlternatives'> = {};
+  if (f.timeUse) out.timeUse = f.timeUse.text;
+  const seed = Number(f.day.slice(8, 10)) || 0;
+  const alt = screenAlternatives(f.screenMinutes, f.openTasks ?? [], seed);
+  if (alt.items.length > 0 && alt.note) {
+    out.screenNote = alt.note;
+    out.screenAlternatives = alt.items;
+  }
+  return out;
 }
 
 // ───────────────────────── Yapay zekâ ─────────────────────────
@@ -192,6 +236,47 @@ export function buildReviewPrompt(
     // Su ve yemek: yalnızca toplu özet; yemek adları asla gitmez. Yargısız, kalori hesabı yapılmaz.
     if (f.nutrition) lines.push(...nutritionPromptLines(f.nutrition));
   }
+  // Görev sonuçları, iş saatleri ve açık işler: kullanıcının kendi yazdığı/işaretlediği veriler
+  const outs = f.outcomes ?? [];
+  if (outs.length > 0) {
+    const seg: string[] = [];
+    const done = outs.filter((o) => o.outcome === 'DONE');
+    const notDone = outs.filter((o) => o.outcome === 'NOT_DONE');
+    const couldNot = outs.filter((o) => o.outcome === 'COULD_NOT');
+    if (done.length > 0) seg.push(`Yaptım: ${done.slice(0, 8).map((o) => o.title).join(', ')}`);
+    if (notDone.length > 0) seg.push(`Yapmadım: ${notDone.slice(0, 8).map((o) => o.title).join(', ')}`);
+    if (couldNot.length > 0) {
+      seg.push(
+        `Yapamadım: ${couldNot
+          .slice(0, 8)
+          .map((o) => (o.reason ? `${o.title} (sebep: ${reasonLabel(o.reason)})` : o.title))
+          .join(', ')}`
+      );
+    }
+    lines.push(`- Görev sonuçları (kullanıcı işaretledi): ${seg.join('; ')}`);
+  }
+  if (f.workWindow) {
+    const hm = (m: number) => `${pad(Math.floor(m / 60) % 24)}:${pad(m % 60)}`;
+    lines.push(
+      `- İş saatleri: ${hm(f.workWindow.startMin)}–${hm(f.workWindow.endMin)}${f.workWindow.source === 'STAMP' ? ' (dükkana geliş ve çıkış damgalarından)' : ''}`
+    );
+  }
+  const openTasks = f.openTasks ?? [];
+  if (openTasks.length > 0) {
+    lines.push(
+      `- Açık kalan işler: ${openTasks
+        .slice(0, 8)
+        .map((t) => `${t.title} (${t.minutes} dk${t.workOk ? ', iş vaktinde yapılabilir' : ''})`)
+        .join(', ')}`
+    );
+  }
+  if (f.timeUse && (f.timeUse.wakeSource === 'STAMP' || shareActivity)) {
+    lines.push(...timeUsePromptLines(f.timeUse, shareActivity));
+  }
+  if (shareActivity && f.smoke) {
+    const sl = smokePromptLine(f.smoke);
+    if (sl) lines.push(sl);
+  }
   lines.push(`- Tepe enerji penceresi: ${pad(f.peakStartHour)}:00–${pad(f.peakEndHour)}:00`);
   lines.push(
     existingTitles.length > 0
@@ -207,10 +292,41 @@ export function buildReviewPrompt(
     '- "tomorrow": Kronos sesiyle (net, stratejik) en fazla 2 kısa cümle; yarının enerji saatlerine göre tek bir somut yaklaşım.',
     '- "ideas": 3 fikir; kullanıcının mevcut hâline uygun, küçük ve uygulanabilir olsun (5-60 dakika). Birbirine benzemesin.',
     '  Her fikir: {"title": en fazla 40 karakter, "category": "SAGLIK" | "ZIHIN" | "ODAK" | "DUZEN", "minutes": 5-60, "hour": 6-21 (sorulacak saat), "minute": 0-59, "why": tek kısa cümle}',
+    '- "timeUse": Aura sesiyle en fazla 3 kısa cümle: zamanın nereye gittiğini yargılamadan özetle (kayıt dışı kalan zaman, akıp giden zaman). Yalnızca yukarıda verilen sayıları kullan; "boşa" gibi değer yargısı taşıyan sözcükler yerine "kayıt dışı kalan zaman" de. Zaman dökümü verilmediyse boş metin ("") ver.',
+    ...(shareActivity
+      ? [
+          '- "screenAlternatives": ekran süresi verildiyse, ekrana giden zamanın küçük bir kısmı yerine yapılabilecek en fazla 3 somut şey. Önce kullanıcının "Yapamadım" ve "Yapmadım" dediği ya da açık kalan işlerden seç; iş saatinde yapılamayacak işleri iş saatine koyma. Her biri: {"title": en fazla 50 karakter, "minutes": 5-120, "why": tek kısa cümle}. Süre verilmediyse boş liste ver.',
+        ]
+      : []),
     'Sadece şu JSON\'u döndür, başka hiçbir şey yazma:',
-    '{"reflection":"...","tomorrow":"...","ideas":[{"title":"...","category":"SAGLIK","minutes":15,"hour":9,"minute":0,"why":"..."}]}'
+    shareActivity
+      ? '{"reflection":"...","tomorrow":"...","ideas":[{"title":"...","category":"SAGLIK","minutes":15,"hour":9,"minute":0,"why":"..."}],"timeUse":"...","screenAlternatives":[{"title":"...","minutes":15,"why":"..."}]}'
+      : '{"reflection":"...","tomorrow":"...","ideas":[{"title":"...","category":"SAGLIK","minutes":15,"hour":9,"minute":0,"why":"..."}],"timeUse":"..."}'
   );
   return lines.join('\n');
+}
+
+/**
+ * Yapay zekâ ya da elle yapıştırılan değerlendirmeye, eksik kalan "zaman nereye gitti" ve "ekran yerine"
+ * alanlarını kural tabanlıdan tamamlar. Modelin önerdiği ekran alternatifleri, kullanıcının açık işleriyle
+ * eşleşiyorsa TASK olarak işaretlenir. Ekran verisi yoksa alternatif listesi gösterilmez.
+ */
+export function withTimeUse(gen: DayReviewPayload, rules: DayReviewPayload, f: DayFacts): DayReviewPayload {
+  const open = new Set((f.openTasks ?? []).map((t) => norm(t.title)));
+  const aiAlts = (gen.screenAlternatives ?? []).map((a) => (open.has(norm(a.title)) ? { ...a, kind: 'TASK' as const } : a));
+  const out: DayReviewPayload = { ...gen };
+  const timeUse = gen.timeUse ?? rules.timeUse;
+  if (timeUse) out.timeUse = timeUse;
+  else delete out.timeUse;
+  const alts = rules.screenNote ? (aiAlts.length > 0 ? aiAlts : (rules.screenAlternatives ?? [])) : [];
+  if (alts.length > 0 && rules.screenNote) {
+    out.screenNote = rules.screenNote;
+    out.screenAlternatives = alts;
+  } else {
+    delete out.screenNote;
+    delete out.screenAlternatives;
+  }
+  return out;
 }
 
 function clampInt(v: unknown, min: number, max: number, fallback: number): number {
@@ -257,12 +373,33 @@ export function parseReviewResponse(
     });
   }
 
-  return {
+  const payload: DayReviewPayload = {
     reflection: reflection.slice(0, 420),
     tomorrow: tomorrow.slice(0, 320),
     ideas,
     source: 'AI',
   };
+
+  // İsteğe bağlı alanlar: eksik ya da uygunsuzsa yalnızca o alan atılır, değerlendirme geçerli kalır
+  const timeUse = typeof obj.timeUse === 'string' ? obj.timeUse.trim() : '';
+  if (timeUse.length >= 10 && !hasBannedWords(timeUse)) payload.timeUse = timeUse.slice(0, 520);
+
+  const alts: ScreenAlternative[] = [];
+  const altTaken = new Set<string>();
+  for (const item of Array.isArray(obj.screenAlternatives) ? obj.screenAlternatives : []) {
+    if (alts.length >= 3) break;
+    if (!item || typeof item !== 'object') continue;
+    const it = item as Record<string, unknown>;
+    const title = typeof it.title === 'string' ? it.title.trim() : '';
+    const why = typeof it.why === 'string' ? it.why.trim() : '';
+    if (title.length < 3 || title.length > 50 || !why) continue;
+    if (hasBannedWords(title) || hasBannedWords(why)) continue;
+    if (altTaken.has(norm(title))) continue;
+    altTaken.add(norm(title));
+    alts.push({ title, minutes: clampInt(it.minutes, 5, 120, 15), why: why.slice(0, 160), kind: 'IDEA' });
+  }
+  if (alts.length > 0) payload.screenAlternatives = alts;
+  return payload;
 }
 
 // ───────────────────────── Elle (ücretsiz sohbet uygulaması) yolu ─────────────────────────

@@ -5,6 +5,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { CoachConsole } from '../components/CoachConsole';
 import { EnergyCheckModal } from '../components/EnergyCheckModal';
+import { ReasonModal } from '../components/ReasonModal';
 import { RoutineCard } from '../components/RoutineCard';
 import { SnoozeModal } from '../components/SnoozeModal';
 import { TaskComposer } from '../components/TaskComposer';
@@ -18,6 +19,7 @@ import {
   isHardDay,
   listDayBlocks,
   listRecentLogs,
+  listTaskOutcomes,
   listVisibleTasks,
 } from '../database/repository';
 import type {
@@ -27,6 +29,7 @@ import type {
   RoutineBrief,
   SleepSummary,
   Task,
+  TaskOutcomeReason,
   TimeBlockRow,
   TimeLog,
   UserProfile,
@@ -57,6 +60,11 @@ import { addWater, loadDayNutrition } from '../services/nutrition';
 import { formatWater, type DayNutrition } from '../services/nutritionLogic';
 import { getNutritionOptions } from '../services/nutritionSettings';
 import { loadGoalState } from '../services/goals';
+import { addSmoke, loadDayFlow, stampEvent, type DayFlowState } from '../services/dayFlow';
+import { FLOW_KINDS, kindLabel } from '../services/dayFlowLogic';
+import { nutritionDay } from '../services/nutritionLogic';
+import { auraOutcomeReply, latestOutcomes, OUTCOME_LABEL, reasonLabel } from '../services/taskOutcomeLogic';
+import { getWork } from '../services/workSettings';
 import { getGoalBundle } from '../services/goalsSettings';
 import { formatClock, formatDayTitle, formatDuration } from '../services/format';
 import { DAY_END_HOUR, dayBounds, planningDay, replanDay } from '../services/planner';
@@ -73,12 +81,15 @@ import { refreshReminders } from '../services/reminderSync';
 import { materializePlannedRoutines, reviewAvailable, reviewDayOf } from '../services/dayReview';
 import {
   addTask,
+  carryOverMissed,
   completeTask,
   logDrift,
+  markTaskMissed,
   postponeTasks,
   removeTask,
   restoreTask,
   startTask,
+  toggleWorkOk,
 } from '../services/taskFlow';
 
 const STATUS_RANK: Record<Task['status'], number> = {
@@ -111,6 +122,10 @@ export default function HomeScreen() {
   const [hardDay, setHardDayOn] = useState(false);
   const [nutrition, setNutrition] = useState<DayNutrition | null>(null);
   const [goalLine, setGoalLine] = useState<string | null>(null);
+  const [workEnabled, setWorkEnabled] = useState(false);
+  const [outcomeNotes, setOutcomeNotes] = useState<Map<string, string>>(new Map());
+  const [couldNot, setCouldNot] = useState<Task | null>(null);
+  const [dayFlow, setDayFlow] = useState<DayFlowState | null>(null);
 
   const load = useCallback(async () => {
     const current = new Date();
@@ -118,6 +133,8 @@ export default function HomeScreen() {
     const u = await getOrCreateUser(db);
     // Dün akşam "yarın yapacağım" denen rutinler bugünün planına girer (hata verirse atlanır)
     await materializePlannedRoutines(db, current).catch(() => 0);
+    // Dün "yapmadım / yapamadım" denen işler yeni günün planına geri döner (hata verirse atlanır)
+    await carryOverMissed(db, current).catch(() => []);
     const t = await listVisibleTasks(db, start.toISOString());
     const b = await listDayBlocks(db, start, end);
     const l = await listRecentLogs(db, 10);
@@ -136,6 +153,20 @@ export default function HomeScreen() {
       setNutrition(await loadDayNutrition(db, current, await getNutritionOptions()));
     } catch {
       setNutrition(null);
+    }
+    // İş saatleri, görev sonuçları ve gün akışı (hata verirse kartlar yine de çalışır)
+    try {
+      setWorkEnabled((await getWork(db)).enabled);
+      const notes = new Map<string, string>();
+      for (const o of latestOutcomes(await listTaskOutcomes(db, nutritionDay(current)))) {
+        if (o.taskId && o.outcome !== 'DONE') {
+          notes.set(o.taskId, [OUTCOME_LABEL[o.outcome], reasonLabel(o.reason)].filter(Boolean).join(' · '));
+        }
+      }
+      setOutcomeNotes(notes);
+      setDayFlow(await loadDayFlow(db, current));
+    } catch {
+      setDayFlow(null);
     }
     // Hedefler özeti (hata verirse kart yine de açılır)
     try {
@@ -361,11 +392,26 @@ export default function HomeScreen() {
     }
   };
 
+  const missTask = (task: Task, outcome: 'NOT_DONE' | 'COULD_NOT', reason: TaskOutcomeReason | null) =>
+    run(async () => {
+      await markTaskMissed(db, task, outcome, reason, new Date());
+      setAuraReply(auraOutcomeReply(outcome, task.title, reason));
+    });
+
+  const onReasonSelect = (reason: TaskOutcomeReason | null) => {
+    const task = couldNot;
+    setCouldNot(null);
+    if (task) missTask(task, 'COULD_NOT', reason);
+  };
+
   const onFinishWithEnergy = (energy: EnergyState) => {
     const task = finishing;
     setFinishing(null);
     if (!task) return;
-    run(() => completeTask(db, task, energy));
+    run(async () => {
+      await completeTask(db, task, energy);
+      setAuraReply(auraOutcomeReply('DONE', task.title));
+    });
   };
 
   if (!user || !coaches) {
@@ -521,6 +567,47 @@ export default function HomeScreen() {
           />
         ))}
 
+        <View style={styles.activityCard}>
+          <Pressable onPress={() => router.push('/day')} style={{ flex: 1 }}>
+            <Text style={styles.activityTitle}>Gün akışı</Text>
+            <Text style={styles.activitySub}>
+              {dayFlow
+                ? `${dayFlow.next ? `Sıradaki: ${kindLabel(dayFlow.next)}` : 'Gün tamam: eve geldin'} · ${dayFlow.smoke.count} sigara`
+                : 'Uyandım, duş, minibüs, dükkan ve sigara sayacı'}
+            </Text>
+          </Pressable>
+          {dayFlow?.next && (
+            <Pressable
+              disabled={busy}
+              onPress={() => run(async () => void (await stampEvent(db, dayFlow.next!, new Date(), 0)))}
+              style={styles.waterBtn}
+              hitSlop={6}
+            >
+              <Text style={styles.waterBtnText}>
+                {FLOW_KINDS.find((k) => k.kind === dayFlow.next)?.icon} {kindLabel(dayFlow.next)}
+              </Text>
+            </Pressable>
+          )}
+          <Pressable
+            disabled={busy}
+            onPress={() => run(async () => void (await addSmoke(db, new Date(), 0)))}
+            style={styles.smokeBtn}
+            hitSlop={6}
+          >
+            <Text style={styles.smokeBtnText}>+1</Text>
+          </Pressable>
+        </View>
+
+        <Pressable onPress={() => router.push('/mark')} style={styles.activityCard}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.activityTitle}>Günü işaretle</Text>
+            <Text style={styles.activitySub}>
+              Gündüz telefona bakamadıysan akşam topluca: yaptım, yapmadım, yapamadım
+            </Text>
+          </View>
+          <Text style={styles.activityArrow}>›</Text>
+        </Pressable>
+
         <Pressable onPress={() => router.push('/routines')} style={styles.activityCard}>
           <View style={{ flex: 1 }}>
             <Text style={styles.activityTitle}>Rutinlerim</Text>
@@ -582,6 +669,11 @@ export default function HomeScreen() {
                 key={task.id}
                 task={task}
                 timeLabel={timeLabel(task)}
+                outcomeNote={outcomeNotes.get(task.id) ?? null}
+                workEnabled={workEnabled}
+                onToggleWorkOk={() => run(() => toggleWorkOk(db, task))}
+                onNotDone={() => missTask(task, 'NOT_DONE', null)}
+                onCouldNot={() => setCouldNot(task)}
                 onStart={() => run(() => startTask(db, task))}
                 onFinish={() => setFinishing(task)}
                 onPostpone={() => run(() => postponeTasks(db, [task.id]))}
@@ -599,6 +691,7 @@ export default function HomeScreen() {
 
       <TaskComposer
         visible={composerOpen}
+        workEnabled={workEnabled}
         onClose={() => setComposerOpen(false)}
         onSubmit={(input) => {
           setComposerOpen(false);
@@ -609,6 +702,12 @@ export default function HomeScreen() {
         taskTitle={finishing?.title ?? null}
         onSelect={onFinishWithEnergy}
         onClose={() => setFinishing(null)}
+      />
+      <ReasonModal
+        taskTitle={couldNot?.title ?? null}
+        workEnabled={workEnabled}
+        onSelect={onReasonSelect}
+        onClose={() => setCouldNot(null)}
       />
       <SnoozeModal
         routineTitle={snoozing?.title ?? null}
@@ -651,6 +750,14 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   waterBtnText: { color: colors.aura, fontSize: 13, fontWeight: '800' },
+  smokeBtn: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+  },
+  smokeBtnText: { color: colors.textMuted, fontSize: 13, fontWeight: '800' },
   reviewCard: {
     flexDirection: 'row',
     alignItems: 'center',

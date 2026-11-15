@@ -11,6 +11,8 @@ import {
   replaceDayBlocks,
   rowToSlot,
 } from '../database/repository';
+import { getWork } from './workSettings';
+import { workWindowFor } from './workLogic';
 import {
   computeDurationFactors,
   reoptimize,
@@ -51,6 +53,8 @@ export async function replanDay(
   const tasks = await listVisibleTasks(db, start.toISOString());
   const previousRows = await listDayBlocks(db, start, end);
   const samples = await listDurationSamples(db);
+  // İş saatleri açıksa ve o gün çalışılıyorsa, "iş vaktinde yapılabilir" işaretsiz işler o saatlere yerleşmez.
+  const workWindow = workWindowFor(day, await getWork(db));
 
   const result = reoptimize({
     now,
@@ -64,6 +68,7 @@ export async function replanDay(
       dayStartHour: DAY_START_HOUR,
       dayEndHour: DAY_END_HOUR,
       durationFactors: computeDurationFactors(samples),
+      workWindow,
     },
   });
 
