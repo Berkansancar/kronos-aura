@@ -410,6 +410,11 @@ export default function SettingsScreen() {
         {kcalMessage && (
           <Text style={[styles.message, { color: kcalMessage.ok ? colors.aura : colors.danger }]}>{kcalMessage.text}</Text>
         )}
+        <Pressable onPress={() => router.push('/goals')} hitSlop={8}>
+          <Text style={styles.switchText}>
+            Hedefler ekranında kalori hedefini hesaplatabilir; yemek saati, ekran süresi, yatış saati ve hatırlatma hedefleri koyabilirsin ›
+          </Text>
+        </Pressable>
 
         <View style={styles.note}>
           <Text style={styles.noteTitle}>Bilmen gerekenler</Text>

@@ -20,6 +20,7 @@ import {
   type DayNutrition,
 } from '../services/nutritionLogic';
 import { getNutritionOptions } from '../services/nutritionSettings';
+import { refreshReminders } from '../services/reminderSync';
 import type { NutritionOptions } from '../services/nutrition';
 
 const AGO_CHOICES: { minutes: number; label: string }[] = [
@@ -62,6 +63,8 @@ export default function NutritionScreen() {
     const day = nutritionDay(t);
     setN(await loadDayNutrition(db, t, o, day));
     setLogs(await loadDayLogs(db, day));
+    // Su hedefine ulaşıldıysa günün su hatırlatmaları sessizce kalkar (hata verirse atlanır)
+    refreshReminders(db, t).catch(() => undefined);
   }, [db]);
 
   useFocusEffect(

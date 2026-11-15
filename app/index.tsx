@@ -56,6 +56,8 @@ import { isEssentialRoutine } from '../services/routineRemindersLogic';
 import { addWater, loadDayNutrition } from '../services/nutrition';
 import { formatWater, type DayNutrition } from '../services/nutritionLogic';
 import { getNutritionOptions } from '../services/nutritionSettings';
+import { loadGoalState } from '../services/goals';
+import { getGoalBundle } from '../services/goalsSettings';
 import { formatClock, formatDayTitle, formatDuration } from '../services/format';
 import { DAY_END_HOUR, dayBounds, planningDay, replanDay } from '../services/planner';
 import { loadRoutineBriefs } from '../services/routineBriefs';
@@ -108,6 +110,7 @@ export default function HomeScreen() {
   const [hasReview, setHasReview] = useState(false);
   const [hardDay, setHardDayOn] = useState(false);
   const [nutrition, setNutrition] = useState<DayNutrition | null>(null);
+  const [goalLine, setGoalLine] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const current = new Date();
@@ -133,6 +136,13 @@ export default function HomeScreen() {
       setNutrition(await loadDayNutrition(db, current, await getNutritionOptions()));
     } catch {
       setNutrition(null);
+    }
+    // Hedefler özeti (hata verirse kart yine de açılır)
+    try {
+      const gs = await loadGoalState(db, current, await getGoalBundle());
+      setGoalLine(`${gs.progress.onTrack}/${gs.progress.total} hedef yolunda`);
+    } catch {
+      setGoalLine(null);
     }
     setNow(current);
     setUser(u);
@@ -543,6 +553,14 @@ export default function HomeScreen() {
             <Text style={styles.activityArrow}>›</Text>
           </Pressable>
         </View>
+
+        <Pressable onPress={() => router.push('/goals')} style={styles.activityCard}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.activityTitle}>Hedefler ve zaman dengesi</Text>
+            <Text style={styles.activitySub}>{goalLine ?? 'Su, kalori, yemek saatleri, ekran süresi, yatış ve boş zaman'}</Text>
+          </View>
+          <Text style={styles.activityArrow}>›</Text>
+        </Pressable>
 
         <Pressable onPress={() => router.push('/weekly')} style={styles.activityCard}>
           <View style={{ flex: 1 }}>

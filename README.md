@@ -30,6 +30,7 @@ Bir yerde hata çıkarsa pencerede görünen kırmızı yazıyı kopyalayıp Cla
 ```
 app/            index.tsx (ana ekran) · chat.tsx (koç sohbeti) · settings.tsx · profile.tsx
                 activity.tsx (gün analizi, uyku) · routines.tsx (rutinlerim) · review.tsx (gün sonu)
+                nutrition.tsx (su ve yemek) · goals.tsx (hedefler, zaman dengesi)
 components/     CoachConsole, CoachCard, TaskItem, TaskComposer, EnergyCheckModal
                 RoutineCard, SnoozeModal, RoutineEditor
 services/       scheduler.ts (zamanlama motoru) · coachEngine.ts (kural tabanlı koç)
@@ -57,6 +58,7 @@ npm run test:morning      sabah brifingi, bildirim planı, veritabanı v6, 62 ko
 npm run test:hardday      zor gün modu (hangi işler kalır, aç/kapat, koç mesajları), 40 kontrol
 npm run test:weekly       haftalık özet (toplamlar, kıyas, metinler, veritabanı), 52 kontrol
 npm run test:nutrition    su, yemek, kalori tahmini ve koç/gün sonu/haftalık bağlantıları, 114 kontrol
+npm run test:goals        hedefler, kalori hesabı güvenlik sınırları, ilerleme, zaman dengesi, hatırlatmalar, 95 kontrol
 ```
 
 
@@ -200,3 +202,32 @@ kaydı olan günlerden) yer alır. Yapay zekâya, yalnızca "gün analizi payla�
 yemek kaydı sayısı, yaklaşık kalori, çay/kahve sayısı); yazılan yemek adları asla gönderilmez.
 
 Veritabanı v7: `WaterLog` ve `MealLog` (gün anahtarı gece 04:00'e kadar önceki gün sayılır).
+
+## Hedefler ve zaman dengesi
+
+Ana ekrandaki "Hedefler ve zaman dengesi" kartı `/goals` ekranını açar (Ayarlar'dan da bağlantı var). Hedeflerin
+hepsi isteğe bağlıdır; konmayan hedef hiçbir yerde gösterilmez ve hepsi kapatılabilir.
+
+- **Hedefler:** su (1,5–3 L), kalori, ilk yemek en geç / son yemek en geç, günlük ekran süresi sınırı, yatış saati ve
+  günlük "dolu zaman" hedefi (bitirilen işlerin toplam süresi). Her hedef için bugünkü durum çubuğu gösterilir
+  (Tamam / Yolunda / Bekliyor / Dikkat). "Dikkat" kırmızı değil sarıdır; Aura "fazla yedin" ya da "başaramadın"
+  demez, Kronos yalnızca kalan zamanı ve sayıyı söyler.
+- **Kalori hedefi, üç yol:** (1) kendin yazarsın, (2) "Hesapla": cinsiyet, yaş, boy, kilo ve hareket düzeyinden
+  Mifflin-St Jeor formülüyle günlük ihtiyaç ve su önerisi, (3) "Kilo hedefiyle": hedef kilo ve tempo (korumak,
+  yavaş, ılımlı) seçilir, tahmini süre gösterilir. Güvenlik sınırları (`services/goalsLogic.ts`): yalnızca 18–80
+  yaş (dışı için doktor/diyetisyen yönlendirmesi), öneri hiçbir zaman 1.200 kcal (erkekte 1.500) ve dinlenme
+  enerjisinin altına inmez, günlük açık ihtiyacın %20'sini geçmez, hedef BMI 19'un altına ya da kilonun %30'undan
+  fazlasına izin verilmez, kilo alma yalnızca BMI 25'in altında, sonuç 1.200–4.500 kcal. Her sonuçta "tahmindir,
+  doktor/diyetisyen yerine geçmez" uyarısı vardır. Boy, kilo ve yaş yalnızca telefonda durur, yapay zekâya hiçbir
+  zaman gönderilmez ve tek dokunuşla silinir.
+- **Zaman dengesi:** bugün kalan gün içinde planda yeri olmayan, en az 20 dakikalık boş pencereler, biten iş, akıp
+  giden zaman ve kayıt dışı zaman gösterilir. Bekleyen işler varsa "Günü planla" düğmesi var. Yatışa 1 saat kala gün
+  kapanıyor sayılır ve yeni plan önerilmez. Aura dinlenmenin de dolu zaman olduğunu söyler, boşa giden zamanı
+  suçlamaz.
+- **Hatırlatmalar (varsayılan KAPALI, tek anahtar):** açılırsa öğle 12:00 ve ikindi 16:30'da su hatırlatması (su
+  hedefi tamamlanınca o günün hatırlatmaları susar) ve yatıştan 45 dakika önce "günü yavaşça kapatma" hatırlatması
+  gelir. Zor gün modundayken o günün hedef hatırlatması gönderilmez. Açarken bildirim izni istenir; verilmezse anahtar
+  kapalı kalır. Bildirimler `rtn-water-…` ve `rtn-winddown-…` kimlikleriyle diğer rutin bildirimleriyle birlikte
+  eşitlenir.
+
+Yapay zekâ gerekmez; tüm hesaplar telefonda yapılır. Hedefler SecureStore'da (`goals_v1`, `body_profile`) durur.
