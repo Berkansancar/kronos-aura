@@ -28,6 +28,8 @@ export interface Task {
   startedAt: string | null;
   /** Bir rutinin "Yapacağım" cevabıyla oluştuysa o rutinin id'si. */
   routineId?: string | null;
+  /** İş saatlerinde de yapılabilir mi? (false: iş saatinin dışına yerleştirilir) */
+  workOk?: boolean;
 }
 
 /** Veritabanındaki TimeBlock satırı. Tarihler ISO-8601 (UTC) metin olarak saklanır. */
@@ -211,6 +213,14 @@ export interface RoutineIdea {
 /** AI: API anahtarıyla, MANUAL: ücretsiz sohbet uygulamasından elle yapıştırılan cevap, RULES: hazır kurallar */
 export type ReviewSource = 'AI' | 'FREE' | 'MANUAL' | 'RULES';
 
+/** Ekran süresi yerine yapılabilecek bir şey. TASK: kullanıcının açık işi, IDEA: kısa fikir. */
+export interface ScreenAlternative {
+  title: string;
+  minutes: number;
+  why: string;
+  kind: 'TASK' | 'IDEA';
+}
+
 export interface DayReviewPayload {
   /** Aura: günü yargılamadan yorumlar */
   reflection: string;
@@ -218,6 +228,11 @@ export interface DayReviewPayload {
   tomorrow: string;
   ideas: RoutineIdea[];
   source: ReviewSource;
+  /** Aura: zamanın nereye gittiği (kayıt dışı kalan zaman, akıp giden, ekran). Eski kayıtlarda yoktur. */
+  timeUse?: string;
+  /** "Ekran süren X. Bunun yalnızca Y kadarını ayırsan şunlar sığar:" */
+  screenNote?: string;
+  screenAlternatives?: ScreenAlternative[];
 }
 
 export interface DayReview {
@@ -250,4 +265,46 @@ export interface MealLog {
   /** Yaklaşık kalori; bilinmiyorsa null */
   kcal: number | null;
   eatenAt: string;
+}
+
+// ───────────────────────── Görev sonuçları ─────────────────────────
+
+/** DONE: Yaptım · NOT_DONE: Yapmadım (bugün yapmamayı seçti) · COULD_NOT: Yapamadım (olmadı) */
+export type TaskOutcomeKind = 'DONE' | 'NOT_DONE' | 'COULD_NOT';
+/** "Yapamadım" için isteğe bağlı sebep: iş vaktindeydi, enerji yoktu, zaman yetmedi, başka bir şey çıktı */
+export type TaskOutcomeReason = 'WORK' | 'ENERGY' | 'TIME' | 'OTHER';
+
+export interface TaskOutcome {
+  id: string;
+  taskId: string | null;
+  title: string;
+  /** Mantıksal gün: yyyy-mm-dd (gece 04:00'e kadar önceki gün) */
+  day: string;
+  outcome: TaskOutcomeKind;
+  reason: TaskOutcomeReason | null;
+  /** Yaptım ise harcanan dakika */
+  minutes: number;
+  workOk: boolean;
+  /** Ertesi gün plana geri alındı mı */
+  carried: boolean;
+  loggedAt: string;
+}
+
+// ───────────────────────── Gün akışı ve sigara sayacı ─────────────────────────
+
+/** Uyandım · Duş aldım · Minibüse bindim · Dükkana geldim · Dükkandan çıktım · Eve geldim */
+export type DayEventKind = 'WAKE' | 'SHOWER' | 'BUS' | 'SHOP_IN' | 'SHOP_OUT' | 'HOME';
+
+export interface DayEvent {
+  id: string;
+  /** Mantıksal gün: yyyy-mm-dd (gece 04:00'e kadar önceki gün) */
+  day: string;
+  kind: DayEventKind;
+  at: string;
+}
+
+export interface SmokeLog {
+  id: string;
+  day: string;
+  at: string;
 }

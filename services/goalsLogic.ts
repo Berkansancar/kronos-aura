@@ -566,6 +566,8 @@ export interface BalanceInputs {
   /** Planda yeri olmayan bekleyen işler */
   unplanned: { count: number; minutes: number };
   focusMin: number | null;
+  /** Plan dışı meşgul zamanlar (ör. iş saatleri): boş pencere sayılmaz, kayıt dışı kalan zamandan düşülür */
+  busy?: { startMin: number; endMin: number }[];
 }
 
 export interface FreeWindow {
@@ -601,24 +603,33 @@ export function buildTimeBalance(b: BalanceInputs): TimeBalance {
   const from = Math.max(nowMin, start);
   const elapsed = Math.max(0, Math.min(nowMin, end) - start);
 
-  // Kalan pencerede plan bloklarının dışında kalan aralıklar
-  const clipped = b.blocks
-    .map((x) => ({ s: Math.max(x.startMin, from), e: Math.min(x.endMin, end) }))
-    .filter((x) => x.e > x.s)
-    .sort((a, c) => a.s - c.s);
+  // Kalan pencerede plan bloklarının ve meşgul zamanların dışında kalan aralıklar
+  const clip = (xs: { startMin: number; endMin: number }[]) =>
+    xs
+      .map((x) => ({ s: Math.max(x.startMin, from), e: Math.min(x.endMin, end) }))
+      .filter((x) => x.e > x.s)
+      .sort((a, c) => a.s - c.s);
+  let plannedLeft = 0;
+  let planCursor = from;
+  for (const x of clip(b.blocks)) {
+    plannedLeft += Math.max(0, x.e - Math.max(x.s, planCursor));
+    planCursor = Math.max(planCursor, x.e);
+  }
   const windows: FreeWindow[] = [];
   let cursor = from;
-  let plannedLeft = 0;
-  for (const x of clipped) {
+  for (const x of clip([...b.blocks, ...(b.busy ?? [])])) {
     if (x.s > cursor && x.s - cursor >= MIN_FREE_WINDOW) windows.push({ from: cursor, to: x.s, minutes: x.s - cursor });
-    plannedLeft += Math.max(0, x.e - Math.max(x.s, cursor));
     cursor = Math.max(cursor, x.e);
   }
   if (end > cursor && end - cursor >= MIN_FREE_WINDOW && from < end && nowMin < end - 60) {
     windows.push({ from: cursor, to: end, minutes: end - cursor });
   }
   const freeTotal = windows.reduce((a, w) => a + w.minutes, 0);
-  const unrecorded = Math.max(0, elapsed - b.doneMinutes - b.driftMinutes);
+  const busyElapsed = (b.busy ?? []).reduce(
+    (sum, x) => sum + Math.max(0, Math.min(x.endMin, nowMin, end) - Math.max(x.startMin, start)),
+    0
+  );
+  const unrecorded = Math.max(0, elapsed - b.doneMinutes - b.driftMinutes - busyElapsed);
   // Yatışa en fazla 1 saat kala gün kapanıyor sayılır: yeni iş ya da boş pencere önerilmez
   const dayOver = nowMin >= end - 60;
   const canPlan = !dayOver && b.unplanned.count > 0 && freeTotal >= 30;

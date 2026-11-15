@@ -19,7 +19,8 @@
     "test:hardday": "tsx scripts/test-hardday.ts",
     "test:weekly": "tsx scripts/test-weekly.ts",
     "test:nutrition": "tsx scripts/test-nutrition.ts",
-    "test:goals": "tsx scripts/test-goals.ts"
+    "test:goals": "tsx scripts/test-goals.ts",
+    "test:outcomes": "tsx scripts/test-outcomes.ts"
   },
   "dependencies": {
     "expo": "~58.0.0"

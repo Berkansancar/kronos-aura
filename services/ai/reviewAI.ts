@@ -19,7 +19,8 @@ const SYSTEM = `${PERSONAS.AURA.system}
 
 BU GÖREVDE ÖZEL
 - Gün sonu değerlendirmesi yazıyorsun. "reflection" alanını Aura olarak, "tomorrow" alanını Kronos'un net ve stratejik sesiyle yaz.
-- Yeni rutin fikirleri küçük, uygulanabilir ve kullanıcının günündeki verilere uygun olsun; tıbbi tavsiye verme.`;
+- Yeni rutin fikirleri küçük, uygulanabilir ve kullanıcının günündeki verilere uygun olsun; tıbbi tavsiye verme.
+- "timeUse" ve "screenAlternatives" alanlarında zamanı yargılama; yalnızca verilen sayıları kullan.`;
 
 export async function generateAiReview(
   facts: DayFacts,
@@ -32,7 +33,7 @@ export async function generateAiReview(
     model: cfg.model,
     system: SYSTEM,
     messages: [{ role: 'user', content: buildReviewPrompt(facts, existingTitles, shareActivity) }],
-    maxTokens: 700,
+    maxTokens: 1200,
     timeoutMs: 40_000,
   });
   const parsed = parseReviewResponse(extractJsonObject(text), existingTitles);

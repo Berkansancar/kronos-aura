@@ -59,6 +59,7 @@ npm run test:hardday      zor gün modu (hangi işler kalır, aç/kapat, koç me
 npm run test:weekly       haftalık özet (toplamlar, kıyas, metinler, veritabanı), 52 kontrol
 npm run test:nutrition    su, yemek, kalori tahmini ve koç/gün sonu/haftalık bağlantıları, 114 kontrol
 npm run test:goals        hedefler, kalori hesabı güvenlik sınırları, ilerleme, zaman dengesi, hatırlatmalar, 95 kontrol
+npm run test:outcomes     yaptım/yapmadım/yapamadım, iş saatleri, gün akışı, sigara sayacı, zaman analizi, 98 kontrol
 ```
 
 
@@ -231,6 +232,38 @@ hepsi isteğe bağlıdır; konmayan hedef hiçbir yerde gösterilmez ve hepsi ka
   eşitlenir.
 
 Yapay zekâ gerekmez; tüm hesaplar telefonda yapılır. Hedefler SecureStore'da (`goals_v1`, `body_profile`) durur.
+
+## Yaptım / Yapmadım / Yapamadım, iş saatleri, gün akışı
+
+Gündüz çalışan ve telefona bakamayan biri için: her şey akşam topluca da işaretlenebilir.
+
+- **Üç düğme:** her görevde **Yaptım** (enerji sorusu, süre kaydı), **Yapmadım** ve **Yapamadım** (kısa bir "ne
+  engelledi?" sorusu: iş vaktindeydi / enerjim yoktu / zamanım yetmedi / başka bir şey çıktı; cevap vermek
+  zorunlu değil). Aura üçünü de aynı sıcaklıkla karşılar; hiçbiri borç ya da suç değildir. Yapmadım ve Yapamadım
+  denen işler bugünün planından çıkar ve ertesi gün (22:00'den sonra yarının planına) kendiliğinden bir kez geri
+  döner. "Ertele" eskisi gibi çalışır.
+- **İş saatleri (Hedefler ekranı, varsayılan kapalı):** başlangıç, bitiş ve günler. Planlayıcı, "İş vaktinde de
+  yapılabilir" işaretlenmemiş işleri iş saatlerine koymaz; işaretlenmiş olanlar gün içine de yerleşebilir. Yer
+  yalnızca iş saatindeyse sebep "iş saati" olarak ayrılır ve Kronos işareti önerir. İş saatleri zaman dengesinde boş
+  pencere sayılmaz. Ayar veritabanındaki `Setting` tablosunda durur (planlayıcı ve testler okuyabilsin diye).
+- **Günü işaretle (`/mark`):** akşam bütün görevleri topluca işaretlersin, "planda olmayan ama yaptığım" işleri
+  geriye dönük eklersin (süre + enerji; iş vaktinde yapıldıysa belirtirsin). Gece yarısından sonra işaretlenenler
+  işaretlenen günün sonuna yazılır. İş saatleri açıksa işin bitiminden 15 dk sonra bir hatırlatma gelir.
+- **Gün akışı (`/day`):** tek dokunuşla Uyandım, Duş aldım, Minibüse bindim, Dükkana geldim, Dükkandan çıktım, Eve
+  geldim. "10 dk önce" gibi geriye dönük girilir. Hazırlık, yol (işe) ve dükkanda geçen süre ile yol (eve) otomatik
+  hesaplanır. "Uyandım" sonrası Aura bir bardak su önerir (+200 ml tek dokunuş). Sabah su hatırlatması son
+  "Uyandım" damgalarının ortancasına göre, damga yoksa 07:45'e kurulur.
+- **Sigara sayacı:** +1, "N dk önce", silme, ortalama aralık, isteğe bağlı günlük sınır. Aura yargılamaz, bırakma
+  baskısı yoktur. Veri telefonda kalır; yapay zekâya yalnızca (gün analizi paylaşımı açıksa) toplam sayı ve
+  ortalama aralık gider.
+- **Gün sonu analizi:** "Zaman nereye gitti?" bölümü: uyanıktan iş, yol ve hazırlık düşülür, bitirilen işler
+  düşülür, kalan **kayıt dışı kalan zaman** olarak yazılır (yemek, dinlenme, sohbet, oyalanma burada durur; "boşa"
+  denmez, çünkü Aura değer yargısı taşıyan sözcük kullanmaz). Ekran süresi biliniyorsa (en az 1 sa) bunun dörtte
+  biri (30–120 dk) kadarını başka işe ayırmak için "Ekran yerine" önerileri çıkar: önce yapmadığın/yapamadığın açık
+  işler, sonra kısa fikirler ("Yarın plana ekle"). Bu bölüm kural tabanlı yolda, ücretsiz/Claude anahtarıyla ve
+  **elle kopyala-yapıştır** yolunda aynı şekilde çalışır; elle yol bozulmadı, istem yalnızca yeni alanları ister.
+
+Veritabanı sürümü 8 (`TaskOutcome`, `Setting`, `DayEvent`, `SmokeLog` tabloları ve `Task.workOk`).
 
 ## Logo ve ikon
 

@@ -13,25 +13,37 @@ import {
   getOrCreateUser,
   isHardDay,
   getTask,
+  listDayEvents,
   listRecentLogs,
   listRoutineLogsSince,
   listRoutines,
   listSleepLogs,
+  listTaskOutcomes,
   listVisibleTasks,
   upsertDayReview,
 } from '../database/repository';
 import type { DayReview, DayReviewPayload, Routine, RoutineIdea, TaskStatus } from '../database/types';
 import { dayKey } from './activityLogic';
+import { buildFlow } from './dayFlowLogic';
+import { getSmokeLimit } from './dayFlow';
 import {
   buildManualPrompt,
   buildRulesReview,
   parseManualResponse,
+  withTimeUse,
   type DayFacts,
 } from './dayReviewLogic';
 import { FREE_PROVIDERS, type FreeConfig } from './ai/freeClient';
 import { generateAiReview, generateFreeReview } from './ai/reviewAI';
 import type { AiConfig } from './ai/settings';
 import { loadDayNutrition, type NutritionOptions } from './nutrition';
+import { nutritionDay } from './nutritionLogic';
+import { analyzeSmoking } from './smokeLogic';
+import { latestOutcomes } from './taskOutcomeLogic';
+import { analyzeTimeUse, type OpenTaskInfo } from './timeUseLogic';
+import { getWork } from './workSettings';
+import { workWindowFor } from './workLogic';
+import { listSmokeLogs } from '../database/repository';
 import { DAY_END_HOUR } from './planner';
 import { acceptRoutine, addCustomRoutine, addRoutineFromTemplate } from './routineFlow';
 import { routineDayState } from './routineLogic';
@@ -69,12 +81,14 @@ export async function gatherDayFacts(
   // Görevler ve zaman kayıtları
   const logs = (await listRecentLogs(db, 80)).filter((l) => l.loggedAt >= start && l.loggedAt < end);
   const tasksDone: DayFacts['tasksDone'] = [];
+  const doneAt: { at: number; minutes: number }[] = [];
   let driftMinutes = 0;
   const energy = { HIGH: 0, EXHAUSTED: 0, DISTRACTED: 0 };
   for (const l of logs) {
     if (l.taskId) {
       const t = await getTask(db, l.taskId);
       tasksDone.push({ title: t?.title ?? 'Görev', minutes: l.actualDuration });
+      doneAt.push({ at: new Date(l.loggedAt).getTime(), minutes: l.actualDuration });
       energy[l.energyStateAtCompletion] += 1;
     } else {
       driftMinutes += l.actualDuration;
@@ -110,6 +124,69 @@ export async function gatherDayFacts(
   const stat = await getDailyStat(db, key);
   const sleep = (await listSleepLogs(db, 3)).find((s) => s.day === key) ?? null;
 
+  // Görev sonuçları (Yaptım / Yapmadım / Yapamadım) ve açık işler
+  const outcomesRaw = latestOutcomes(await listTaskOutcomes(db, key));
+  const missed = new Map(outcomesRaw.filter((o) => o.outcome !== 'DONE' && o.taskId).map((o) => [o.taskId as string, o]));
+  const visible = await listVisibleTasks(db, start);
+  const openTasks: OpenTaskInfo[] = visible
+    .filter((t) => t.status === 'PENDING' || t.status === 'IN_PROGRESS' || (t.status === 'POSTPONED' && missed.has(t.id)))
+    .map((t) => {
+      const m = missed.get(t.id);
+      return {
+        title: t.title,
+        minutes: t.estimatedDuration,
+        workOk: t.workOk === true,
+        missed: m ? (m.outcome as 'COULD_NOT' | 'NOT_DONE') : null,
+        reason: m ? m.reason : null,
+      };
+    });
+
+  // Gün akışı damgaları, iş saatleri ve zaman dökümü
+  const flow = buildFlow(await listDayEvents(db, key), now);
+  const minOf = (d: Date) => Math.round((d.getTime() - day.getTime()) / 60_000);
+  const endMin = Math.min(1680, Math.max(0, minOf(now)));
+  let wakeMin: number | null = null;
+  let wakeSource: 'STAMP' | 'SLEEP' | null = null;
+  if (flow.wakeAt) {
+    wakeMin = minOf(flow.wakeAt);
+    wakeSource = 'STAMP';
+  } else if (sleep) {
+    const [h, m] = formatClockIso(sleep.wakeTime).split(':').map(Number);
+    wakeMin = h * 60 + m;
+    wakeSource = 'SLEEP';
+  }
+  let work: DayFacts['workWindow'] = null;
+  if (flow.shopInAt) {
+    work = { startMin: minOf(flow.shopInAt), endMin: flow.shopOutAt ? minOf(flow.shopOutAt) : endMin, source: 'STAMP' };
+  } else {
+    const win = workWindowFor(day, await getWork(db));
+    if (win) work = { ...win, source: 'SETTING' };
+  }
+  const dayStartMs = day.getTime();
+  const doneInWork = work
+    ? doneAt
+        .filter((d) => d.at >= dayStartMs + work.startMin * 60_000 && d.at < dayStartMs + work.endMin * 60_000)
+        .reduce((sum, d) => sum + d.minutes, 0)
+    : 0;
+  const timeUse = analyzeTimeUse({
+    wakeMin,
+    wakeSource,
+    endMin,
+    work,
+    commuteMinutes: (flow.commuteToMinutes ?? 0) + (flow.commuteBackMinutes ?? 0),
+    prepMinutes: flow.prepMinutes ?? 0,
+    doneMinutes: doneAt.reduce((sum, d) => sum + d.minutes, 0),
+    doneInWorkMinutes: doneInWork,
+    driftMinutes,
+    screenMinutes: stat ? stat.screenMinutes : null,
+  });
+  const smoke = analyzeSmoking(
+    (await listSmokeLogs(db, key)).map((l) => new Date(l.at)),
+    now,
+    await getSmokeLimit(db),
+    key === nutritionDay(now)
+  );
+
   return {
     day: key,
     tasksDone,
@@ -128,6 +205,11 @@ export async function gatherDayFacts(
     peakStartHour: user.peakStartHour,
     peakEndHour: user.peakEndHour,
     nutrition: nutritionOpts ? await loadDayNutrition(db, now, nutritionOpts, key).catch(() => null) : null,
+    outcomes: outcomesRaw.map((o) => ({ title: o.title, outcome: o.outcome, reason: o.reason, workOk: o.workOk })),
+    openTasks,
+    workWindow: work,
+    timeUse,
+    smoke,
   };
 }
 
@@ -168,7 +250,8 @@ export async function loadOrCreateReview(
   const existingTitles = [...active, ...retired].map((r) => r.title);
   const activeTemplateIds = active.map((r) => r.templateId).filter((x): x is string => !!x);
 
-  let payload = buildRulesReview(facts, existingTitles, activeTemplateIds);
+  const rules = buildRulesReview(facts, existingTitles, activeTemplateIds);
+  let payload = rules;
   // Sıra: ücretsiz anahtar (kullanıcı özellikle bunun için eklediyse) -> Claude anahtarı -> hazır kurallar.
   const errors: string[] = [];
   let generated: DayReviewPayload | null = null;
@@ -187,7 +270,7 @@ export async function loadOrCreateReview(
       errors.push(e instanceof Error ? e.message : String(e));
     }
   }
-  if (generated) payload = generated;
+  if (generated) payload = withTimeUse(generated, rules, facts);
   const aiError: string | null = generated || errors.length === 0 ? null : errors.join(' · ');
 
   await upsertDayReview(db, facts.day, payload, now);
@@ -222,10 +305,12 @@ export async function saveManualReview(
   pastedText: string
 ): Promise<DayReview> {
   const facts = await gatherDayFacts(db, now);
-  const parsed = parseManualResponse(pastedText, await allRoutineTitles(db));
+  const titles = await allRoutineTitles(db);
+  const parsed = parseManualResponse(pastedText, titles);
   if (!parsed.ok) throw new Error(parsed.message);
-  await upsertDayReview(db, facts.day, parsed.payload, now);
-  return { day: facts.day, payload: parsed.payload, createdAt: now.toISOString() };
+  const payload = withTimeUse(parsed.payload, buildRulesReview(facts, titles, []), facts);
+  await upsertDayReview(db, facts.day, payload, now);
+  return { day: facts.day, payload, createdAt: now.toISOString() };
 }
 
 // ───────────────────────── Yarın cevapları ─────────────────────────

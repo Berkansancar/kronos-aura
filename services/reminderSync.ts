@@ -2,7 +2,10 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import type { RoutineBrief } from '../database/types';
 import { dayKey } from './activityLogic';
+import { listDayEventsSince } from '../database/repository';
+import { typicalWakeMinute } from './dayFlowLogic';
 import { reminderExtras } from './dayReview';
+import { getWork } from './workSettings';
 import { getGoals } from './goalsSettings';
 import { loadDayNutrition } from './nutrition';
 import { nutritionDay } from './nutritionLogic';
@@ -23,7 +26,16 @@ async function goalReminders(db: SQLiteDatabase, now: Date): Promise<GoalReminde
       const n = await loadDayNutrition(db, now, await getNutritionOptions());
       waterGoalReached = n.waterMl >= n.waterGoalMl;
     }
-    return { waterGoalReached, bedtime: goals.bedtime };
+    // Tipik uyanış (son 7 günün "Uyandım" damgaları) ve iş saatleri: sabah su ve iş sonrası işaretleme hatırlatması
+    const since = dayKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7));
+    const wakes = (await listDayEventsSince(db, since)).filter((e) => e.kind === 'WAKE').map((e) => new Date(e.at));
+    const w = await getWork(db);
+    return {
+      waterGoalReached,
+      bedtime: goals.bedtime,
+      wakeMinute: typicalWakeMinute(wakes),
+      work: w.enabled ? { endMin: w.endMin, days: w.days } : null,
+    };
   } catch {
     return null;
   }

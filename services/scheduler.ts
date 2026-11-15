@@ -39,6 +39,8 @@ export interface SchedulerTask {
   estimatedDuration: number;
   cognitiveWeight: CognitiveWeight;
   status: TaskStatus;
+  /** İş saatlerinde de yapılabilir mi? false ya da yoksa iş penceresine yerleştirilmez. */
+  workOk?: boolean;
 }
 
 export interface SchedulerUser {
@@ -72,6 +74,8 @@ export interface ScheduleOptions {
   highLoadCapMinutes?: number;
   /** Saat başına gecikme cezası; eşit enerji uyumunda erken saati seçtirir */
   earlinessWeight?: number;
+  /** İş saatleri (planlanan günün gece yarısından dakika). Yoksa ya da null ise kısıt yok. */
+  workWindow?: { startMin: number; endMin: number } | null;
 }
 
 export interface ScheduleInput {
@@ -87,7 +91,8 @@ export interface ScheduleInput {
 
 export interface UnscheduledTask {
   taskId: string;
-  reason: 'NO_ROOM' | 'WINDOW_CLOSED';
+  /** WORK_HOURS: iş saati dışında yeri yok, ama iş vaktinde yapılabilir işaretlenirse sığar */
+  reason: 'NO_ROOM' | 'WINDOW_CLOSED' | 'WORK_HOURS';
   missingMinutes: number;
   /** Bazı parçaları yerleşti, bazıları sığmadı */
   partial: boolean;
@@ -178,6 +183,7 @@ const DEFAULTS = {
   durationFactors: { HIGH: 1, MEDIUM: 1, LOW: 1 } as Record<CognitiveWeight, number>,
   highLoadCapMinutes: 240,
   earlinessWeight: 0.02,
+  workWindow: null as { startMin: number; endMin: number } | null,
 };
 
 type ResolvedOptions = typeof DEFAULTS;
@@ -192,6 +198,7 @@ function resolveOptions(o: ScheduleOptions | undefined): ResolvedOptions {
     durationFactors: { ...DEFAULTS.durationFactors, ...o?.durationFactors },
     highLoadCapMinutes: o?.highLoadCapMinutes ?? DEFAULTS.highLoadCapMinutes,
     earlinessWeight: o?.earlinessWeight ?? DEFAULTS.earlinessWeight,
+    workWindow: o?.workWindow ?? null,
   };
 }
 
@@ -435,10 +442,17 @@ export function buildSchedule(input: ScheduleInput): ScheduleResult {
       a.chunkIndex - b.chunkIndex
   );
 
-  const findBestSlot = (u: Unit, minStart: number): { start: number } | null => {
+  // İş saatleri: "iş vaktinde yapılabilir" işaretsiz işler bu pencereye girmez.
+  const dayMidnight = atHour(day, 0).getTime();
+  const work = o.workWindow
+    ? { start: dayMidnight + o.workWindow.startMin * MIN, end: dayMidnight + o.workWindow.endMin * MIN }
+    : null;
+
+  const findBestSlot = (u: Unit, minStart: number, ignoreWork = false): { start: number } | null => {
     const durMs = u.minutes * MIN;
     const bufMs = u.buffer * MIN;
     let best: { start: number; cost: number } | null = null;
+    const blockedByWork = work !== null && !ignoreWork && !u.task.workOk;
 
     for (const iv of free) {
       for (let s = ceilToStep(Math.max(iv.start, minStart)); ; s += STEP) {
@@ -446,6 +460,7 @@ export function buildSchedule(input: ScheduleInput): ScheduleResult {
         // Son tampon, günün sonundan taşabilir; ama diğer bloklara taşamaz.
         const fits = e <= iv.end && (e + bufMs <= iv.end || iv.end >= windowEnd);
         if (!fits) break;
+        if (blockedByWork && work && s < work.end && e > work.start) continue;
         const { avgEnergy } = blockStats(user, s, e);
         const hoursIn = (s - windowStart) / (60 * MIN);
         const cost = fitCost(u.task.cognitiveWeight, avgEnergy) + o.earlinessWeight * hoursIn;
@@ -460,6 +475,7 @@ export function buildSchedule(input: ScheduleInput): ScheduleResult {
   const failed = new Set<string>();
   const placedMinutes = new Map<string, number>();
   const missingMinutes = new Map<string, number>();
+  const workBlocked = new Set<string>();
 
   for (const u of units) {
     const id = u.task.id;
@@ -470,6 +486,7 @@ export function buildSchedule(input: ScheduleInput): ScheduleResult {
     const slot = findBestSlot(u, nextChunkEarliest.get(id) ?? 0);
     if (!slot) {
       failed.add(id);
+      if (work && !u.task.workOk && findBestSlot(u, nextChunkEarliest.get(id) ?? 0, true)) workBlocked.add(id);
       missingMinutes.set(id, (missingMinutes.get(id) ?? 0) + u.minutes);
       continue;
     }
@@ -485,7 +502,7 @@ export function buildSchedule(input: ScheduleInput): ScheduleResult {
   for (const [taskId, missing] of missingMinutes) {
     unscheduled.push({
       taskId,
-      reason: 'NO_ROOM',
+      reason: workBlocked.has(taskId) ? 'WORK_HOURS' : 'NO_ROOM',
       missingMinutes: missing,
       partial: (placedMinutes.get(taskId) ?? 0) > 0,
     });

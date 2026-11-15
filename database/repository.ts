@@ -6,6 +6,8 @@ import type {
   CoachId,
   CognitiveWeight,
   DailyStat,
+  DayEvent,
+  DayEventKind,
   DurationSample,
   EnergyState,
   PlannedSlot,
@@ -15,7 +17,11 @@ import type {
   RoutineOutcome,
   RoutineStatus,
   SleepLog,
+  SmokeLog,
   Task,
+  TaskOutcome,
+  TaskOutcomeKind,
+  TaskOutcomeReason,
   TaskStatus,
   TimeBlockRow,
   TimeLog,
@@ -89,6 +95,8 @@ export async function createTask(
     cognitiveWeight: CognitiveWeight;
     /** Rutinden doğan görevlerde rutinin id'si */
     routineId?: string | null;
+    /** İş saatlerinde de yapılabilir mi? Varsayılan: hayır */
+    workOk?: boolean;
   }
 ): Promise<Task> {
   const title = input.title.trim();
@@ -102,10 +110,11 @@ export async function createTask(
     createdAt: new Date().toISOString(),
     startedAt: null,
     routineId: input.routineId ?? null,
+    workOk: input.workOk === true,
   };
   await db.runAsync(
-    `INSERT INTO Task (id, title, estimatedDuration, cognitiveWeight, status, createdAt, startedAt, routineId)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO Task (id, title, estimatedDuration, cognitiveWeight, status, createdAt, startedAt, routineId, workOk)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       task.id,
       task.title,
@@ -115,6 +124,7 @@ export async function createTask(
       task.createdAt,
       task.startedAt,
       task.routineId ?? null,
+      task.workOk ? 1 : 0,
     ]
   );
   return task;
@@ -128,13 +138,24 @@ export async function listVisibleTasks(
   db: SQLiteDatabase,
   dayStartISO: string
 ): Promise<Task[]> {
-  return db.getAllAsync<Task>(
+  const rows = await db.getAllAsync<Task>(
     `SELECT t.* FROM Task t
      WHERE t.status != 'COMPLETED'
         OR EXISTS (SELECT 1 FROM TimeLog l WHERE l.taskId = t.id AND l.loggedAt >= ?)
      ORDER BY t.createdAt ASC`,
     [dayStartISO]
   );
+  return rows.map(normalizeTask);
+}
+
+/** SQLite'ta 0/1 duran işareti gerçek boolean'a çevirir. */
+function normalizeTask(row: Task): Task {
+  return { ...row, workOk: Boolean(row.workOk) };
+}
+
+/** İş vaktinde yapılabilir işaretini değiştirir. */
+export async function setTaskWorkOk(db: SQLiteDatabase, id: string, workOk: boolean): Promise<void> {
+  await db.runAsync('UPDATE Task SET workOk = ? WHERE id = ?', [workOk ? 1 : 0, id]);
 }
 
 export async function setTaskStatus(
@@ -370,7 +391,8 @@ export async function listDailyStats(db: SQLiteDatabase, limit = 7): Promise<Dai
 }
 
 export async function getTask(db: SQLiteDatabase, id: string): Promise<Task | null> {
-  return db.getFirstAsync<Task>('SELECT * FROM Task WHERE id = ?', [id]);
+  const row = await db.getFirstAsync<Task>('SELECT * FROM Task WHERE id = ?', [id]);
+  return row ? normalizeTask(row) : null;
 }
 
 // ───────────────────────── Rutinler ─────────────────────────
@@ -737,4 +759,126 @@ export async function listMealLogsSince(db: SQLiteDatabase, sinceDay: string): P
 
 export async function deleteMealLog(db: SQLiteDatabase, id: string): Promise<void> {
   await db.runAsync('DELETE FROM MealLog WHERE id = ?', [id]);
+}
+
+// ───────────────────────── Görev sonuçları ─────────────────────────
+
+interface TaskOutcomeRow extends Omit<TaskOutcome, 'workOk' | 'carried'> {
+  workOk: number;
+  carried: number;
+}
+
+const rowToOutcome = (r: TaskOutcomeRow): TaskOutcome => ({ ...r, workOk: !!r.workOk, carried: !!r.carried });
+
+export interface NewTaskOutcome {
+  taskId: string | null;
+  title: string;
+  day: string;
+  outcome: TaskOutcomeKind;
+  reason?: TaskOutcomeReason | null;
+  minutes?: number;
+  workOk?: boolean;
+  at?: Date;
+}
+
+/** Aynı görev ve gün için tek sonuç tutulur: yenisi eskisinin yerine geçer. */
+export async function addTaskOutcome(db: SQLiteDatabase, o: NewTaskOutcome): Promise<TaskOutcome> {
+  const out: TaskOutcome = {
+    id: newId('out'),
+    taskId: o.taskId,
+    title: o.title.trim() || 'Görev',
+    day: o.day,
+    outcome: o.outcome,
+    reason: o.outcome === 'COULD_NOT' ? (o.reason ?? null) : null,
+    minutes: Math.max(0, Math.round(o.minutes ?? 0)),
+    workOk: o.workOk === true,
+    carried: false,
+    loggedAt: (o.at ?? new Date()).toISOString(),
+  };
+  await db.withTransactionAsync(async () => {
+    if (out.taskId) await db.runAsync('DELETE FROM TaskOutcome WHERE taskId = ? AND day = ?', [out.taskId, out.day]);
+    await db.runAsync(
+      `INSERT INTO TaskOutcome (id, taskId, title, day, outcome, reason, minutes, workOk, carried, loggedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+      [out.id, out.taskId, out.title, out.day, out.outcome, out.reason, out.minutes, out.workOk ? 1 : 0, out.loggedAt]
+    );
+  });
+  return out;
+}
+
+export async function listTaskOutcomes(db: SQLiteDatabase, day: string): Promise<TaskOutcome[]> {
+  const rows = await db.getAllAsync<TaskOutcomeRow>('SELECT * FROM TaskOutcome WHERE day = ? ORDER BY loggedAt ASC', [day]);
+  return rows.map(rowToOutcome);
+}
+
+export async function listTaskOutcomesSince(db: SQLiteDatabase, sinceDay: string): Promise<TaskOutcome[]> {
+  const rows = await db.getAllAsync<TaskOutcomeRow>('SELECT * FROM TaskOutcome WHERE day >= ? ORDER BY day ASC, loggedAt ASC', [sinceDay]);
+  return rows.map(rowToOutcome);
+}
+
+/** Bugünden önceki, henüz plana geri alınmamış "yapmadım / yapamadım" sonuçları. */
+export async function listUncarriedMisses(db: SQLiteDatabase, beforeDay: string): Promise<TaskOutcome[]> {
+  const rows = await db.getAllAsync<TaskOutcomeRow>(
+    `SELECT * FROM TaskOutcome
+     WHERE day < ? AND carried = 0 AND outcome IN ('NOT_DONE', 'COULD_NOT') AND taskId IS NOT NULL
+     ORDER BY day ASC, loggedAt ASC`,
+    [beforeDay]
+  );
+  return rows.map(rowToOutcome);
+}
+
+export async function markOutcomeCarried(db: SQLiteDatabase, id: string): Promise<void> {
+  await db.runAsync('UPDATE TaskOutcome SET carried = 1 WHERE id = ?', [id]);
+}
+
+// ───────────────────────── Ayarlar (anahtar-değer) ─────────────────────────
+
+/** Planlayıcının okuması gereken ayarlar (ör. iş saatleri) veritabanında durur; SecureStore gerekmez. */
+export async function getSetting(db: SQLiteDatabase, key: string): Promise<string | null> {
+  const row = await db.getFirstAsync<{ value: string }>('SELECT value FROM Setting WHERE key = ?', [key]);
+  return row ? row.value : null;
+}
+
+export async function setSetting(db: SQLiteDatabase, key: string, value: string): Promise<void> {
+  await db.runAsync('INSERT INTO Setting (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value', [key, value]);
+}
+
+// ───────────────────────── Gün akışı damgaları ─────────────────────────
+
+export async function addDayEvent(db: SQLiteDatabase, day: string, kind: DayEventKind, at: Date): Promise<DayEvent> {
+  const ev: DayEvent = { id: newId('evt'), day, kind, at: at.toISOString() };
+  await db.runAsync('INSERT INTO DayEvent (id, day, kind, at) VALUES (?, ?, ?, ?)', [ev.id, ev.day, ev.kind, ev.at]);
+  return ev;
+}
+
+export async function listDayEvents(db: SQLiteDatabase, day: string): Promise<DayEvent[]> {
+  return db.getAllAsync<DayEvent>('SELECT * FROM DayEvent WHERE day = ? ORDER BY at ASC', [day]);
+}
+
+export async function listDayEventsSince(db: SQLiteDatabase, sinceDay: string): Promise<DayEvent[]> {
+  return db.getAllAsync<DayEvent>('SELECT * FROM DayEvent WHERE day >= ? ORDER BY at ASC', [sinceDay]);
+}
+
+export async function deleteDayEvent(db: SQLiteDatabase, id: string): Promise<void> {
+  await db.runAsync('DELETE FROM DayEvent WHERE id = ?', [id]);
+}
+
+// ───────────────────────── Sigara sayacı ─────────────────────────
+
+export async function addSmokeLog(db: SQLiteDatabase, day: string, at: Date): Promise<SmokeLog> {
+  const log: SmokeLog = { id: newId('smk'), day, at: at.toISOString() };
+  await db.runAsync('INSERT INTO SmokeLog (id, day, at) VALUES (?, ?, ?)', [log.id, log.day, log.at]);
+  return log;
+}
+
+export async function listSmokeLogs(db: SQLiteDatabase, day: string): Promise<SmokeLog[]> {
+  return db.getAllAsync<SmokeLog>('SELECT * FROM SmokeLog WHERE day = ? ORDER BY at ASC', [day]);
+}
+
+export async function listSmokeLogsSince(db: SQLiteDatabase, sinceDay: string): Promise<SmokeLog[]> {
+  return db.getAllAsync<SmokeLog>('SELECT * FROM SmokeLog WHERE day >= ? ORDER BY at ASC', [sinceDay]);
+}
+
+export async function deleteSmokeLog(db: SQLiteDatabase, id: string): Promise<void> {
+  await db.runAsync('DELETE FROM SmokeLog WHERE id = ?', [id]);
 }

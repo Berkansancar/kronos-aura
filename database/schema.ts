@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 export const DB_NAME = 'kronos-aura.db';
-export const DATABASE_VERSION = 7;
+export const DATABASE_VERSION = 8;
 
 /**
  * Not: SQLite'ın gerçek bir DATETIME tipi yoktur. Zaman alanlarını ISO-8601 (UTC) TEXT
@@ -115,6 +115,55 @@ CREATE TABLE IF NOT EXISTS MealLog (
 CREATE INDEX IF NOT EXISTS idx_meallog_day ON MealLog(day);
 `;
 
+/**
+ * Sürüm 8: görev sonuçları (Yaptım / Yapmadım / Yapamadım), iş vaktinde yapılabilir işaret, ayar tablosu,
+ * gün akışı damgaları ve sigara sayacı.
+ * TaskOutcome görev silinse de kalır (gün sonu analizi geçmişi görebilsin diye taskId yabancı anahtar değildir).
+ * `day` mantıksal gündür (gece 04:00'e kadar önceki gün). `carried`: ertesi gün plana geri alındı mı.
+ */
+const CREATE_TABLES_V8 = `
+CREATE TABLE IF NOT EXISTS TaskOutcome (
+  id       TEXT PRIMARY KEY NOT NULL,
+  taskId   TEXT,
+  title    TEXT NOT NULL,
+  day      TEXT NOT NULL,
+  outcome  TEXT NOT NULL CHECK (outcome IN ('DONE', 'NOT_DONE', 'COULD_NOT')),
+  reason   TEXT CHECK (reason IS NULL OR reason IN ('WORK', 'ENERGY', 'TIME', 'OTHER')),
+  minutes  INTEGER NOT NULL DEFAULT 0 CHECK (minutes >= 0),
+  workOk   INTEGER NOT NULL DEFAULT 0,
+  carried  INTEGER NOT NULL DEFAULT 0,
+  loggedAt TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_taskoutcome_day  ON TaskOutcome(day);
+CREATE INDEX IF NOT EXISTS idx_taskoutcome_task ON TaskOutcome(taskId, day);
+
+CREATE TABLE IF NOT EXISTS Setting (
+  key   TEXT PRIMARY KEY NOT NULL,
+  value TEXT NOT NULL
+);
+
+/** Gün akışı damgaları: uyandım, duş, minibüs, dükkan... Aynı tür gün içinde birden çok kez olabilir (gidiş ve dönüş). */
+CREATE TABLE IF NOT EXISTS DayEvent (
+  id   TEXT PRIMARY KEY NOT NULL,
+  day  TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('WAKE', 'SHOWER', 'BUS', 'SHOP_IN', 'SHOP_OUT', 'HOME')),
+  at   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_dayevent_day ON DayEvent(day);
+
+/** Sigara sayacı: her içilen için bir satır. */
+CREATE TABLE IF NOT EXISTS SmokeLog (
+  id  TEXT PRIMARY KEY NOT NULL,
+  day TEXT NOT NULL,
+  at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_smokelog_day ON SmokeLog(day);
+`;
+
+const ADD_TASK_WORK_OK = `
+ALTER TABLE Task ADD COLUMN workOk INTEGER NOT NULL DEFAULT 0;
+`;
+
 const CREATE_TABLES_V5 = `
 CREATE TABLE IF NOT EXISTS DayReview (
   day       TEXT PRIMARY KEY NOT NULL,
@@ -219,8 +268,16 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {
     current = 7;
   }
 
+  if (current === 7) {
+    await db.execAsync(CREATE_TABLES_V8);
+    if (!(await hasColumn(db, 'Task', 'workOk'))) {
+      await db.execAsync(ADD_TASK_WORK_OK);
+    }
+    current = 8;
+  }
+
   // Gelecekteki migrasyonlar:
-  // if (current === 7) { await db.execAsync(`ALTER TABLE ...`); current = 8; }
+  // if (current === 8) { await db.execAsync(`ALTER TABLE ...`); current = 9; }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
 }
