@@ -9,6 +9,7 @@
  *  - Aura:   empatik, sakin. Suçluluğu söndürür; "boşa geçen" zamanı yargılamadan veriye çevirir.
  *            Aura'nın dilinde "boşa", "kaybettin", "tembellik" gibi yargılayıcı sözler yoktur.
  */
+import type { DayNutrition } from './nutritionLogic';
 import type {
   ActivitySummary,
   CoachId,
@@ -69,6 +70,8 @@ export interface CoachContext {
   sleep?: SleepSummary;
   /** Zor gün modu açık: koçlar baskı kurmaz, yalnızca hafifletilmiş planı destekler. */
   hardDay?: boolean;
+  /** Bugünün su ve yemek özeti (kullanıcı kayıt tuttuysa). */
+  nutrition?: DayNutrition | null;
 }
 
 const ZONE_LABEL: Record<EnergyZone, string> = {
@@ -417,6 +420,17 @@ export function getAuraMessage(ctx: CoachContext): CoachMessage {
         body: `Bugün ${act.steps} adım atıldı. Kısa bir yürüyüş zihni tazeler; şu an belki sadece buna ihtiyacın vardır.`,
       };
     }
+  }
+
+  // Su: yalnızca öğleden sonra, hâlâ çok az içildiyse ve gün bitmediyse; yargısız, tek bir bardaklık adım
+  const nut = ctx.nutrition;
+  if (nut && !nut.quiet && nut.waterRatio < 0.25 && ctx.now.getHours() >= 14 && ctx.now.getHours() < 21) {
+    return {
+      ...base,
+      tone: 'CALM',
+      headline: 'Bir bardak su iyi gelir',
+      body: 'Bugün su kaydın az görünüyor (kayıt eksik de olabilir). Şu an yalnızca bir bardak yeter; gerisi gün içine yayılır.',
+    };
   }
 
   // Bugün yapılan ve süren bir rutin: küçük bir takdir

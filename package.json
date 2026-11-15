@@ -17,7 +17,8 @@
     "test:free": "tsx scripts/test-free.ts",
     "test:morning": "tsx scripts/test-morning.ts",
     "test:hardday": "tsx scripts/test-hardday.ts",
-    "test:weekly": "tsx scripts/test-weekly.ts"
+    "test:weekly": "tsx scripts/test-weekly.ts",
+    "test:nutrition": "tsx scripts/test-nutrition.ts"
   },
   "dependencies": {
     "expo": "~58.0.0"

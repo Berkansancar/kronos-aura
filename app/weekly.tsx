@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { colors, radius, spacing } from '../constants/theme';
+import { getNutritionOptions } from '../services/nutritionSettings';
 import { loadWeekSummary } from '../services/weekly';
 import type { WeekSummary } from '../services/weeklyLogic';
 
@@ -19,7 +20,7 @@ export default function WeeklyScreen() {
     useCallback(() => {
       (async () => {
         try {
-          setSummary((await loadWeekSummary(db, new Date())).summary);
+          setSummary((await loadWeekSummary(db, new Date(), await getNutritionOptions())).summary);
         } catch (e) {
           Alert.alert('Bir sorun oldu', e instanceof Error ? e.message : String(e));
         } finally {

@@ -56,6 +56,7 @@ npm run test:free         Gemini ve Groq istemcisi (model yedeği, hata eşleme)
 npm run test:morning      sabah brifingi, bildirim planı, veritabanı v6, 62 kontrol
 npm run test:hardday      zor gün modu (hangi işler kalır, aç/kapat, koç mesajları), 40 kontrol
 npm run test:weekly       haftalık özet (toplamlar, kıyas, metinler, veritabanı), 52 kontrol
+npm run test:nutrition    su, yemek, kalori tahmini ve koç/gün sonu/haftalık bağlantıları, 114 kontrol
 ```
 
 
@@ -170,3 +171,32 @@ ilerleme ve önceki haftayla kıyas. Aura haftayı yargılamadan yorumlar; Krono
 gereken rutini (3+ şansta %40'ın altı) ve gelecek hafta için tepe saati önerisini söyler. Rutinden gelen görevler
 ikinci kez "görev" sayılmaz; sabah bakınca henüz bitmemiş gün rutin oranını düşürmez. Yapay zekâ gerekmez
 (`services/weeklyLogic.ts`, veri `services/weekly.ts`).
+
+
+## Su, yemek ve kalori
+
+Ana ekrandaki "Su ve yemek" kartı (üzerinde tek dokunuşla +200 ml) `/nutrition` ekranını açar:
+
+- **Su:** bardak (200), küçük şişe (330), şişe (500), büyük şişe (750) tek dokunuşla eklenir; son kayıt geri
+  alınır. Hedef Ayarlar'dan seçilir (1,5–3 L; varsayılan 2 L). Kronos, kalan suyu saat 21:00'e kadar saatlik
+  miktara böler.
+- **Çay, kahve, şekerli içecek:** tek dokunuşla eklenir (içecek kaydı olarak, yemek sayılmaz).
+- **Yemek:** öğün türü (kahvaltı, öğle, akşam, ara öğün), ne zaman yendiği (şimdi ... 3 saat önce) ve serbest
+  yazı. Yazdıkça besin grupları (sebze, meyve, protein, ekmek/tahıl, süt ürünü, kuruyemiş, tatlı, kızartma,
+  şekerli içecek, çay/kahve) kendiliğinden işaretlenir; istenirse elle değiştirilir.
+- **Kalori:** "2 yumurta, 3 dilim ekmek, çay" gibi yazıdan yaklaşık kalori tahmin edilir
+  (`services/foodTable.ts`: 127 yemeklik tablo, 190+ yazım biçimi; sayı, "yarım", gram ve ml anlaşılır). Tanınmayan
+  yemek için uydurma sayı yazılmaz; kullanıcı sayıyı her zaman kendisi yazar ya da boş bırakır. Sayılar
+  tipik porsiyonlardan tahmindir. İstenirse Ayarlar'dan günlük kalori hedefi konur (1.200–4.500 kcal;
+  daha düşüğü kaydedilmez ve bir diyetisyene yönlendirilir). Hedef yoksa hiçbir yerde hedef gösterilmez.
+- **Analiz** (`services/nutritionLogic.ts`, yapay zekâ gerekmez): su oranı ve dağılımı, öğün sayısı, ilk ve son
+  yemek saati, en uzun yemek arası, son çay/kahve saati (akşamsa uyku notu), geç yemek, sebze/meyve eksikliği.
+  Aura yargılamaz; "fazla yedin" gibi cümle kurulmaz. Kronos zamanı yönetir (su hızı, ara öğün, tepe saatinden
+  önce bir bardak su).
+
+Bağlantılar: ana ekran Aura'sı öğleden sonra su çok azsa nazik bir hatırlatma yapar; gün sonu değerlendirmesinde
+su/yemek özeti gösterilir; haftalık özette ortalama su, hedefe ulaşılan gün ve kalori ortalaması (yalnızca 2+ yemek
+kaydı olan günlerden) yer alır. Yapay zekâya, yalnızca "gün analizi paylaşımı" açıksa, toplu özet gider (su miktarı,
+yemek kaydı sayısı, yaklaşık kalori, çay/kahve sayısı); yazılan yemek adları asla gönderilmez.
+
+Veritabanı v7: `WaterLog` ve `MealLog` (gün anahtarı gece 04:00'e kadar önceki gün sayılır).

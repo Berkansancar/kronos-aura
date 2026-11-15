@@ -20,6 +20,7 @@ import type { DayReview, Routine, RoutineIdea } from '../database/types';
 import { isSharingWithAi } from '../services/activity';
 import { getFreeConfig } from '../services/ai/freeSettings';
 import { getAiConfig } from '../services/ai/settings';
+import { getNutritionOptions } from '../services/nutritionSettings';
 import {
   addIdeaAsRoutine,
   buildManualReviewPrompt,
@@ -75,7 +76,8 @@ export default function ReviewScreen() {
         const free = await getFreeConfig();
         setHasKey(cfg !== null || free !== null);
         const share = await isSharingWithAi();
-        const result = await loadOrCreateReview(db, n, { cfg, free, shareActivity: share, force });
+        const nutritionOpts = await getNutritionOptions();
+        const result = await loadOrCreateReview(db, n, { cfg, free, shareActivity: share, force, nutritionOpts });
         setFacts(result.facts);
         setReview(result.review);
         setAiError(result.aiError);
@@ -147,7 +149,7 @@ export default function ReviewScreen() {
   const copyPrompt = async () => {
     setManualMsg(null);
     try {
-      const text = await buildManualReviewPrompt(db, new Date());
+      const text = await buildManualReviewPrompt(db, new Date(), await getNutritionOptions());
       try {
         await Clipboard.setStringAsync(text);
         setCopied(true);

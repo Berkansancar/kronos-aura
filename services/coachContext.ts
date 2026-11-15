@@ -10,6 +10,8 @@ import { dayKey } from './activityLogic';
 import { isSharingWithAi, loadActivitySummary, loadSleepSummary } from './activity';
 import type { CoachContext } from './coachEngine';
 import { DAY_END_HOUR, dayBounds, planningDay } from './planner';
+import { loadDayNutrition } from './nutrition';
+import { getNutritionOptions } from './nutritionSettings';
 import { loadRoutineBriefs } from './routineBriefs';
 
 /** Sohbet ekranı gibi, ana ekran dışındaki yerlerde koçlara güncel durumu vermek için. */
@@ -23,6 +25,9 @@ export async function loadCoachContext(db: SQLiteDatabase, now: Date): Promise<C
   const shareActivityWithAi = activity ? await isSharingWithAi() : false;
   const routines = await loadRoutineBriefs(db, now);
   const sleep = await loadSleepSummary(db, now);
+  const nutrition = await getNutritionOptions()
+    .then((o) => loadDayNutrition(db, now, o))
+    .catch(() => null);
   return {
     now,
     user,
@@ -39,5 +44,6 @@ export async function loadCoachContext(db: SQLiteDatabase, now: Date): Promise<C
     routines,
     sleep,
     hardDay: await isHardDay(db, dayKey(planningDay(now))),
+    nutrition,
   };
 }

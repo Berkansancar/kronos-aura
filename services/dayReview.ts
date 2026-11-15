@@ -31,6 +31,7 @@ import {
 import { FREE_PROVIDERS, type FreeConfig } from './ai/freeClient';
 import { generateAiReview, generateFreeReview } from './ai/reviewAI';
 import type { AiConfig } from './ai/settings';
+import { loadDayNutrition, type NutritionOptions } from './nutrition';
 import { DAY_END_HOUR } from './planner';
 import { acceptRoutine, addCustomRoutine, addRoutineFromTemplate } from './routineFlow';
 import { routineDayState } from './routineLogic';
@@ -54,7 +55,11 @@ function nextDay(d: Date): Date {
 
 // ───────────────────────── Gerçekleri topla ─────────────────────────
 
-export async function gatherDayFacts(db: SQLiteDatabase, now: Date): Promise<DayFacts> {
+export async function gatherDayFacts(
+  db: SQLiteDatabase,
+  now: Date,
+  nutritionOpts?: NutritionOptions
+): Promise<DayFacts> {
   const day = reviewDayOf(now);
   const key = dayKey(day);
   const start = day.toISOString();
@@ -122,6 +127,7 @@ export async function gatherDayFacts(db: SQLiteDatabase, now: Date): Promise<Day
     sleepWake: sleep ? formatClockIso(sleep.wakeTime) : null,
     peakStartHour: user.peakStartHour,
     peakEndHour: user.peakEndHour,
+    nutrition: nutritionOpts ? await loadDayNutrition(db, now, nutritionOpts, key).catch(() => null) : null,
   };
 }
 
@@ -142,9 +148,15 @@ export interface ReviewResult {
 export async function loadOrCreateReview(
   db: SQLiteDatabase,
   now: Date,
-  opts: { cfg: AiConfig | null; free?: FreeConfig | null; shareActivity: boolean; force?: boolean }
+  opts: {
+    cfg: AiConfig | null;
+    free?: FreeConfig | null;
+    shareActivity: boolean;
+    force?: boolean;
+    nutritionOpts?: NutritionOptions;
+  }
 ): Promise<ReviewResult> {
-  const facts = await gatherDayFacts(db, now);
+  const facts = await gatherDayFacts(db, now, opts.nutritionOpts);
   if (!opts.force) {
     const stored = await getDayReview(db, facts.day);
     if (stored) return { facts, review: stored, aiError: null };
@@ -191,8 +203,12 @@ async function allRoutineTitles(db: SQLiteDatabase): Promise<string[]> {
 }
 
 /** Kopyalanıp ücretsiz sohbet uygulamasına yapıştırılacak günün özeti ve komut. */
-export async function buildManualReviewPrompt(db: SQLiteDatabase, now: Date): Promise<string> {
-  const facts = await gatherDayFacts(db, now);
+export async function buildManualReviewPrompt(
+  db: SQLiteDatabase,
+  now: Date,
+  nutritionOpts?: NutritionOptions
+): Promise<string> {
+  const facts = await gatherDayFacts(db, now, nutritionOpts);
   return buildManualPrompt(facts, await allRoutineTitles(db));
 }
 

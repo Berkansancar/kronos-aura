@@ -190,7 +190,7 @@ async function dbTests(): Promise<void> {
   const { db, raw } = makeTestDb();
   await migrateDbIfNeeded(db);
   const ver = (raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;
-  check('temiz kurulum son sürüm', ver === DATABASE_VERSION && DATABASE_VERSION === 6);
+  check('temiz kurulum son sürüm', ver === DATABASE_VERSION && DATABASE_VERSION === 7);
 
   // v4 -> v5 yükseltme
   raw.exec('DROP TABLE DayReview');

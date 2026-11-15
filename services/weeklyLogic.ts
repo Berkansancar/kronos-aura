@@ -6,6 +6,7 @@
 import type { EnergyState } from '../database/types';
 import { formatSteps } from './activityLogic';
 import { formatDuration } from './format';
+import { DEFAULT_WATER_GOAL, formatKcal, formatWater } from './nutritionLogic';
 
 export interface WeekDay {
   /** yyyy-mm-dd */
@@ -17,6 +18,11 @@ export interface WeekDay {
   screenMinutes: number | null;
   sleepMinutes: number | null;
   hardDay: boolean;
+  /** Su ve yemek (kayıt tutulduysa; eski veriler için isteğe bağlı) */
+  waterMl?: number;
+  foodEntries?: number;
+  /** Kayıtlı yaklaşık kalori (bilinmiyorsa null) */
+  kcal?: number | null;
 }
 
 export interface WeekRoutineInput {
@@ -40,6 +46,8 @@ export interface WeekFacts {
   peakEndHour: number;
   /** Son günün rutinleri şansa katılsın mı? (akşam 20:00'den sonra evet) */
   countEndDay: boolean;
+  /** Günlük su hedefi (ml); verilmezse varsayılan */
+  waterGoalMl?: number;
 }
 
 export interface WeekTotals {
@@ -52,6 +60,13 @@ export interface WeekTotals {
   sleepNights: number;
   stepsAvg: number | null;
   screenAvg: number | null;
+  /** Su kaydı olan gün sayısı ve (en az 3 gün varsa) günlük ortalama */
+  waterDays: number;
+  waterAvg: number | null;
+  waterGoalDays: number;
+  /** Yemek kaydı olan gün sayısı; kalori ortalaması yalnızca en az 3 günde 2+ yemek kaydı varsa */
+  foodDays: number;
+  kcalAvg: number | null;
 }
 
 export interface WeekRoutineRow {
@@ -131,7 +146,8 @@ function avg(values: number[], minCount: number): number | null {
 export function totalsOf(
   days: WeekDay[],
   routines: WeekRoutineInput[],
-  countEndDay: boolean
+  countEndDay: boolean,
+  waterGoalMl: number = DEFAULT_WATER_GOAL
 ): WeekTotals {
   const keys = days.map((d) => d.day);
   const last = keys[keys.length - 1];
@@ -152,6 +168,11 @@ export function totalsOf(
   const sleeps = days.map((d) => d.sleepMinutes).filter((x): x is number => x !== null && x > 0);
   const steps = days.map((d) => d.steps).filter((x): x is number => x !== null && x > 0);
   const screens = days.map((d) => d.screenMinutes).filter((x): x is number => x !== null);
+  const waters = days.map((d) => d.waterMl ?? 0).filter((x) => x > 0);
+  // Kalori ortalaması yalnızca yeterince kayıt tutulan günlerden alınır (tek öğün yazılan gün ortalamayı bozar)
+  const kcals = days
+    .filter((d) => (d.foodEntries ?? 0) >= 2 && (d.kcal ?? 0) > 0)
+    .map((d) => d.kcal as number);
   return {
     tasksDone: days.reduce((a, d) => a + d.tasksDone, 0),
     taskMinutes: days.reduce((a, d) => a + d.taskMinutes, 0),
@@ -162,6 +183,11 @@ export function totalsOf(
     sleepNights: sleeps.length,
     stepsAvg: avg(steps, 3),
     screenAvg: avg(screens, 3),
+    waterDays: waters.length,
+    waterAvg: avg(waters, 3),
+    waterGoalDays: waters.filter((w) => w >= waterGoalMl).length,
+    foodDays: days.filter((d) => (d.foodEntries ?? 0) > 0).length,
+    kcalAvg: avg(kcals, 3),
   };
 }
 
@@ -192,8 +218,9 @@ function compare(now: number, before: number, unit: (n: number) => string, more:
 }
 
 export function buildWeekSummary(f: WeekFacts): WeekSummary {
-  const totals = totalsOf(f.days, f.routines, f.countEndDay);
-  const prev = totalsOf(f.prevDays, f.routines, true);
+  const goal = f.waterGoalMl ?? DEFAULT_WATER_GOAL;
+  const totals = totalsOf(f.days, f.routines, f.countEndDay, goal);
+  const prev = totalsOf(f.prevDays, f.routines, true, goal);
   const rows = routineRows(f.routines, f.days, f.countEndDay);
   const routineRate = totals.routineChances > 0 ? totals.routinesDone / totals.routineChances : null;
 
@@ -212,6 +239,8 @@ export function buildWeekSummary(f: WeekFacts): WeekSummary {
     totals.routinesDone === 0 &&
     totals.sleepAvg === null &&
     totals.stepsAvg === null &&
+    totals.waterDays === 0 &&
+    totals.foodDays === 0 &&
     f.energy.HIGH + f.energy.EXHAUSTED + f.energy.DISTRACTED === 0;
 
   // Ayarlanacak rutin: en az 3 şans, yapılma oranı %40'ın altı. Suçlama yok; saat/süre ayarı önerilir.
@@ -244,6 +273,17 @@ export function buildWeekSummary(f: WeekFacts): WeekSummary {
   }
   if (totals.screenAvg !== null) {
     highlights.push(`Günlük ortalama ekran süresi ${formatDuration(totals.screenAvg)}`);
+  }
+  if (totals.waterAvg !== null) {
+    highlights.push(
+      `Günlük ortalama ${formatWater(totals.waterAvg)} su` +
+        (totals.waterGoalDays > 0 ? `, ${totals.waterGoalDays} gün hedefe (${formatWater(goal)}) ulaştın` : '')
+    );
+  }
+  if (totals.kcalAvg !== null) {
+    highlights.push(`Kayıt tuttuğun günlerde ortalama ≈${formatKcal(totals.kcalAvg)} (yaklaşık, kayıt eksik olabilir)`);
+  } else if (totals.foodDays > 0) {
+    highlights.push(`${totals.foodDays} günde yemek kaydı tuttun`);
   }
   if (totals.hardDays > 0) {
     highlights.push(`${totals.hardDays} gün zor gün modunda hafif ilerledin`);
@@ -280,6 +320,7 @@ export function buildWeekSummary(f: WeekFacts): WeekSummary {
     } else {
       parts.push('Küçük adımların toplamı bu. Hepsi sayılır.');
     }
+    if (totals.waterGoalDays >= 4) parts.push(`Su hedefine ${totals.waterGoalDays} gün ulaştın, bu güzel bir alışkanlık.`);
     aura = parts.join(' ');
   }
 
@@ -291,6 +332,9 @@ export function buildWeekSummary(f: WeekFacts): WeekSummary {
     kronos.push(
       `"${routineToAdjust.title}" ${routineToAdjust.done}/${routineToAdjust.chances} gün yapıldı. Saatini değiştirmeyi ya da süresini kısaltmayı dene.`
     );
+  }
+  if (totals.waterDays >= 3 && totals.waterGoalDays <= 1) {
+    kronos.push('Su hedefine az günde ulaşılmış. Her görev bitişinde bir bardak ekleyerek kolaylaştırabilirsin.');
   }
   kronos.push(
     `Gelecek hafta: en zor işi tepe saatinde (${pad(f.peakStartHour)}:00–${pad(f.peakEndHour % 24)}:00) yap ve her akşam gün sonu değerlendirmesini aç.`

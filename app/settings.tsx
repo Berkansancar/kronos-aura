@@ -23,6 +23,8 @@ import {
   setFreeProvider,
 } from '../services/ai/freeSettings';
 import { refreshReminders } from '../services/reminderSync';
+import { KCAL_TARGET_MAX, KCAL_TARGET_MIN, WATER_GOALS, formatWater } from '../services/nutritionLogic';
+import { getKcalTarget, getWaterGoal, saveKcalTarget, setWaterGoal } from '../services/nutritionSettings';
 import {
   getMorningSettings,
   getReviewReminderEnabled,
@@ -35,6 +37,9 @@ export default function SettingsScreen() {
   const router = useRouter();
   const db = useSQLiteContext();
   const [morning, setMorning] = useState({ enabled: true, hour: 8 });
+  const [waterGoal, setWaterGoalState] = useState(2000);
+  const [kcalInput, setKcalInput] = useState('');
+  const [kcalMessage, setKcalMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const [key, setKey] = useState('');
   const [saved, setSaved] = useState(false);
   const [model, setModelState] = useState<string>(DEFAULT_MODEL);
@@ -56,6 +61,9 @@ export default function SettingsScreen() {
       setModelState(await getModel());
       setReviewReminder(await getReviewReminderEnabled());
       setMorning(await getMorningSettings());
+      setWaterGoalState(await getWaterGoal());
+      const kt = await getKcalTarget();
+      setKcalInput(kt === null ? '' : String(kt));
     })();
   }, []);
 
@@ -279,8 +287,8 @@ export default function SettingsScreen() {
           <Text style={styles.noteText}>
             {info.privacy}
             {'\n'}Bu anahtar yalnızca gün sonu değerlendirmesi için kullanılır; koçlarla sohbet Claude anahtarınla
-            yapılır. İkisi de varsa gün sonunda önce ücretsiz olan denenir. Adım, ekran ve uyku bilgisi yalnızca
-            gün analizi paylaşımını açtıysan gider.
+            yapılır. İkisi de varsa gün sonunda önce ücretsiz olan denenir. Adım, ekran, uyku ve su/yemek özeti
+            (yemek adları asla) yalnızca gün analizi paylaşımını açtıysan gider.
           </Text>
         </View>
 
@@ -346,6 +354,63 @@ export default function SettingsScreen() {
           </View>
         )}
 
+        <View style={styles.sectionDivider} />
+        <Text style={styles.heading2}>Su ve beslenme</Text>
+        <Text style={styles.sub}>
+          Günlük su hedefin. Gerçek ihtiyaç kişiden kişiye değişir; sağlık durumun için bir doktora danışabilirsin.
+        </Text>
+        <View style={styles.hourRow}>
+          {WATER_GOALS.map((g) => {
+            const active = g === waterGoal;
+            return (
+              <Pressable
+                key={g}
+                onPress={async () => {
+                  setWaterGoalState(g);
+                  await setWaterGoal(g);
+                }}
+                style={[styles.hourChip, active && { borderColor: colors.aura }]}
+              >
+                <Text style={[styles.hourText, active && { color: colors.aura }]}>{formatWater(g)}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Text style={styles.label}>Günlük kalori hedefi (isteğe bağlı)</Text>
+        <TextInput
+          value={kcalInput}
+          onChangeText={(t) => {
+            setKcalInput(t.replace(/[^0-9.,]/g, ''));
+            setKcalMessage(null);
+          }}
+          placeholder="Boş bırakırsan hedef gösterilmez"
+          placeholderTextColor={colors.textMuted}
+          keyboardType="numeric"
+          maxLength={5}
+          style={styles.input}
+        />
+        <Text style={styles.switchText}>
+          Kalori sayıları yaklaşıktır ve yalnızca bilgi içindir. Hedefi sen belirlersin ({KCAL_TARGET_MIN}–{KCAL_TARGET_MAX} kcal);
+          kendine uygun değeri bir diyetisyenden öğrenebilirsin. Yemek takibi seni germeye başlarsa kapatmak ya da ara vermek serbest.
+        </Text>
+        <Pressable
+          onPress={async () => {
+            const r = await saveKcalTarget(kcalInput);
+            if (!r.ok) setKcalMessage({ text: r.message, ok: false });
+            else {
+              setKcalInput(r.value === null ? '' : String(r.value));
+              setKcalMessage({ text: r.value === null ? 'Kalori hedefi kapalı.' : 'Hedef kaydedildi.', ok: true });
+            }
+          }}
+          style={styles.secondary}
+        >
+          <Text style={styles.secondaryText}>Kalori hedefini kaydet</Text>
+        </Pressable>
+        {kcalMessage && (
+          <Text style={[styles.message, { color: kcalMessage.ok ? colors.aura : colors.danger }]}>{kcalMessage.text}</Text>
+        )}
+
         <View style={styles.note}>
           <Text style={styles.noteTitle}>Bilmen gerekenler</Text>
           <Text style={styles.noteText}>
@@ -353,7 +418,7 @@ export default function SettingsScreen() {
             konmaz.{'\n'}• Her yapay zekâ mesajı API'den ücretlendirilir; Claude aboneliğinden
             ayrıdır. Anthropic Console'dan harcama sınırı belirleyebilirsin.{'\n'}• Koçlara görev
             adların, planın ve enerji kayıtların gönderilir. Göndermek istemediğin bir şeyi görev
-            adına yazma. Rutinlerinin adı, bugünkü durumu ve gün sonu değerlendirmesi için günün özeti de gider. Gün analizinde paylaşımı açtıysan adım, ekran süren ve uyku tahminin de gider.{'\n'}• Anahtar yoksa ya da internet kesilirse koçlar kural tabanlı
+            adına yazma. Rutinlerinin adı, bugünkü durumu ve gün sonu değerlendirmesi için günün özeti de gider. Gün analizinde paylaşımı açtıysan adım, ekran süren, uyku tahminin ve su/yemek özetin (miktar, sayı, yaklaşık kalori; yemek adları değil) de gider.{'\n'}• Anahtar yoksa ya da internet kesilirse koçlar kural tabanlı
             çalışmaya devam eder.
           </Text>
         </View>
@@ -378,6 +443,7 @@ const styles = StyleSheet.create({
   },
   hourText: { color: colors.textMuted, fontSize: 13, fontWeight: '700' },
   sectionDivider: { height: 1, backgroundColor: colors.border, marginTop: spacing.lg },
+  heading2: { color: colors.text, fontSize: 18, fontWeight: '800' },
   heading2: { color: colors.text, fontSize: 18, fontWeight: '800' },
   linkText: { color: colors.kronos, fontSize: 13, fontWeight: '700' },
   switchRow: {

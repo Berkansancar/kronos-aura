@@ -226,3 +226,28 @@ export interface DayReview {
   payload: DayReviewPayload;
   createdAt: string;
 }
+
+
+// ───────────────────────── Su ve yemek ─────────────────────────
+
+export type MealKind = 'KAHVALTI' | 'OGLE' | 'AKSAM' | 'ARA' | 'ICECEK';
+
+export interface WaterLog {
+  id: string;
+  /** yyyy-mm-dd */
+  day: string;
+  amountMl: number;
+  loggedAt: string;
+}
+
+export interface MealLog {
+  id: string;
+  day: string;
+  kind: MealKind;
+  note: string;
+  /** Besin grubu kimlikleri (JSON'dan çözülmüş) */
+  groups: string[];
+  /** Yaklaşık kalori; bilinmiyorsa null */
+  kcal: number | null;
+  eatenAt: string;
+}

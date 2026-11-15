@@ -53,6 +53,9 @@ import { confirmEndHardDay, confirmStartHardDay } from '../components/hardDayAle
 import { endHardDay, startHardDay } from '../services/hardDay';
 import { countExhaustedSince, shouldSuggestHardDay } from '../services/hardDayLogic';
 import { isEssentialRoutine } from '../services/routineRemindersLogic';
+import { addWater, loadDayNutrition } from '../services/nutrition';
+import { formatWater, type DayNutrition } from '../services/nutritionLogic';
+import { getNutritionOptions } from '../services/nutritionSettings';
 import { formatClock, formatDayTitle, formatDuration } from '../services/format';
 import { DAY_END_HOUR, dayBounds, planningDay, replanDay } from '../services/planner';
 import { loadRoutineBriefs } from '../services/routineBriefs';
@@ -104,6 +107,7 @@ export default function HomeScreen() {
   const [snoozing, setSnoozing] = useState<Routine | null>(null);
   const [hasReview, setHasReview] = useState(false);
   const [hardDay, setHardDayOn] = useState(false);
+  const [nutrition, setNutrition] = useState<DayNutrition | null>(null);
 
   const load = useCallback(async () => {
     const current = new Date();
@@ -124,6 +128,12 @@ export default function HomeScreen() {
       // Rutin verisi olmadan da görevler çalışır.
     }
     setHardDayOn(await isHardDay(db, dayKey(planningDay(current))).catch(() => false));
+    // Su ve yemek özeti (kayıt yoksa ya da hata verirse kart yine de çalışır)
+    try {
+      setNutrition(await loadDayNutrition(db, current, await getNutritionOptions()));
+    } catch {
+      setNutrition(null);
+    }
     setNow(current);
     setUser(u);
     setTasks(t);
@@ -259,8 +269,9 @@ export default function HomeScreen() {
       routines: briefs,
       sleep,
       hardDay,
+      nutrition,
     };
-  }, [now, user, tasks, blocks, logs, activity, shareActivity, briefs, sleep, hardDay]);
+  }, [now, user, tasks, blocks, logs, activity, shareActivity, briefs, sleep, hardDay, nutrition]);
 
   const coaches = useMemo(
     () => (ctx ? { kronos: getKronosMessage(ctx), aura: getAuraMessage(ctx) } : null),
@@ -284,8 +295,9 @@ export default function HomeScreen() {
       briefs.map((b) => `${b.routine.id}:${b.state}`).join(','),
       sleep?.lastMinutes != null ? Math.floor(sleep.lastMinutes / 60) : '',
       hardDay ? 'hard' : '',
+      nutrition ? `${Math.floor(nutrition.waterMl / 500)}:${nutrition.foodEntries}` : '',
     ].join('|');
-  }, [coaches, tasks, blocks, logs, activity, shareActivity, briefs, sleep, hardDay]);
+  }, [coaches, tasks, blocks, logs, activity, shareActivity, briefs, sleep, hardDay, nutrition]);
 
   const ai = useAICoachMessages(ctx, coaches, situationKey, aiTick);
 
@@ -507,6 +519,31 @@ export default function HomeScreen() {
           <Text style={styles.activityArrow}>›</Text>
         </Pressable>
 
+        <View style={styles.activityCard}>
+          <Pressable onPress={() => router.push('/nutrition')} style={{ flex: 1, gap: 6 }}>
+            <Text style={styles.activityTitle}>Su ve yemek</Text>
+            <Text style={styles.activitySub}>
+              {nutrition
+                ? `Su ${formatWater(nutrition.waterMl)} / ${formatWater(nutrition.waterGoalMl)}${nutrition.foodEntries > 0 ? ` · ${nutrition.foodEntries} yemek kaydı` : ''}`
+                : 'Su, yemek ve kalori kaydı'}
+            </Text>
+            <View style={styles.waterTrack}>
+              <View style={[styles.waterFill, { width: `${Math.round((nutrition?.waterRatio ?? 0) * 100)}%` }]} />
+            </View>
+          </Pressable>
+          <Pressable
+            disabled={busy}
+            onPress={() => run(async () => void (await addWater(db, new Date(), 200)))}
+            style={styles.waterBtn}
+            hitSlop={6}
+          >
+            <Text style={styles.waterBtnText}>+200 ml</Text>
+          </Pressable>
+          <Pressable onPress={() => router.push('/nutrition')} hitSlop={8}>
+            <Text style={styles.activityArrow}>›</Text>
+          </Pressable>
+        </View>
+
         <Pressable onPress={() => router.push('/weekly')} style={styles.activityCard}>
           <View style={{ flex: 1 }}>
             <Text style={styles.activityTitle}>Haftalık özet</Text>
@@ -585,6 +622,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
   },
+  waterTrack: { height: 6, borderRadius: 3, backgroundColor: colors.surfaceAlt, overflow: 'hidden' },
+  waterFill: { height: 6, borderRadius: 3, backgroundColor: colors.aura },
+  waterBtn: {
+    borderWidth: 1,
+    borderColor: colors.aura,
+    backgroundColor: colors.auraSoft,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+  },
+  waterBtnText: { color: colors.aura, fontSize: 13, fontWeight: '800' },
   reviewCard: {
     flexDirection: 'row',
     alignItems: 'center',

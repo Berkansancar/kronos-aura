@@ -4,13 +4,16 @@ import {
   getOrCreateUser,
   listDailyStats,
   listHardDaysSince,
+  listMealLogsSince,
   listRoutineLogsSince,
   listRoutines,
   listSleepLogs,
   listTimeLogsSince,
+  listWaterLogsSince,
 } from '../database/repository';
 import type { EnergyState } from '../database/types';
 import { dayKey } from './activityLogic';
+import type { NutritionOptions } from './nutrition';
 import {
   buildWeekSummary,
   weekEndDate,
@@ -20,7 +23,11 @@ import {
   type WeekSummary,
 } from './weeklyLogic';
 
-export async function gatherWeekFacts(db: SQLiteDatabase, now: Date): Promise<WeekFacts> {
+export async function gatherWeekFacts(
+  db: SQLiteDatabase,
+  now: Date,
+  nutritionOpts?: NutritionOptions
+): Promise<WeekFacts> {
   const end = weekEndDate(now);
   const endDay = dayKey(end);
   const keys = windowKeys(endDay, 14);
@@ -34,6 +41,17 @@ export async function gatherWeekFacts(db: SQLiteDatabase, now: Date): Promise<We
   const stats = await listDailyStats(db, 20);
   const sleeps = await listSleepLogs(db, 20);
   const hardDays = new Set(await listHardDaysSince(db, startKey));
+
+  // Su ve yemek: gün başına toplamlar
+  const waterByDay = new Map<string, number>();
+  for (const w of await listWaterLogsSince(db, startKey)) waterByDay.set(w.day, (waterByDay.get(w.day) ?? 0) + w.amountMl);
+  const foodByDay = new Map<string, { entries: number; kcal: number | null }>();
+  for (const m of await listMealLogsSince(db, startKey)) {
+    const cur = foodByDay.get(m.day) ?? { entries: 0, kcal: null };
+    if (m.kind !== 'ICECEK') cur.entries += 1;
+    if (m.kcal !== null) cur.kcal = (cur.kcal ?? 0) + m.kcal;
+    foodByDay.set(m.day, cur);
+  }
 
   const doneByDay = new Map<string, number>();
   // Bir rutin aynı gün birden çok kez "yapıldı" yazabilir; gün başına bir kez sayılır.
@@ -82,6 +100,9 @@ export async function gatherWeekFacts(db: SQLiteDatabase, now: Date): Promise<We
       screenMinutes: st?.screenMinutes ?? null,
       sleepMinutes: sleepByDay.get(k) ?? null,
       hardDay: hardDays.has(k),
+      waterMl: waterByDay.get(k) ?? 0,
+      foodEntries: foodByDay.get(k)?.entries ?? 0,
+      kcal: foodByDay.get(k)?.kcal ?? null,
     };
   };
 
@@ -99,13 +120,15 @@ export async function gatherWeekFacts(db: SQLiteDatabase, now: Date): Promise<We
     peakStartHour: user.peakStartHour,
     peakEndHour: user.peakEndHour,
     countEndDay: now.getHours() >= 20 || now.getHours() < 4,
+    waterGoalMl: nutritionOpts?.waterGoalMl,
   };
 }
 
 export async function loadWeekSummary(
   db: SQLiteDatabase,
-  now: Date
+  now: Date,
+  nutritionOpts?: NutritionOptions
 ): Promise<{ facts: WeekFacts; summary: WeekSummary }> {
-  const facts = await gatherWeekFacts(db, now);
+  const facts = await gatherWeekFacts(db, now, nutritionOpts);
   return { facts, summary: buildWeekSummary(facts) };
 }
