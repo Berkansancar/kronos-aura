@@ -834,6 +834,7 @@ export default function HomeScreen() {
         {moreOpen && (
           <View style={styles.tileGrid}>
             <HomeTile title="Rutinlerim" subtitle={routineLine} onPress={() => router.push('/routines')} />
+            <HomeTile title="Rutin modu" subtitle="Rutinleri tek ekranda, sırayla ve süreyle yap" onPress={() => router.push('/routine-run')} />
             <HomeTile
               title="Su ve yemek"
               subtitle={

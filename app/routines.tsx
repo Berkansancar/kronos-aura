@@ -234,6 +234,12 @@ export default function RoutinesScreen() {
           })
         )}
 
+        {progress.open > 0 && (
+          <Pressable onPress={() => router.push('/routine-run')} style={styles.runBtn}>
+            <Text style={styles.runBtnText}>▶ Rutin modunu başlat ({progress.open} açık)</Text>
+          </Pressable>
+        )}
+
         <Pressable onPress={() => setEditor({ open: true, routine: null })} style={styles.customBtn}>
           <Text style={styles.customBtnText}>+ Kendi rutinimi ekle</Text>
         </Pressable>
@@ -397,6 +403,15 @@ const styles = StyleSheet.create({
   suggestionBtnText: { color: colors.bg, fontSize: 13, fontWeight: '800' },
   actions: { flexDirection: 'row', gap: spacing.xl, marginTop: spacing.xs },
   action: { color: colors.kronos, fontSize: 13, fontWeight: '600' },
+  runBtn: {
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.aura,
+    backgroundColor: colors.auraSoft,
+    borderRadius: radius.pill,
+    paddingVertical: 14,
+  },
+  runBtnText: { color: colors.aura, fontSize: 15, fontWeight: '800' },
   calendarBtn: {
     backgroundColor: colors.surface,
     borderWidth: 1,
