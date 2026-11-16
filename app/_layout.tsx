@@ -2,10 +2,11 @@ import { Suspense, useEffect } from 'react';
 import { ActivityIndicator, AppState, View } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { router, Stack } from 'expo-router';
-import { SQLiteProvider } from 'expo-sqlite';
+import { SQLiteProvider, type SQLiteDatabase } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
 import { colors } from '../constants/theme';
 import { DB_NAME, migrateDbIfNeeded } from '../database/schema';
+import { ensureWorkSeed } from '../services/workSettings';
 import { ensureTracking } from '../services/activity';
 
 /** Bildirime dokunulunca bildirimin belirttiği ekranı (sabah brifingi, gün sonu) açar. */
@@ -55,6 +56,12 @@ function Loading() {
   );
 }
 
+/** Veritabanını hazırlar; iş programı ilk açılışta bir kez kaydedilir (hata uygulamayı durdurmaz). */
+async function initDatabase(db: SQLiteDatabase): Promise<void> {
+  await migrateDbIfNeeded(db);
+  await ensureWorkSeed(db).catch(() => undefined);
+}
+
 export default function RootLayout() {
   useNotificationOpen();
   // Arka plan takibi açık bırakıldıysa, uygulama her öne geldiğinde servisin çalıştığından emin ol.
@@ -68,7 +75,7 @@ export default function RootLayout() {
 
   return (
     <Suspense fallback={<Loading />}>
-      <SQLiteProvider databaseName={DB_NAME} onInit={migrateDbIfNeeded} useSuspense>
+      <SQLiteProvider databaseName={DB_NAME} onInit={initDatabase} useSuspense>
         <StatusBar style="light" />
         <Stack
           screenOptions={{

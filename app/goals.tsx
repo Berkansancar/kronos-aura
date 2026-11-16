@@ -35,7 +35,19 @@ import { askNotificationPermission } from '../services/routineReminders';
 import { KCAL_TARGET_MAX, KCAL_TARGET_MIN, WATER_GOALS, clockOfMinute, formatKcal, formatWater } from '../services/nutritionLogic';
 import { saveKcalTarget, setWaterGoal } from '../services/nutritionSettings';
 import { getWork, saveWork } from '../services/workSettings';
-import { DEFAULT_WORK, WORK_DAYS, WORK_END_CHOICES, WORK_START_CHOICES, workSummary, type WorkSchedule } from '../services/workLogic';
+import {
+  DEFAULT_WORK,
+  WORK_DAYS,
+  adjustWork,
+  setSpecial,
+  weeklyWorkMinutes,
+  windowForDow,
+  workSummary,
+  workWeekLines,
+  type WindowEdge,
+  type WindowTarget,
+  type WorkSchedule,
+} from '../services/workLogic';
 
 const STATUS_COLOR: Record<GoalStatus, string> = {
   DONE: colors.aura,
@@ -83,6 +95,26 @@ function Choices<T extends number>({
           <Text style={[styles.chipText, value === null && { color: colors.text }]}>{offLabel}</Text>
         </Pressable>
       )}
+    </View>
+  );
+}
+
+/** Başlangıç/bitiş saati: 10 ve 30 dakikalık adımlarla ayarlanır. */
+function TimeStepper({ label, value, onStep }: { label: string; value: number; onStep: (delta: number) => void }) {
+  return (
+    <View style={styles.stepRow}>
+      <Text style={styles.stepLabel}>{label}</Text>
+      {[-30, -10].map((d) => (
+        <Pressable key={d} onPress={() => onStep(d)} style={styles.stepBtn} hitSlop={4}>
+          <Text style={styles.stepBtnText}>{d}</Text>
+        </Pressable>
+      ))}
+      <Text style={styles.stepValue}>{hhmm(value)}</Text>
+      {[10, 30].map((d) => (
+        <Pressable key={d} onPress={() => onStep(d)} style={styles.stepBtn} hitSlop={4}>
+          <Text style={styles.stepBtnText}>+{d}</Text>
+        </Pressable>
+      ))}
     </View>
   );
 }
@@ -162,6 +194,11 @@ export default function GoalsScreen() {
       await saveWork(db, p);
       await replanDay(db, new Date(), 'MANUAL');
     });
+
+  // Tam bir iş programını kaydeder (özel saatler dahil; boş liste özel saatleri temizler)
+  const applyNext = (next: WorkSchedule) =>
+    applyWork({ startMin: next.startMin, endMin: next.endMin, days: next.days, special: next.special ?? {} });
+  const stepWork = (target: WindowTarget, edge: WindowEdge, delta: number) => applyNext(adjustWork(work, target, edge, delta));
 
   const toggleReminders = (on: boolean) =>
     void run(async () => {
@@ -331,21 +368,18 @@ export default function GoalsScreen() {
               </Text>
               {work.enabled && (
                 <>
-                  <Text style={styles.label}>Başlangıç</Text>
-                  <Choices
-                    options={WORK_START_CHOICES}
-                    value={work.startMin}
-                    label={hhmm}
-                    onPick={(v) => v !== null && applyWork({ startMin: v })}
-                  />
-                  <Text style={styles.label}>Bitiş</Text>
-                  <Choices
-                    options={WORK_END_CHOICES}
-                    value={work.endMin}
-                    label={hhmm}
-                    onPick={(v) => v !== null && applyWork({ endMin: v })}
-                  />
-                  <Text style={styles.label}>Günler</Text>
+                  <Text style={styles.label}>Hafta programın</Text>
+                  {workWeekLines(work).map((l) => (
+                    <View key={l.day} style={styles.weekRow}>
+                      <Text style={styles.weekDay}>{l.label}</Text>
+                      <Text style={[styles.weekText, l.free && { color: colors.aura }]}>{l.text}</Text>
+                    </View>
+                  ))}
+                  <Text style={styles.muted}>
+                    Haftada toplam {formatDuration(weeklyWorkMinutes(work))} iş. Boş günlerde planlayıcı günün tamamını kullanır.
+                  </Text>
+
+                  <Text style={styles.label}>Çalıştığın günler (dokununca açılır/kapanır)</Text>
                   <View style={styles.chipRow}>
                     {WORK_DAYS.map((d) => {
                       const on = work.days.includes(d.day);
@@ -365,6 +399,38 @@ export default function GoalsScreen() {
                       );
                     })}
                   </View>
+
+                  <Text style={styles.label}>Ortak saat (özel saati olmayan günler)</Text>
+                  <TimeStepper label="Başlangıç" value={work.startMin} onStep={(d) => stepWork('COMMON', 'start', d)} />
+                  <TimeStepper label="Bitiş" value={work.endMin} onStep={(d) => stepWork('COMMON', 'end', d)} />
+
+                  <Text style={styles.label}>Farklı saati olan gün (ör. Cumartesi yarım gün)</Text>
+                  <View style={styles.chipRow}>
+                    {WORK_DAYS.filter((d) => work.days.includes(d.day)).map((d) => {
+                      const on = !!work.special?.[d.day];
+                      return (
+                        <Pressable
+                          key={d.day}
+                          disabled={busy}
+                          onPress={() => applyNext(setSpecial(work, d.day, !on))}
+                          style={[styles.chip, on && { borderColor: colors.kronos, backgroundColor: colors.surface }]}
+                        >
+                          <Text style={[styles.chipText, on && { color: colors.kronos }]}>{d.label}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                  {WORK_DAYS.filter((d) => work.days.includes(d.day) && work.special?.[d.day]).map((d) => {
+                    const win = windowForDow(work, d.day);
+                    if (!win) return null;
+                    return (
+                      <View key={d.day} style={{ gap: spacing.sm }}>
+                        <Text style={styles.label}>{d.label} saatleri</Text>
+                        <TimeStepper label="Başlangıç" value={win.startMin} onStep={(x) => stepWork(d.day, 'start', x)} />
+                        <TimeStepper label="Bitiş" value={win.endMin} onStep={(x) => stepWork(d.day, 'end', x)} />
+                      </View>
+                    );
+                  })}
                 </>
               )}
             </View>
@@ -666,6 +732,21 @@ const styles = StyleSheet.create({
   fieldRow: { flexDirection: 'row', gap: spacing.sm },
   field: { flex: 1, gap: 4 },
   hint: { color: colors.textMuted, fontSize: 12, lineHeight: 17 },
+  weekRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  weekDay: { color: colors.text, fontSize: 14, fontWeight: '700', width: 44 },
+  weekText: { flex: 1, color: colors.text, fontSize: 14, textAlign: 'right' },
+  stepRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  stepLabel: { color: colors.textMuted, fontSize: 12, fontWeight: '700', width: 64 },
+  stepBtn: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 8,
+  },
+  stepBtnText: { color: colors.text, fontSize: 12, fontWeight: '700' },
+  stepValue: { flex: 1, color: colors.text, fontSize: 18, fontWeight: '800', textAlign: 'center' },
   link: { color: colors.kronos, fontSize: 13, fontWeight: '600' },
   message: { fontSize: 13, lineHeight: 19 },
   result: { backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: spacing.lg, gap: spacing.sm },

@@ -6,6 +6,7 @@ import { listDayEventsSince } from '../database/repository';
 import { typicalWakeMinute } from './dayFlowLogic';
 import { reminderExtras } from './dayReview';
 import { getWork } from './workSettings';
+import { workEndsByDay } from './workLogic';
 import { getGoals } from './goalsSettings';
 import { loadDayNutrition } from './nutrition';
 import { nutritionDay } from './nutritionLogic';
@@ -34,7 +35,7 @@ async function goalReminders(db: SQLiteDatabase, now: Date): Promise<GoalReminde
       waterGoalReached,
       bedtime: goals.bedtime,
       wakeMinute: typicalWakeMinute(wakes),
-      work: w.enabled ? { endMin: w.endMin, days: w.days } : null,
+      work: w.enabled ? { endMin: w.endMin, days: w.days, ends: workEndsByDay(w) } : null,
     };
   } catch {
     return null;

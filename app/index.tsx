@@ -68,6 +68,8 @@ import { FLOW_KINDS, kindLabel } from '../services/dayFlowLogic';
 import { nutritionDay } from '../services/nutritionLogic';
 import { auraOutcomeReply, latestOutcomes, OUTCOME_LABEL, reasonLabel } from '../services/taskOutcomeLogic';
 import { getWork } from '../services/workSettings';
+import { freeDayPlan } from '../services/freeDayLogic';
+import { isFreeDay, workWindowFor, type WorkSchedule } from '../services/workLogic';
 import { getGoalBundle } from '../services/goalsSettings';
 import { formatClock, formatDayTitle, formatDuration } from '../services/format';
 import { DAY_END_HOUR, dayBounds, planningDay, replanDay } from '../services/planner';
@@ -134,6 +136,7 @@ export default function HomeScreen() {
   const [nutrition, setNutrition] = useState<DayNutrition | null>(null);
   const [goalLine, setGoalLine] = useState<string | null>(null);
   const [workEnabled, setWorkEnabled] = useState(false);
+  const [workSched, setWorkSched] = useState<WorkSchedule | null>(null);
   const [outcomeNotes, setOutcomeNotes] = useState<Map<string, string>>(new Map());
   const [couldNot, setCouldNot] = useState<Task | null>(null);
   const [dayFlow, setDayFlow] = useState<DayFlowState | null>(null);
@@ -172,7 +175,9 @@ export default function HomeScreen() {
     }
     // İş saatleri, görev sonuçları ve gün akışı (hata verirse kartlar yine de çalışır)
     try {
-      setWorkEnabled((await getWork(db)).enabled);
+      const wk = await getWork(db);
+      setWorkEnabled(wk.enabled);
+      setWorkSched(wk);
       setMoreOpen((await getSetting(db, 'home_more')) === '1');
       const notes = new Map<string, string>();
       for (const o of latestOutcomes(await listTaskOutcomes(db, nutritionDay(current)))) {
@@ -474,12 +479,17 @@ export default function HomeScreen() {
   });
   const visibleDue = dueBriefs(briefs).filter((b) => !hardDay || isEssentialRoutine(b.routine));
   const morningWindow = now.getHours() >= 5 && now.getHours() < 12;
+  // İş programı gün bazlıdır: Cumartesi yarım gün, Pazar tamamen boş olabilir
+  const logicalDay = planningDay(now);
+  const workToday = workSched ? workWindowFor(logicalDay, workSched) : null;
+  const freeDay = workSched ? isFreeDay(logicalDay, workSched) : false;
+  const freePlan = freeDay ? freeDayPlan(tasks) : null;
   // Günün saatine göre öne çıkan tek kart; geri kalanı "Daha fazla" altında durur
   const focus: 'MORNING' | 'MARK' | 'REVIEW' | null = reviewAvailable(now)
     ? 'REVIEW'
     : morningWindow
       ? 'MORNING'
-      : workEnabled && now.getHours() >= 17
+      : workToday && now.getHours() * 60 + now.getMinutes() >= workToday.endMin - 60
         ? 'MARK'
         : null;
 
@@ -578,6 +588,23 @@ export default function HomeScreen() {
           <Pressable disabled={busy} onPress={toggleHardDay} hitSlop={6}>
             <Text style={styles.aiHint}>Zor bir gün mü? Planı hafiflet ›</Text>
           </Pressable>
+        )}
+
+        {freePlan && (
+          <View style={styles.freeCard}>
+            <Text style={styles.activityTitle}>🌿 Boş gün</Text>
+            <Text style={styles.activitySub}>{freePlan.headline}</Text>
+            {freePlan.items.map((it) => (
+              <View key={it.id} style={styles.commuteRow}>
+                <Text style={styles.commuteText} numberOfLines={2}>
+                  {it.title}
+                </Text>
+                <Text style={styles.commuteMin}>
+                  {it.why} · {it.minutes} dk
+                </Text>
+              </View>
+            ))}
+          </View>
         )}
 
         {commute.onBus && (
@@ -870,6 +897,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.kronos,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    gap: spacing.sm,
+  },
+  freeCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.aura,
     borderRadius: radius.md,
     padding: spacing.lg,
     gap: spacing.sm,

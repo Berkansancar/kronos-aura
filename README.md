@@ -64,6 +64,7 @@ npm run test:history      ilerleme ve geçmiş (günlük seriler, ortalamalar, s
 npm run test:backup       yedek ve geri yükleme (bozuk metin, eski sürüm, tek işlemlilik), 27 kontrol
 npm run test:taskedit     görev düzenleme ve yanlış işareti geri alma, 17 kontrol
 npm run test:commute      yolda yapılabilir işler, günün özet satırı, yedek hatırlatması, 39 kontrol
+npm run test:work         haftalık iş programı (Cmt yarım gün, Pazar boş), planlayıcı, hatırlatma, boş gün planı, 43 kontrol
 npm run test:language     dil öğrenme (uygulama süresi, kalem-kağıt, hedef, geçmiş, gün analizi, yedek, veritabanı v10), 52 kontrol
 ```
 
@@ -348,6 +349,19 @@ Dil çalışması üç kaynaktan toplanır: **uygulama** (varsayılan Duolingo),
   uygulaması bilgisi yalnızca ekran paylaşımı açıksa isteme girer.
 - **Yolda kartı:** dil öğrenme ilk öneridir (kalan hedef kadar, "bugün 12 / 20 dk"); hedef tamamsa dakika yazılmaz.
 - Günün özet satırına "dil 12 / 20 dk" eklenir; yedek ve geri yükleme `StudyLog` tablosunu da kapsar.
+
+## Haftalık iş programı ve boş gün (Hedefler > İş saatleri)
+
+İş saatleri gün bazlıdır: **ortak saat** (özel saati olmayan iş günleri) ve istenen günlere **özel saat**. İlk açılışta
+bir kez şu program kaydedilir (sonra Hedefler'den değiştirilebilir, bir daha üzerine yazılmaz): **Pzt–Cum 07:40–18:00,
+Cumartesi 08:30–13:30, Pazar tamamen boş**. Ekranda gün gün program, haftalık toplam, çalışılan gün seçimi ve 10/30
+dakikalık adımlarla saat ayarı vardır.
+- Planlayıcı, gün sonu zaman analizi, zaman dengesi ve işaretleme ekranı her günün kendi penceresini kullanır
+  (Cumartesi 13:30'dan sonrası serbest; Pazar günün tamamı serbest).
+- "Günü işaretle" kartı ve hatırlatması iş bitişine göre gelir (Cumartesi 13:45, hafta içi 18:15); boş günde gelmez.
+- **Boş gün kartı:** iş saatleri açıkken çalışılmayan günde (Pazar) ana ekranda "🌿 Boş gün" çıkar: odak isteyen, uzun
+  ve ertelenmiş işlerden en çok 5 tanesi, toplam ≈5 saati geçmeyecek şekilde önerilir (gün baştan sona doldurulmaz;
+  yargı içermez).
 
 ## Logo ve ikon
 

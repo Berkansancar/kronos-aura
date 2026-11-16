@@ -52,7 +52,7 @@ export interface GoalReminders {
    */
   wakeMinute?: number | null;
   /** İş saatleri açıksa: bitişten sonra "günü işaretleyelim" hatırlatması (gün başından dakika, hafta günleri 0=Pazar) */
-  work?: { endMin: number; days: number[] } | null;
+  work?: { endMin: number; days: number[]; /** günlere özel bitişler (0 = Pazar) */ ends?: Record<number, number> } | null;
 }
 
 /** Uyanıştan kaç dakika sonra su hatırlatması gelsin, ve uyanış bilinmiyorsa varsayılan saat (07:45) */
@@ -198,7 +198,7 @@ export function planReminders(
         }
       }
       if (g.work && g.work.days.includes(base.getDay())) {
-        const at = new Date(base.getFullYear(), base.getMonth(), base.getDate(), 0, g.work.endMin + MARK_AFTER_WORK_MINUTES);
+        const at = new Date(base.getFullYear(), base.getMonth(), base.getDate(), 0, (g.work.ends?.[base.getDay()] ?? g.work.endMin) + MARK_AFTER_WORK_MINUTES);
         if (at.getTime() > now.getTime()) {
           out.push({
             id: `${REMINDER_ID_PREFIX}mark-${dayKey(base)}`,

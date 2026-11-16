@@ -25,7 +25,8 @@
     "test:backup": "tsx scripts/test-backup.ts",
     "test:taskedit": "tsx scripts/test-taskedit.ts",
     "test:commute": "tsx scripts/test-commute.ts",
-    "test:language": "tsx scripts/test-language.ts"
+    "test:language": "tsx scripts/test-language.ts",
+    "test:work": "tsx scripts/test-work.ts"
   },
   "dependencies": {
     "expo": "~58.0.0"
