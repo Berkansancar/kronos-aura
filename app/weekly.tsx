@@ -125,6 +125,10 @@ export default function WeeklyScreen() {
               </Pressable>
             )}
 
+            <Pressable onPress={() => router.push('/history')} style={styles.addBtn}>
+              <Text style={styles.addBtnText}>Daha uzun geçmiş: günlük grafikler ›</Text>
+            </Pressable>
+
             <Text style={styles.hint}>
               Bu özet yalnızca telefondaki verinden hesaplanır; internet ya da yapay zekâ anahtarı gerekmez.
             </Text>

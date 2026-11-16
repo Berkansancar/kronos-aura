@@ -60,6 +60,7 @@ npm run test:weekly       haftalık özet (toplamlar, kıyas, metinler, veritaba
 npm run test:nutrition    su, yemek, kalori tahmini ve koç/gün sonu/haftalık bağlantıları, 114 kontrol
 npm run test:goals        hedefler, kalori hesabı güvenlik sınırları, ilerleme, zaman dengesi, hatırlatmalar, 95 kontrol
 npm run test:outcomes     yaptım/yapmadım/yapamadım, iş saatleri, gün akışı, sigara sayacı, zaman analizi, 98 kontrol
+npm run test:history      ilerleme ve geçmiş (günlük seriler, ortalamalar, sebepler, veri toplama), 31 kontrol
 ```
 
 
@@ -264,6 +265,25 @@ Gündüz çalışan ve telefona bakamayan biri için: her şey akşam topluca da
   **elle kopyala-yapıştır** yolunda aynı şekilde çalışır; elle yol bozulmadı, istem yalnızca yeni alanları ister.
 
 Veritabanı sürümü 8 (`TaskOutcome`, `Setting`, `DayEvent`, `SmokeLog` tabloları ve `Task.workOk`).
+
+## Ana ekran ve İlerleme ve geçmiş
+
+**Ana ekran sadeleştirildi.** Üstte koç konsolu, zor gün modu ve gün saatine göre **tek öne çıkan kart** durur:
+sabah "Sabah brifingi", akşam 20:00'den sonra "Gün sonu değerlendirmesi", iş saatlerini açtıysan 17:00'den sonra
+"Günü işaretle". Altında tek dokunuşluk üç düğme vardır: **su +200 ml**, **gün akışının sıradaki damgası**,
+**sigara +1**. Sonra görevler gelir. Diğer her şey ("Rutinlerim", "Su ve yemek", "Hedefler", "İlerleme ve geçmiş",
+"Gün akışı", "Haftalık özet", "Gün analizi"...) **"Daha fazla"** bölümünde küçük kutular olarak durur; açık/kapalı
+hâli hatırlanır. Gün sonu değerlendirmesi ve **kopyala-yapıştır yolu** gün boyu açıktır (öne çıkan kart değilken
+küçük bir bağlantı olarak ana ekranda durur).
+
+**İlerleme ve geçmiş** (`/history`): tek bir ölçü seçilir (biten iş süresi, rutinler, su, kalori, sigara, ekran,
+adım, uyku, uyanış saati, dükkanda ve yolda geçen süre), 7 / 14 / 30 günlük çubuk grafik çizilir. Çubuklara
+dokunulunca o günün değeri görünür. Renkler iyi/kötü anlatmaz; hepsi aynı sakin renktir. Kayıt tutulmayan gün
+**boş nokta**dır, "0" sayılmaz (sigara için 0 yalnızca o gün gün akışı kullanıldıysa sayılır). Ortalama ve "son
+günler / öncesi" kıyası en az 3 kayıtlı günle verilir, yargı içermez. Altında seçili aralığın **yaptım / yapmadım /
+yapamadım** sayıları ve yapamadıkların sebepleri durur; sebep çoğunlukla iş vaktiyse Kronos görevleri "iş vaktinde
+yapılabilir" diye işaretlemeyi önerir. Veri `services/history.ts` içinde toplanır, hesap `services/historyLogic.ts`
+içindedir (veritabanı değişmedi).
 
 ## Logo ve ikon
 

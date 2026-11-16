@@ -5,6 +5,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { CoachConsole } from '../components/CoachConsole';
 import { EnergyCheckModal } from '../components/EnergyCheckModal';
+import { HomeTile } from '../components/HomeTile';
 import { ReasonModal } from '../components/ReasonModal';
 import { RoutineCard } from '../components/RoutineCard';
 import { SnoozeModal } from '../components/SnoozeModal';
@@ -18,9 +19,11 @@ import {
   getOrCreateUser,
   isHardDay,
   listDayBlocks,
+  getSetting,
   listRecentLogs,
   listTaskOutcomes,
   listVisibleTasks,
+  setSetting,
 } from '../database/repository';
 import type {
   ActivitySummary,
@@ -126,6 +129,7 @@ export default function HomeScreen() {
   const [outcomeNotes, setOutcomeNotes] = useState<Map<string, string>>(new Map());
   const [couldNot, setCouldNot] = useState<Task | null>(null);
   const [dayFlow, setDayFlow] = useState<DayFlowState | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const load = useCallback(async () => {
     const current = new Date();
@@ -157,6 +161,7 @@ export default function HomeScreen() {
     // İş saatleri, görev sonuçları ve gün akışı (hata verirse kartlar yine de çalışır)
     try {
       setWorkEnabled((await getWork(db)).enabled);
+      setMoreOpen((await getSetting(db, 'home_more')) === '1');
       const notes = new Map<string, string>();
       for (const o of latestOutcomes(await listTaskOutcomes(db, nutritionDay(current)))) {
         if (o.taskId && o.outcome !== 'DONE') {
@@ -392,6 +397,13 @@ export default function HomeScreen() {
     }
   };
 
+  // "Daha fazla" bölümünün açık/kapalı hâli hatırlanır
+  const toggleMore = () => {
+    const next = !moreOpen;
+    setMoreOpen(next);
+    setSetting(db, 'home_more', next ? '1' : '0').catch(() => undefined);
+  };
+
   const missTask = (task: Task, outcome: 'NOT_DONE' | 'COULD_NOT', reason: TaskOutcomeReason | null) =>
     run(async () => {
       await markTaskMissed(db, task, outcome, reason, new Date());
@@ -446,6 +458,14 @@ export default function HomeScreen() {
   });
   const visibleDue = dueBriefs(briefs).filter((b) => !hardDay || isEssentialRoutine(b.routine));
   const morningWindow = now.getHours() >= 5 && now.getHours() < 12;
+  // Günün saatine göre öne çıkan tek kart; geri kalanı "Daha fazla" altında durur
+  const focus: 'MORNING' | 'MARK' | 'REVIEW' | null = reviewAvailable(now)
+    ? 'REVIEW'
+    : morningWindow
+      ? 'MORNING'
+      : workEnabled && now.getHours() >= 17
+        ? 'MARK'
+        : null;
 
   const preset = CHRONOTYPE_PRESETS[user.chronotype];
   const planDay = planningDay(now);
@@ -520,7 +540,7 @@ export default function HomeScreen() {
           </Pressable>
         )}
 
-        {morningWindow && (
+        {focus === 'MORNING' && (
           <Pressable onPress={() => router.push('/morning')} style={styles.activityCard}>
             <View style={{ flex: 1 }}>
               <Text style={styles.activityTitle}>Sabah brifingi</Text>
@@ -530,25 +550,27 @@ export default function HomeScreen() {
           </Pressable>
         )}
 
-        <Pressable onPress={() => router.push('/review')} style={styles.reviewCard}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.reviewTitle}>Gün sonu değerlendirmesi</Text>
-            <Text style={styles.activitySub}>
-              {!reviewAvailable(now)
-                ? 'Akşam 20:00\'den sonra kendiliğinden hazır olur · kopyala-yapıştır yolu şimdi de açık'
-                : hasReview
+        {focus === 'MARK' && (
+          <Pressable onPress={() => router.push('/mark')} style={styles.activityCard}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.activityTitle}>Günü işaretle</Text>
+              <Text style={styles.activitySub}>
+                Gündüz bakamadıysan topluca: yaptım, yapmadım, yapamadım
+              </Text>
+            </View>
+            <Text style={styles.activityArrow}>›</Text>
+          </Pressable>
+        )}
+
+        {focus === 'REVIEW' && (
+          <Pressable onPress={() => router.push('/review')} style={styles.reviewCard}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.reviewTitle}>Gün sonu değerlendirmesi</Text>
+              <Text style={styles.activitySub}>
+                {hasReview
                   ? 'Hazır · yarın için rutinlerine bak'
                   : 'Bugünü birlikte değerlendirelim, yarını planlayalım'}
-            </Text>
-          </View>
-          <Text style={styles.activityArrow}>›</Text>
-        </Pressable>
-
-        {deviceActivityAvailable && (
-          <Pressable onPress={() => router.push('/activity')} style={styles.activityCard}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.activityTitle}>Gün analizi</Text>
-              <Text style={styles.activitySub}>{activityLine}</Text>
+              </Text>
             </View>
             <Text style={styles.activityArrow}>›</Text>
           </Pressable>
@@ -567,95 +589,84 @@ export default function HomeScreen() {
           />
         ))}
 
-        <View style={styles.activityCard}>
-          <Pressable onPress={() => router.push('/day')} style={{ flex: 1 }}>
-            <Text style={styles.activityTitle}>Gün akışı</Text>
-            <Text style={styles.activitySub}>
-              {dayFlow
-                ? `${dayFlow.next ? `Sıradaki: ${kindLabel(dayFlow.next)}` : 'Gün tamam: eve geldin'} · ${dayFlow.smoke.count} sigara`
-                : 'Uyandım, duş, minibüs, dükkan ve sigara sayacı'}
-            </Text>
-          </Pressable>
-          {dayFlow?.next && (
-            <Pressable
-              disabled={busy}
-              onPress={() => run(async () => void (await stampEvent(db, dayFlow.next!, new Date(), 0)))}
-              style={styles.waterBtn}
-              hitSlop={6}
-            >
-              <Text style={styles.waterBtnText}>
-                {FLOW_KINDS.find((k) => k.kind === dayFlow.next)?.icon} {kindLabel(dayFlow.next)}
-              </Text>
-            </Pressable>
-          )}
-          <Pressable
-            disabled={busy}
-            onPress={() => run(async () => void (await addSmoke(db, new Date(), 0)))}
-            style={styles.smokeBtn}
-            hitSlop={6}
-          >
-            <Text style={styles.smokeBtnText}>+1</Text>
-          </Pressable>
-        </View>
-
-        <Pressable onPress={() => router.push('/mark')} style={styles.activityCard}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.activityTitle}>Günü işaretle</Text>
-            <Text style={styles.activitySub}>
-              Gündüz telefona bakamadıysan akşam topluca: yaptım, yapmadım, yapamadım
-            </Text>
-          </View>
-          <Text style={styles.activityArrow}>›</Text>
-        </Pressable>
-
-        <Pressable onPress={() => router.push('/routines')} style={styles.activityCard}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.activityTitle}>Rutinlerim</Text>
-            <Text style={styles.activitySub}>{routineLine}</Text>
-          </View>
-          <Text style={styles.activityArrow}>›</Text>
-        </Pressable>
-
-        <View style={styles.activityCard}>
-          <Pressable onPress={() => router.push('/nutrition')} style={{ flex: 1, gap: 6 }}>
-            <Text style={styles.activityTitle}>Su ve yemek</Text>
-            <Text style={styles.activitySub}>
-              {nutrition
-                ? `Su ${formatWater(nutrition.waterMl)} / ${formatWater(nutrition.waterGoalMl)}${nutrition.foodEntries > 0 ? ` · ${nutrition.foodEntries} yemek kaydı` : ''}`
-                : 'Su, yemek ve kalori kaydı'}
-            </Text>
-            <View style={styles.waterTrack}>
-              <View style={[styles.waterFill, { width: `${Math.round((nutrition?.waterRatio ?? 0) * 100)}%` }]} />
-            </View>
-          </Pressable>
+        <View style={styles.quickRow}>
           <Pressable
             disabled={busy}
             onPress={() => run(async () => void (await addWater(db, new Date(), 200)))}
-            style={styles.waterBtn}
-            hitSlop={6}
+            style={styles.quickBtn}
           >
-            <Text style={styles.waterBtnText}>+200 ml</Text>
+            <Text style={styles.quickMain}>💧 +200 ml</Text>
+            <Text style={styles.quickSub} numberOfLines={1}>
+              {nutrition ? `${formatWater(nutrition.waterMl)} / ${formatWater(nutrition.waterGoalMl)}` : 'Su'}
+            </Text>
           </Pressable>
-          <Pressable onPress={() => router.push('/nutrition')} hitSlop={8}>
-            <Text style={styles.activityArrow}>›</Text>
+          <Pressable
+            disabled={busy}
+            onPress={() =>
+              dayFlow?.next
+                ? run(async () => void (await stampEvent(db, dayFlow.next!, new Date(), 0)))
+                : router.push('/day')
+            }
+            style={styles.quickBtn}
+          >
+            <Text style={styles.quickMain} numberOfLines={1}>
+              {dayFlow?.next
+                ? `${FLOW_KINDS.find((k) => k.kind === dayFlow.next)?.icon ?? ''} ${kindLabel(dayFlow.next)}`
+                : 'Gün akışı'}
+            </Text>
+            <Text style={styles.quickSub} numberOfLines={1}>
+              {dayFlow?.next ? 'Tek dokunuş damga' : dayFlow ? 'Gün tamam' : 'Uyandım, dükkan…'}
+            </Text>
+          </Pressable>
+          <Pressable
+            disabled={busy}
+            onPress={() => run(async () => void (await addSmoke(db, new Date(), 0)))}
+            style={styles.quickBtn}
+          >
+            <Text style={styles.quickMain}>Sigara +1</Text>
+            <Text style={styles.quickSub} numberOfLines={1}>
+              {dayFlow ? `bugün ${dayFlow.smoke.count}` : 'sayaç'}
+            </Text>
           </Pressable>
         </View>
 
-        <Pressable onPress={() => router.push('/goals')} style={styles.activityCard}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.activityTitle}>Hedefler ve zaman dengesi</Text>
-            <Text style={styles.activitySub}>{goalLine ?? 'Su, kalori, yemek saatleri, ekran süresi, yatış ve boş zaman'}</Text>
-          </View>
-          <Text style={styles.activityArrow}>›</Text>
-        </Pressable>
+        {focus !== 'REVIEW' && (
+          <Pressable onPress={() => router.push('/review')} hitSlop={6}>
+            <Text style={styles.aiHint}>Gün sonu değerlendirmesi ve kopyala-yapıştır yolu ›</Text>
+          </Pressable>
+        )}
 
-        <Pressable onPress={() => router.push('/weekly')} style={styles.activityCard}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.activityTitle}>Haftalık özet</Text>
-            <Text style={styles.activitySub}>Son 7 günün görev, rutin, uyku ve enerji özeti</Text>
-          </View>
-          <Text style={styles.activityArrow}>›</Text>
+        <Pressable onPress={toggleMore} style={styles.moreRow} hitSlop={6}>
+          <Text style={styles.moreText}>{moreOpen ? 'Daha az göster' : 'Daha fazla: rutinler, hedefler, geçmiş…'}</Text>
+          <Text style={styles.activityArrow}>{moreOpen ? '⌃' : '⌄'}</Text>
         </Pressable>
+        {moreOpen && (
+          <View style={styles.tileGrid}>
+            <HomeTile title="Rutinlerim" subtitle={routineLine} onPress={() => router.push('/routines')} />
+            <HomeTile
+              title="Su ve yemek"
+              subtitle={
+                nutrition
+                  ? `Su ${formatWater(nutrition.waterMl)}${nutrition.foodEntries > 0 ? ` · ${nutrition.foodEntries} yemek` : ''}`
+                  : 'Su, yemek ve kalori kaydı'
+              }
+              onPress={() => router.push('/nutrition')}
+            />
+            <HomeTile title="Hedefler" subtitle={goalLine ?? 'Su, kalori, ekran, yatış, boş zaman'} onPress={() => router.push('/goals')} />
+            <HomeTile title="İlerleme ve geçmiş" subtitle="Günlük çubuk grafikler, 7-30 gün" onPress={() => router.push('/history')} />
+            <HomeTile title="Gün akışı" subtitle="Damgalar, süreler, sigara sayacı" onPress={() => router.push('/day')} />
+            {focus !== 'MARK' && (
+              <HomeTile title="Günü işaretle" subtitle="Akşam topluca: yaptım, yapmadım, yapamadım" onPress={() => router.push('/mark')} />
+            )}
+            {focus !== 'MORNING' && (
+              <HomeTile title="Sabah brifingi" subtitle="Günün planı ve en önemli iş" onPress={() => router.push('/morning')} />
+            )}
+            <HomeTile title="Haftalık özet" subtitle="Son 7 günün görev, rutin, uyku ve enerji özeti" onPress={() => router.push('/weekly')} />
+            {deviceActivityAvailable && (
+              <HomeTile title="Gün analizi" subtitle={activityLine} onPress={() => router.push('/activity')} />
+            )}
+          </View>
+        )}
 
         <Text style={styles.sectionTitle}>Görevler</Text>
         {sortedTasks.length === 0 ? (
@@ -750,6 +761,28 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   waterBtnText: { color: colors.aura, fontSize: 13, fontWeight: '800' },
+  quickRow: { flexDirection: 'row', gap: spacing.sm },
+  quickBtn: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    alignItems: 'center',
+    gap: 2,
+  },
+  quickMain: { color: colors.text, fontSize: 13, fontWeight: '800', textAlign: 'center' },
+  quickSub: { color: colors.textMuted, fontSize: 11, textAlign: 'center' },
+  moreRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+  },
+  moreText: { color: colors.textMuted, fontSize: 13, fontWeight: '700' },
+  tileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   smokeBtn: {
     borderWidth: 1,
     borderColor: colors.border,

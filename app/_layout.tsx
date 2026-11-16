@@ -89,6 +89,7 @@ export default function RootLayout() {
           <Stack.Screen name="goals" />
           <Stack.Screen name="mark" />
           <Stack.Screen name="day" />
+          <Stack.Screen name="history" />
         </Stack>
       </SQLiteProvider>
     </Suspense>
