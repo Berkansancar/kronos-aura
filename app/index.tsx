@@ -87,6 +87,7 @@ import { materializePlannedRoutines, reviewAvailable, reviewDayOf } from '../ser
 import { loadBackupNudge, snoozeBackupNudge } from '../services/backupNudge';
 import { loadTypicalCommute } from '../services/commute';
 import { loadGame, takeLevelUp } from '../services/game';
+import { countParked } from '../services/weekPlan';
 import type { GameSummary } from '../services/gameLogic';
 import { loadLanguageDay, type LanguageDayState } from '../services/language';
 import { languageLine } from '../services/languageLogic';
@@ -147,6 +148,7 @@ export default function HomeScreen() {
   const [typicalCommute, setTypicalCommute] = useState<number | null>(null);
   const [lang, setLang] = useState<LanguageDayState | null>(null);
   const [game, setGame] = useState<GameSummary | null>(null);
+  const [parked, setParked] = useState(0);
   const [levelMsg, setLevelMsg] = useState<string | null>(null);
   const [backupHint, setBackupHint] = useState<string | null>(null);
 
@@ -199,6 +201,8 @@ export default function HomeScreen() {
     // Dil öğrenme (Duolingo ekran süresi + elle kayıtlar); hata verirse satır ve tuş gizlenir
     const langState = await loadLanguageDay(db, current).catch(() => null);
     setLang(langState);
+    // Başka bir güne ayrılmış işler (Hafta planı)
+    setParked(await countParked(db, current).catch(() => 0));
     // Oyunlaştırma: seviye, altın, seri (hata verirse satır gizlenir)
     try {
       const bundle = await getGoalBundle();
@@ -566,6 +570,15 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
+        {parked > 0 && (
+          <Pressable onPress={() => router.push('/week')} style={styles.hintCard}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.activityTitle}>📅 {parked} iş başka günlere ayrıldı</Text>
+              <Text style={styles.activitySub}>O güne kadar burada görünmez · Hafta planı ›</Text>
+            </View>
+          </Pressable>
+        )}
+
         {levelMsg && (
           <Pressable onPress={() => setLevelMsg(null)} style={styles.freeCard}>
             <Text style={styles.activityTitle}>{levelMsg}</Text>
@@ -798,6 +811,11 @@ export default function HomeScreen() {
               onPress={() => router.push('/nutrition')}
             />
             <HomeTile
+              title="Hafta planı"
+              subtitle={parked > 0 ? `${parked} iş başka günlerde · Pazar için öneri` : 'İşleri günlere ayır, Pazar için plan'}
+              onPress={() => router.push('/week')}
+            />
+            <HomeTile
               title="Kahraman"
               subtitle={game ? `Seviye ${game.level} · 🪙 ${game.gold} · ödüller ve rozetler` : 'Seviye, ödüller ve rozetler'}
               onPress={() => router.push('/hero')}
@@ -866,6 +884,7 @@ export default function HomeScreen() {
         visible={composerOpen || editing !== null}
         workEnabled={workEnabled}
         editTask={editing}
+        today={planningDay(now)}
         onClose={() => {
           setComposerOpen(false);
           setEditing(null);

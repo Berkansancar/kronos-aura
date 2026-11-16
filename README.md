@@ -65,6 +65,7 @@ npm run test:backup       yedek ve geri yükleme (bozuk metin, eski sürüm, tek
 npm run test:taskedit     görev düzenleme ve yanlış işareti geri alma, 17 kontrol
 npm run test:commute      yolda yapılabilir işler, günün özet satırı, yedek hatırlatması, 39 kontrol
 npm run test:work         haftalık iş programı (Cmt yarım gün, Pazar boş), planlayıcı, hatırlatma, boş gün planı, 43 kontrol
+npm run test:weekplan     hafta planı (güne ayırma, kapasite, otomatik dağıtım, veritabanı v11), 41 kontrol
 npm run test:game         oyunlaştırma (XP, seviye, altın, seri, rozet, ödül, veritabanından türetme, yedek), 62 kontrol
 npm run test:language     dil öğrenme (uygulama süresi, kalem-kağıt, hedef, geçmiş, gün analizi, yedek, veritabanı v10), 52 kontrol
 ```
@@ -270,7 +271,7 @@ Gündüz çalışan ve telefona bakamayan biri için: her şey akşam topluca da
   işler, sonra kısa fikirler ("Yarın plana ekle"). Bu bölüm kural tabanlı yolda, ücretsiz/Claude anahtarıyla ve
   **elle kopyala-yapıştır** yolunda aynı şekilde çalışır; elle yol bozulmadı, istem yalnızca yeni alanları ister.
 
-Veritabanı sürümü 10 (`TaskOutcome`, `Setting`, `DayEvent`, `SmokeLog`, `StudyLog` tabloları, `Task.workOk` ve `Task.commuteOk`).
+Veritabanı sürümü 11 (`TaskOutcome`, `Setting`, `DayEvent`, `SmokeLog`, `StudyLog` tabloları, `Task.workOk`, `Task.commuteOk` ve `Task.plannedDay`).
 
 ## Ana ekran ve İlerleme ve geçmiş
 
@@ -379,6 +380,19 @@ ekranı açılır (Daha fazla > Kahraman).
 - **Seri:** puan kazanılan günlerin zinciri; iki gün arasında bir boş gün (dinlenme günü) seriyi bozmaz, bugün henüz
   bitmediği için bozmaz. **Rozetler:** iş sayısı, seri, su, dil saati, rutin ve seviye için 17 rozet.
 - **Habitica'dan farkı:** can kaybı, ceza ya da puan düşmesi yoktur (Aura yargılamaz).
+
+## Hafta planı (Daha fazla > Hafta planı)
+
+Görev eklerken/düzenlerken **"Ne zaman?"**: Bugün, Yarın ya da sonraki günlerden biri. Bir güne ayrılan iş o güne kadar
+ana ekranda, günlük planda ve gün analizinde görünmez (o gün gelince kendiliğinden çıkar; günü geçmiş iş yuvarlanır,
+kaybolmaz). Ana ekranda "📅 N iş başka günlere ayrıldı" ipucu çıkar.
+- **Hafta planı ekranı:** önümüzdeki 7 gün; her günün iş saati (iş günü / Cumartesi yarım gün / 🌿 boş gün), yaklaşık
+  iş dışı boş zamanı ve ayrılan işler ("Rahat" / "Dolu"). Her işte **Taşı** ile başka güne ya da bugüne alınır.
+- **Otomatik dağıt:** bugünün bekleyen/ertelenen işlerini haftaya dağıtmayı önerir (onay sorar): odak isteyen ya da 45 dk
+  ve üstü işler önce boş güne (Pazar), sonra yarım güne; kısa işler en yakın uygun güne. Her güne boş zamanın en çok %60'ı
+  kadar iş ayrılır; sığmayan yerinde kalır, başlanmış işe dokunulmaz. "Hepsini bugüne al" ile geri alınır.
+- Boş zaman yaklaşıktır: uyanık 07:00–23:00, iş günlerinde yol + hazırlık için 90 dk düşülür.
+- Yedekte `Task.plannedDay` da yer alır; eski yedekler günsüz geri yüklenir.
 
 ## Logo ve ikon
 

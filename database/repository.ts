@@ -101,6 +101,8 @@ export async function createTask(
     workOk?: boolean;
     /** Minibüste yapılabilir mi? Varsayılan: hayır */
     commuteOk?: boolean;
+    /** Yapılacağı gün (yyyy-mm-dd); verilirse görev o güne kadar plana girmez */
+    plannedDay?: string | null;
   }
 ): Promise<Task> {
   const title = input.title.trim();
@@ -116,10 +118,11 @@ export async function createTask(
     routineId: input.routineId ?? null,
     workOk: input.workOk === true,
     commuteOk: input.commuteOk === true,
+    plannedDay: input.plannedDay ?? null,
   };
   await db.runAsync(
-    `INSERT INTO Task (id, title, estimatedDuration, cognitiveWeight, status, createdAt, startedAt, routineId, workOk, commuteOk)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO Task (id, title, estimatedDuration, cognitiveWeight, status, createdAt, startedAt, routineId, workOk, commuteOk, plannedDay)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       task.id,
       task.title,
@@ -131,6 +134,7 @@ export async function createTask(
       task.routineId ?? null,
       task.workOk ? 1 : 0,
       task.commuteOk ? 1 : 0,
+      task.plannedDay ?? null,
     ]
   );
   return task;
@@ -144,19 +148,43 @@ export async function listVisibleTasks(
   db: SQLiteDatabase,
   dayStartISO: string
 ): Promise<Task[]> {
+  // Başka bir güne ayrılmış (plannedDay ileride) işler o güne kadar görünmez; bitenler her zaman görünür.
+  const dayStart = new Date(dayStartISO);
+  const today = Number.isNaN(dayStart.getTime()) ? '9999-12-31' : localDayKey(dayStart);
   const rows = await db.getAllAsync<Task>(
     `SELECT t.* FROM Task t
-     WHERE t.status != 'COMPLETED'
-        OR EXISTS (SELECT 1 FROM TimeLog l WHERE l.taskId = t.id AND l.loggedAt >= ?)
+     WHERE (t.status != 'COMPLETED'
+        OR EXISTS (SELECT 1 FROM TimeLog l WHERE l.taskId = t.id AND l.loggedAt >= ?))
+       AND (t.plannedDay IS NULL OR t.plannedDay <= ? OR t.status = 'COMPLETED')
      ORDER BY t.createdAt ASC`,
-    [dayStartISO]
+    [dayStartISO, today]
   );
   return rows.map(normalizeTask);
 }
 
+/** Başka bir güne ayrılmış, henüz bitmemiş işler (Hafta planı ekranı için), gün sırasıyla. */
+export async function listParkedTasks(db: SQLiteDatabase, todayKey: string): Promise<Task[]> {
+  const rows = await db.getAllAsync<Task>(
+    `SELECT * FROM Task WHERE status != 'COMPLETED' AND plannedDay IS NOT NULL AND plannedDay > ?
+     ORDER BY plannedDay ASC, createdAt ASC`,
+    [todayKey]
+  );
+  return rows.map(normalizeTask);
+}
+
+/** Bir görevin yapılacağı günü değiştirir (null: belirli gün yok / bugüne al). */
+export async function setTaskPlannedDay(db: SQLiteDatabase, id: string, day: string | null): Promise<void> {
+  await db.runAsync('UPDATE Task SET plannedDay = ? WHERE id = ?', [day, id]);
+}
+
+/** Yerel takvim günü anahtarı (yyyy-mm-dd) */
+function localDayKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 /** SQLite'ta 0/1 duran işareti gerçek boolean'a çevirir. */
 function normalizeTask(row: Task): Task {
-  return { ...row, workOk: Boolean(row.workOk), commuteOk: Boolean(row.commuteOk) };
+  return { ...row, workOk: Boolean(row.workOk), commuteOk: Boolean(row.commuteOk), plannedDay: row.plannedDay ?? null };
 }
 
 /** İş vaktinde yapılabilir işaretini değiştirir. */
@@ -206,12 +234,14 @@ export async function updateTask(
     cognitiveWeight: CognitiveWeight;
     workOk?: boolean;
     commuteOk?: boolean;
+    /** Verilirse yapılacağı gün değişir (null: belirli gün yok) */
+    plannedDay?: string | null;
   }
 ): Promise<void> {
   const title = patch.title.trim();
   if (!title) throw new Error('Görev başlığı boş olamaz.');
   const sets = ['title = ?', 'estimatedDuration = ?', 'cognitiveWeight = ?'];
-  const params: (string | number)[] = [title, Math.max(5, Math.round(patch.estimatedDuration)), patch.cognitiveWeight];
+  const params: (string | number | null)[] = [title, Math.max(5, Math.round(patch.estimatedDuration)), patch.cognitiveWeight];
   if (patch.workOk !== undefined) {
     sets.push('workOk = ?');
     params.push(patch.workOk ? 1 : 0);
@@ -219,6 +249,10 @@ export async function updateTask(
   if (patch.commuteOk !== undefined) {
     sets.push('commuteOk = ?');
     params.push(patch.commuteOk ? 1 : 0);
+  }
+  if (patch.plannedDay !== undefined) {
+    sets.push('plannedDay = ?');
+    params.push(patch.plannedDay);
   }
   await db.runAsync(`UPDATE Task SET ${sets.join(', ')} WHERE id = ?`, [...params, id]);
 }

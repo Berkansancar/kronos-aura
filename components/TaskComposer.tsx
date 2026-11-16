@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { colors, radius, spacing } from '../constants/theme';
 import type { CognitiveWeight, Task } from '../database/types';
+import { whenChoices } from '../services/weekPlanLogic';
 
 const DURATIONS = [15, 30, 45, 60, 90, 120];
 const WEIGHTS: { value: CognitiveWeight; label: string; hint: string; color: string }[] = [
@@ -27,21 +28,26 @@ interface Props {
   workEnabled?: boolean;
   /** Verilirse "Görevi düzenle" olarak açılır ve alanlar bu görevle dolar */
   editTask?: Task | null;
+  /** Planlama gününün tarihi ("Ne zaman?" seçenekleri bugünden başlar) */
+  today?: Date;
   onSubmit: (input: {
     title: string;
     estimatedDuration: number;
     cognitiveWeight: CognitiveWeight;
     workOk: boolean;
     commuteOk: boolean;
+    plannedDay: string | null;
   }) => void;
 }
 
-export function TaskComposer({ visible, onClose, onSubmit, workEnabled, editTask }: Props) {
+export function TaskComposer({ visible, onClose, onSubmit, workEnabled, editTask, today }: Props) {
   const [title, setTitle] = useState('');
   const [duration, setDuration] = useState(30);
   const [weight, setWeight] = useState<CognitiveWeight>('MEDIUM');
   const [workOk, setWorkOk] = useState(false);
   const [commuteOk, setCommuteOk] = useState(false);
+  const [plannedDay, setPlannedDay] = useState<string | null>(null);
+  const choices = useMemo(() => whenChoices(today ?? new Date()), [today, visible]);
 
   // Her açılışta alanlar baştan kurulur: yeni görevde boş, düzenlemede görevin kendi değerleri
   useEffect(() => {
@@ -51,6 +57,8 @@ export function TaskComposer({ visible, onClose, onSubmit, workEnabled, editTask
     setWeight(editTask?.cognitiveWeight ?? 'MEDIUM');
     setWorkOk(editTask?.workOk === true);
     setCommuteOk(editTask?.commuteOk === true);
+    // Yalnızca ileri bir güne ayrılmışsa seçili gelir (geçmiş gün = bugün)
+    setPlannedDay(editTask?.plannedDay && choices.some((c) => c.key === editTask.plannedDay) ? editTask.plannedDay : null);
     // editTask nesnesi değil kimliği izlenir; yazarken alanlar sıfırlanmasın
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, editTask?.id]);
@@ -76,6 +84,7 @@ export function TaskComposer({ visible, onClose, onSubmit, workEnabled, editTask
       // İş saatleri kapalıyken düzenlemede görevin mevcut işareti bozulmaz
       workOk: workEnabled ? workOk : editTask?.workOk === true,
       commuteOk,
+      plannedDay,
     });
   };
 
@@ -131,6 +140,19 @@ export function TaskComposer({ visible, onClose, onSubmit, workEnabled, editTask
                 </Pressable>
               );
             })}
+          </View>
+
+          <Text style={styles.label}>Ne zaman?</Text>
+          <View style={styles.wrap}>
+            {choices.map((c) => (
+              <Pressable
+                key={c.key ?? 'today'}
+                onPress={() => setPlannedDay(c.key)}
+                style={[styles.pill, plannedDay === c.key && styles.pillActive]}
+              >
+                <Text style={[styles.pillText, plannedDay === c.key && styles.pillTextActive]}>{c.label}</Text>
+              </Pressable>
+            ))}
           </View>
 
           {workEnabled && (

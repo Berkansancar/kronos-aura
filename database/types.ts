@@ -32,6 +32,8 @@ export interface Task {
   workOk?: boolean;
   /** Minibüste telefonla yapılabilir mi? (yoldayken önerilir; plana etkisi yok) */
   commuteOk?: boolean;
+  /** Yapılacağı gün (yyyy-mm-dd); doluysa görev o güne kadar plana girmez. Boş: belirli bir günü yok. */
+  plannedDay?: string | null;
 }
 
 /** Veritabanındaki TimeBlock satırı. Tarihler ISO-8601 (UTC) metin olarak saklanır. */

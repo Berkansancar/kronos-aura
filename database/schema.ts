@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 export const DB_NAME = 'kronos-aura.db';
-export const DATABASE_VERSION = 10;
+export const DATABASE_VERSION = 11;
 
 /**
  * Not: SQLite'ın gerçek bir DATETIME tipi yoktur. Zaman alanlarını ISO-8601 (UTC) TEXT
@@ -169,6 +169,11 @@ const ADD_TASK_COMMUTE_OK = `
 ALTER TABLE Task ADD COLUMN commuteOk INTEGER NOT NULL DEFAULT 0;
 `;
 
+/** Sürüm 11: görevin "yapılacağı gün" (yyyy-mm-dd). Doluysa görev o güne kadar planda ve ana ekranda görünmez. */
+const ADD_TASK_PLANNED_DAY = `
+ALTER TABLE Task ADD COLUMN plannedDay TEXT;
+`;
+
 /**
  * Sürüm 10: dil çalışması kayıtları (kalem-kağıt, elle girilen uygulama süresi, dinleme/konuşma).
  * Duolingo gibi uygulamaların süresi ekran süresinden otomatik okunur; burada yalnızca elle eklenenler durur.
@@ -308,8 +313,15 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {
     current = 10;
   }
 
+  if (current === 10) {
+    if (!(await hasColumn(db, 'Task', 'plannedDay'))) {
+      await db.execAsync(ADD_TASK_PLANNED_DAY);
+    }
+    current = 11;
+  }
+
   // Gelecekteki migrasyonlar:
-  // if (current === 10) { await db.execAsync(`ALTER TABLE ...`); current = 11; }
+  // if (current === 11) { await db.execAsync(`ALTER TABLE ...`); current = 12; }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
 }

@@ -99,6 +99,7 @@ export default function RootLayout() {
           <Stack.Screen name="history" />
           <Stack.Screen name="language" />
           <Stack.Screen name="hero" />
+          <Stack.Screen name="week" />
         </Stack>
       </SQLiteProvider>
     </Suspense>
