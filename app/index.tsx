@@ -82,6 +82,10 @@ import {
 import { dueBriefs, todayProgress, type SnoozeOption } from '../services/routineLogic';
 import { refreshReminders } from '../services/reminderSync';
 import { materializePlannedRoutines, reviewAvailable, reviewDayOf } from '../services/dayReview';
+import { loadBackupNudge, snoozeBackupNudge } from '../services/backupNudge';
+import { loadTypicalCommute } from '../services/commute';
+import { commuteLine, commuteState, commuteSuggestions, remainingMinutes } from '../services/commuteLogic';
+import { todayLine } from '../services/todayLogic';
 import {
   addTask,
   carryOverMissed,
@@ -133,6 +137,8 @@ export default function HomeScreen() {
   const [dayFlow, setDayFlow] = useState<DayFlowState | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
   const [editing, setEditing] = useState<Task | null>(null);
+  const [typicalCommute, setTypicalCommute] = useState<number | null>(null);
+  const [backupHint, setBackupHint] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const current = new Date();
@@ -173,9 +179,11 @@ export default function HomeScreen() {
       }
       setOutcomeNotes(notes);
       setDayFlow(await loadDayFlow(db, current));
+      setTypicalCommute(await loadTypicalCommute(db, current));
     } catch {
       setDayFlow(null);
     }
+    setBackupHint(await loadBackupNudge(db, current));
     // Hedefler özeti (hata verirse kart yine de açılır)
     try {
       const gs = await loadGoalState(db, current, await getGoalBundle());
@@ -470,6 +478,20 @@ export default function HomeScreen() {
         ? 'MARK'
         : null;
 
+  const summaryLine = todayLine({
+    done: tasks.filter((t) => t.status === 'COMPLETED').length,
+    open: tasks.filter((t) => t.status === 'PENDING' || t.status === 'IN_PROGRESS').length,
+    waterMl: nutrition ? nutrition.waterMl : null,
+    waterGoalMl: nutrition ? nutrition.waterGoalMl : null,
+    smoke: dayFlow ? dayFlow.smoke.count : null,
+    smokeLimit: dayFlow ? dayFlow.smoke.limit : null,
+  });
+  const commute = commuteState(dayFlow?.events ?? [], now);
+  const commuteSugs =
+    commute.onBus && commute.direction
+      ? commuteSuggestions(tasks, remainingMinutes(commute, typicalCommute), commute.direction, now.getDate())
+      : [];
+
   const preset = CHRONOTYPE_PRESETS[user.chronotype];
   const planDay = planningDay(now);
   const isTomorrow = planDay.getDate() !== now.getDate();
@@ -481,6 +503,7 @@ export default function HomeScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.date}>{formatDayTitle(planDay)}</Text>
             <Text style={styles.subtitle}>{isTomorrow ? 'Yarın için plan' : 'Bugünün akışı'}</Text>
+            {summaryLine && <Text style={styles.todayLine}>{summaryLine}</Text>}
           </View>
           <Pressable onPress={() => router.push('/settings')} hitSlop={10}>
             <Text style={styles.gear}>⚙</Text>
@@ -541,6 +564,34 @@ export default function HomeScreen() {
           <Pressable disabled={busy} onPress={toggleHardDay} hitSlop={6}>
             <Text style={styles.aiHint}>Zor bir gün mü? Planı hafiflet ›</Text>
           </Pressable>
+        )}
+
+        {commute.onBus && (
+          <View style={styles.commuteCard}>
+            <Text style={styles.activityTitle}>🚌 Yoldasın</Text>
+            <Text style={styles.activitySub}>{commuteLine(commute, typicalCommute)}</Text>
+            {commuteSugs.map((sg) => (
+              <View key={sg.taskId ?? sg.title} style={styles.commuteRow}>
+                <Text style={styles.commuteText} numberOfLines={2}>
+                  {sg.title}
+                </Text>
+                <Text style={styles.commuteMin}>{sg.minutes} dk</Text>
+                {sg.kind === 'TASK' && (
+                  <Pressable
+                    disabled={busy}
+                    onPress={() => {
+                      const target = tasks.find((x) => x.id === sg.taskId);
+                      if (target) setFinishing(target);
+                    }}
+                    style={styles.waterBtn}
+                    hitSlop={6}
+                  >
+                    <Text style={styles.waterBtnText}>Yaptım</Text>
+                  </Pressable>
+                )}
+              </View>
+            ))}
+          </View>
         )}
 
         {focus === 'MORNING' && (
@@ -637,6 +688,23 @@ export default function HomeScreen() {
           <Pressable onPress={() => router.push('/review')} hitSlop={6}>
             <Text style={styles.aiHint}>Gün sonu değerlendirmesi ve kopyala-yapıştır yolu ›</Text>
           </Pressable>
+        )}
+
+        {backupHint && (
+          <View style={styles.hintCard}>
+            <Pressable onPress={() => router.push('/settings')} style={{ flex: 1 }}>
+              <Text style={styles.activitySub}>{backupHint} ›</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                setBackupHint(null);
+                snoozeBackupNudge(db).catch(() => undefined);
+              }}
+              hitSlop={8}
+            >
+              <Text style={styles.hintLater}>Şimdi değil</Text>
+            </Pressable>
+          </View>
         )}
 
         <Pressable onPress={toggleMore} style={styles.moreRow} hitSlop={6}>
@@ -778,6 +846,29 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   waterBtnText: { color: colors.aura, fontSize: 13, fontWeight: '800' },
+  todayLine: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
+  commuteCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.kronos,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    gap: spacing.sm,
+  },
+  commuteRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  commuteText: { flex: 1, color: colors.text, fontSize: 14 },
+  commuteMin: { color: colors.textMuted, fontSize: 12 },
+  hintCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+  },
+  hintLater: { color: colors.textMuted, fontSize: 12, fontWeight: '700' },
   quickRow: { flexDirection: 'row', gap: spacing.sm },
   quickBtn: {
     flex: 1,

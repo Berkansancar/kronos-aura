@@ -23,7 +23,8 @@ import {
   setFreeKey,
   setFreeProvider,
 } from '../services/ai/freeSettings';
-import { getLastBackup, makeBackupText, restoreFromText } from '../services/backup';
+import { makeBackupText, restoreFromText } from '../services/backup';
+import { getLastBackup } from '../services/backupNudge';
 import { backupStamp, inspectBackup } from '../services/backupLogic';
 import { refreshReminders } from '../services/reminderSync';
 import { KCAL_TARGET_MAX, KCAL_TARGET_MIN, WATER_GOALS, formatWater } from '../services/nutritionLogic';

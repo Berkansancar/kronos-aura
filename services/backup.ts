@@ -1,11 +1,10 @@
 /** Yedek: telefonun güvenli deposundaki ayarları da katarak metni üretir / geri yükler. */
 import * as SecureStore from 'expo-secure-store';
 import type { SQLiteDatabase } from 'expo-sqlite';
-import { getSetting, setSetting } from '../database/repository';
+import { setSetting } from '../database/repository';
+import { LAST_BACKUP_KEY } from './backupNudge';
 import { BACKUP_PREF_KEYS, createBackup, restoreBackup, type RestoreResult } from './backupLogic';
 import { refreshReminders } from './reminderSync';
-
-export const LAST_BACKUP_KEY = 'last_backup';
 
 async function readPrefs(): Promise<Record<string, string | null>> {
   const prefs: Record<string, string | null> = {};
@@ -25,16 +24,6 @@ export async function makeBackupText(db: SQLiteDatabase, now: Date = new Date())
   // Zaman damgası yedekten SONRA yazılır; yedeğin kendi içinde kendi tarihi durmaz
   await setSetting(db, LAST_BACKUP_KEY, now.toISOString()).catch(() => undefined);
   return text;
-}
-
-export async function getLastBackup(db: SQLiteDatabase): Promise<Date | null> {
-  try {
-    const v = await getSetting(db, LAST_BACKUP_KEY);
-    const d = v ? new Date(v) : null;
-    return d && !Number.isNaN(d.getTime()) ? d : null;
-  } catch {
-    return null;
-  }
 }
 
 /** Metinden geri yükler; güvenli depodaki ayarları yedektekine eşitler ve bildirimleri yeniler. */

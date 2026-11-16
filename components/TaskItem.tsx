@@ -80,6 +80,7 @@ export function TaskItem({
         </Text>
         <Text style={styles.meta}>
           {weight.label} · {formatDuration(task.estimatedDuration)}
+          {task.commuteOk ? '  ·  🚌 yolda' : ''}
           {timeLabel ? `  ·  ${timeLabel}` : ''}
         </Text>
         {postponed && <Text style={styles.note}>{outcomeNote ?? 'Ertelendi'}</Text>}

@@ -137,7 +137,7 @@ async function dbTests(): Promise<void> {
   const { db, raw } = makeTestDb();
   await migrateDbIfNeeded(db);
   const ver = (raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;
-  check('temiz kurulum son sürüm', ver === DATABASE_VERSION && DATABASE_VERSION === 8);
+  check('temiz kurulum son sürüm', ver === DATABASE_VERSION && DATABASE_VERSION === 9);
   raw.exec('DROP TABLE DayMode');
   raw.exec('PRAGMA user_version = 5');
   await migrateDbIfNeeded(db);

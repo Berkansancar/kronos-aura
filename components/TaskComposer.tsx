@@ -32,6 +32,7 @@ interface Props {
     estimatedDuration: number;
     cognitiveWeight: CognitiveWeight;
     workOk: boolean;
+    commuteOk: boolean;
   }) => void;
 }
 
@@ -40,6 +41,7 @@ export function TaskComposer({ visible, onClose, onSubmit, workEnabled, editTask
   const [duration, setDuration] = useState(30);
   const [weight, setWeight] = useState<CognitiveWeight>('MEDIUM');
   const [workOk, setWorkOk] = useState(false);
+  const [commuteOk, setCommuteOk] = useState(false);
 
   // Her açılışta alanlar baştan kurulur: yeni görevde boş, düzenlemede görevin kendi değerleri
   useEffect(() => {
@@ -48,6 +50,7 @@ export function TaskComposer({ visible, onClose, onSubmit, workEnabled, editTask
     setDuration(editTask?.estimatedDuration ?? 30);
     setWeight(editTask?.cognitiveWeight ?? 'MEDIUM');
     setWorkOk(editTask?.workOk === true);
+    setCommuteOk(editTask?.commuteOk === true);
     // editTask nesnesi değil kimliği izlenir; yazarken alanlar sıfırlanmasın
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, editTask?.id]);
@@ -72,6 +75,7 @@ export function TaskComposer({ visible, onClose, onSubmit, workEnabled, editTask
       cognitiveWeight: weight,
       // İş saatleri kapalıyken düzenlemede görevin mevcut işareti bozulmaz
       workOk: workEnabled ? workOk : editTask?.workOk === true,
+      commuteOk,
     });
   };
 
@@ -144,6 +148,18 @@ export function TaskComposer({ visible, onClose, onSubmit, workEnabled, editTask
               />
             </View>
           )}
+
+          <View style={styles.workRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.weightLabel}>🚌 Yolda yapılabilir</Text>
+              <Text style={styles.weightHint}>Minibüste telefonla yapılabilen hafif iş; yoldayken önerilir</Text>
+            </View>
+            <Switch
+              value={commuteOk}
+              onValueChange={setCommuteOk}
+              trackColor={{ true: colors.kronos, false: colors.border }}
+            />
+          </View>
 
           <Pressable
             onPress={submit}

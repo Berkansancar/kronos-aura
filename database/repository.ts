@@ -97,6 +97,8 @@ export async function createTask(
     routineId?: string | null;
     /** İş saatlerinde de yapılabilir mi? Varsayılan: hayır */
     workOk?: boolean;
+    /** Minibüste yapılabilir mi? Varsayılan: hayır */
+    commuteOk?: boolean;
   }
 ): Promise<Task> {
   const title = input.title.trim();
@@ -111,10 +113,11 @@ export async function createTask(
     startedAt: null,
     routineId: input.routineId ?? null,
     workOk: input.workOk === true,
+    commuteOk: input.commuteOk === true,
   };
   await db.runAsync(
-    `INSERT INTO Task (id, title, estimatedDuration, cognitiveWeight, status, createdAt, startedAt, routineId, workOk)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO Task (id, title, estimatedDuration, cognitiveWeight, status, createdAt, startedAt, routineId, workOk, commuteOk)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       task.id,
       task.title,
@@ -125,6 +128,7 @@ export async function createTask(
       task.startedAt,
       task.routineId ?? null,
       task.workOk ? 1 : 0,
+      task.commuteOk ? 1 : 0,
     ]
   );
   return task;
@@ -150,7 +154,7 @@ export async function listVisibleTasks(
 
 /** SQLite'ta 0/1 duran işareti gerçek boolean'a çevirir. */
 function normalizeTask(row: Task): Task {
-  return { ...row, workOk: Boolean(row.workOk) };
+  return { ...row, workOk: Boolean(row.workOk), commuteOk: Boolean(row.commuteOk) };
 }
 
 /** İş vaktinde yapılabilir işaretini değiştirir. */
@@ -190,28 +194,31 @@ export async function deleteTask(db: SQLiteDatabase, id: string): Promise<void> 
   await db.runAsync('DELETE FROM Task WHERE id = ?', [id]);
 }
 
-/** Görevin adını, süresini, yükünü ve (verilirse) iş vaktinde yapılabilir işaretini değiştirir. */
+/** Görevin adını, süresini, yükünü ve (verilirse) iş vaktinde / yolda yapılabilir işaretlerini değiştirir. */
 export async function updateTask(
   db: SQLiteDatabase,
   id: string,
-  patch: { title: string; estimatedDuration: number; cognitiveWeight: CognitiveWeight; workOk?: boolean }
+  patch: {
+    title: string;
+    estimatedDuration: number;
+    cognitiveWeight: CognitiveWeight;
+    workOk?: boolean;
+    commuteOk?: boolean;
+  }
 ): Promise<void> {
   const title = patch.title.trim();
   if (!title) throw new Error('Görev başlığı boş olamaz.');
-  const duration = Math.max(5, Math.round(patch.estimatedDuration));
-  if (patch.workOk === undefined) {
-    await db.runAsync('UPDATE Task SET title = ?, estimatedDuration = ?, cognitiveWeight = ? WHERE id = ?', [
-      title,
-      duration,
-      patch.cognitiveWeight,
-      id,
-    ]);
-  } else {
-    await db.runAsync(
-      'UPDATE Task SET title = ?, estimatedDuration = ?, cognitiveWeight = ?, workOk = ? WHERE id = ?',
-      [title, duration, patch.cognitiveWeight, patch.workOk ? 1 : 0, id]
-    );
+  const sets = ['title = ?', 'estimatedDuration = ?', 'cognitiveWeight = ?'];
+  const params: (string | number)[] = [title, Math.max(5, Math.round(patch.estimatedDuration)), patch.cognitiveWeight];
+  if (patch.workOk !== undefined) {
+    sets.push('workOk = ?');
+    params.push(patch.workOk ? 1 : 0);
   }
+  if (patch.commuteOk !== undefined) {
+    sets.push('commuteOk = ?');
+    params.push(patch.commuteOk ? 1 : 0);
+  }
+  await db.runAsync(`UPDATE Task SET ${sets.join(', ')} WHERE id = ?`, [...params, id]);
 }
 
 // ───────────────────────── Zaman blokları ─────────────────────────

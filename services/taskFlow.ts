@@ -29,7 +29,7 @@ import { recordRoutineDoneFromTask } from './routineFlow';
 
 export async function addTask(
   db: SQLiteDatabase,
-  input: { title: string; estimatedDuration: number; cognitiveWeight: CognitiveWeight; workOk?: boolean },
+  input: { title: string; estimatedDuration: number; cognitiveWeight: CognitiveWeight; workOk?: boolean; commuteOk?: boolean },
   now: Date = new Date()
 ): Promise<void> {
   await createTask(db, input);
@@ -196,7 +196,7 @@ export async function addDoneTask(
 export async function updateTaskDetails(
   db: SQLiteDatabase,
   taskId: string,
-  input: { title: string; estimatedDuration: number; cognitiveWeight: CognitiveWeight; workOk?: boolean },
+  input: { title: string; estimatedDuration: number; cognitiveWeight: CognitiveWeight; workOk?: boolean; commuteOk?: boolean },
   now: Date = new Date()
 ): Promise<void> {
   await updateTask(db, taskId, input);

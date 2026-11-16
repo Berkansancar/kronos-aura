@@ -297,3 +297,26 @@ export async function restoreBackup(db: SQLiteDatabase, text: string): Promise<R
   }
   return { ok: true, summary, prefs: data.prefs };
 }
+
+/** Yedek hatırlatması: en az bu kadar kaydı olanlara gösterilir (yeni kullanıcı rahatsız edilmez) */
+export const NUDGE_MIN_RECORDS = 30;
+/** Son yedekten bu kadar gün sonra hatırlatılır */
+export const NUDGE_AFTER_DAYS = 14;
+/** "Şimdi değil" dendiğinde bu kadar gün sessiz kalınır */
+export const NUDGE_SNOOZE_DAYS = 7;
+
+/** Ana ekrandaki küçük yedek hatırlatması; gösterilmeyecekse null. Yargı yok, yalnızca bilgi. */
+export function backupNudge(input: {
+  lastBackup: Date | null;
+  snoozeUntil: Date | null;
+  now: Date;
+  records: number;
+}): string | null {
+  const { lastBackup, snoozeUntil, now, records } = input;
+  if (records < NUDGE_MIN_RECORDS) return null;
+  if (snoozeUntil && snoozeUntil.getTime() > now.getTime()) return null;
+  if (!lastBackup) return 'Kayıtların yalnızca bu telefonda duruyor. Bir yedek alalım mı?';
+  const days = Math.floor((now.getTime() - lastBackup.getTime()) / 86_400_000);
+  if (days >= NUDGE_AFTER_DAYS) return `Son yedeğin ${days} gün önce. Yeni bir yedek alalım mı?`;
+  return null;
+}

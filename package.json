@@ -23,7 +23,8 @@
     "test:outcomes": "tsx scripts/test-outcomes.ts",
     "test:history": "tsx scripts/test-history.ts",
     "test:backup": "tsx scripts/test-backup.ts",
-    "test:taskedit": "tsx scripts/test-taskedit.ts"
+    "test:taskedit": "tsx scripts/test-taskedit.ts",
+    "test:commute": "tsx scripts/test-commute.ts"
   },
   "dependencies": {
     "expo": "~58.0.0"

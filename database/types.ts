@@ -30,6 +30,8 @@ export interface Task {
   routineId?: string | null;
   /** İş saatlerinde de yapılabilir mi? (false: iş saatinin dışına yerleştirilir) */
   workOk?: boolean;
+  /** Minibüste telefonla yapılabilir mi? (yoldayken önerilir; plana etkisi yok) */
+  commuteOk?: boolean;
 }
 
 /** Veritabanındaki TimeBlock satırı. Tarihler ISO-8601 (UTC) metin olarak saklanır. */

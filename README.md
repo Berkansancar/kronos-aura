@@ -63,6 +63,7 @@ npm run test:outcomes     yaptım/yapmadım/yapamadım, iş saatleri, gün akı�
 npm run test:history      ilerleme ve geçmiş (günlük seriler, ortalamalar, sebepler, veri toplama), 31 kontrol
 npm run test:backup       yedek ve geri yükleme (bozuk metin, eski sürüm, tek işlemlilik), 27 kontrol
 npm run test:taskedit     görev düzenleme ve yanlış işareti geri alma, 17 kontrol
+npm run test:commute      yolda yapılabilir işler, günün özet satırı, yedek hatırlatması, veritabanı v9, 39 kontrol
 ```
 
 
@@ -266,7 +267,7 @@ Gündüz çalışan ve telefona bakamayan biri için: her şey akşam topluca da
   işler, sonra kısa fikirler ("Yarın plana ekle"). Bu bölüm kural tabanlı yolda, ücretsiz/Claude anahtarıyla ve
   **elle kopyala-yapıştır** yolunda aynı şekilde çalışır; elle yol bozulmadı, istem yalnızca yeni alanları ister.
 
-Veritabanı sürümü 8 (`TaskOutcome`, `Setting`, `DayEvent`, `SmokeLog` tabloları ve `Task.workOk`).
+Veritabanı sürümü 9 (`TaskOutcome`, `Setting`, `DayEvent`, `SmokeLog` tabloları, `Task.workOk` ve `Task.commuteOk`).
 
 ## Ana ekran ve İlerleme ve geçmiş
 
@@ -312,6 +313,22 @@ seçenek olarak görünür. Yanlış işaretler geri alınır: biten görevde **
 **Plana al**. Geri alınca sonuç kaydı, süre kaydı ve rutine yazılan "yaptım" silinir; geçmiş grafikleri ve sayılar
 da buna göre düşer. Dünün ya da yarına taşınmış kayıtlar silinmez. Mantık `services/taskFlow.ts` (`undoOutcome`,
 `updateTaskDetails`) içindedir.
+
+## Yolda yapılabilir işler, günün özeti, yedek hatırlatması
+
+**Yolda:** Göreve "🚌 Yolda yapılabilir" işareti konabilir (görev eklerken ya da Düzenle ile): minibüste telefonla
+yapılabilen hafif iş. Gün akışında "Minibüse bindim" damgası vurulunca (son damga buysa, 2 saatten eskiyse sayılmaz)
+ana ekranda **"Yoldasın"** kartı çıkar: tipik yol süren (son 14 günün tek yön yol sürelerinin ortancası, en az 3
+örnek; yoksa 25 dk varsayılır) ve kalan süre kadar iş önerilir. Önce işaretli işler, sonra yola sığan hafif
+(zihinsel yükü düşük) işler; süreler toplamı yolu aşmaz, derin odak ve ertelenmiş işler önerilmez. Uygun iş yoksa
+iki kısa fikir çıkar (işe giderken planlama, eve giderken günü bırakma türünden; yargı içermez). Kartta "Yaptım"
+düğmesi görevi her zamanki enerji sorusuyla bitirir. Yolda işareti plana etki etmez; yalnızca öneri kartını besler.
+
+**Günün özet satırı:** ana ekranda tarihin altında "3 iş bitti, 2 açık · su 1,2 L / 2,0 L · sigara 4/10". Yalnızca
+sayılar; yorum yok.
+
+**Yedek hatırlatması:** en az 30 kaydın varsa ve hiç yedek alınmadıysa ya da son yedek 14 günden eskiyse ana ekranda
+küçük bir satır çıkar. "Şimdi değil" bir hafta susturur; satıra dokununca Ayarlar'daki yedek bölümü açılır.
 
 ## Logo ve ikon
 
