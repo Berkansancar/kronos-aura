@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { colors, radius, spacing } from '../constants/theme';
 import { listRoutines } from '../database/repository';
@@ -46,6 +46,17 @@ const norm = (s: string) => s.trim().toLocaleLowerCase('tr-TR');
 export default function ReviewScreen() {
   const db = useSQLiteContext();
   const router = useRouter();
+  // Ana ekrandaki "Yapay zekâya kopyala" kartı doğrudan elle yol bölümüne indirir
+  const { manual } = useLocalSearchParams<{ manual?: string }>();
+  const scrollRef = useRef<ScrollView>(null);
+  const manualY = useRef<number | null>(null);
+  const openedAt = useRef(Date.now());
+  // Yalnızca açılıştaki ilk birkaç saniyede iner; sonra yukarıdaki içerik değişse de sayfayı oynatmaz
+  const goManual = () => {
+    if (manual === '1' && manualY.current !== null && Date.now() - openedAt.current < 4000) {
+      scrollRef.current?.scrollTo({ y: Math.max(0, manualY.current - 12), animated: false });
+    }
+  };
 
   const [now, setNow] = useState(() => new Date());
   const [loading, setLoading] = useState(true);
@@ -214,7 +225,7 @@ export default function ReviewScreen() {
 
   return (
     <SafeAreaView style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Pressable onPress={() => router.back()} hitSlop={10}>
           <Text style={styles.back}>‹ Geri</Text>
         </Pressable>
@@ -427,7 +438,15 @@ export default function ReviewScreen() {
               </>
             )}
 
-            <Text style={styles.section}>Ücretsiz yapay zekâyla (elle)</Text>
+            <Text
+              style={styles.section}
+              onLayout={(e) => {
+                manualY.current = e.nativeEvent.layout.y;
+                goManual();
+              }}
+            >
+              Ücretsiz yapay zekâyla (elle)
+            </Text>
             <View style={styles.card}>
               <Text style={styles.cardText}>
                 1. "Özeti kopyala"ya bas.{'\n'}2. Gemini, ChatGPT ya da Claude uygulamasını aç, yapıştırıp

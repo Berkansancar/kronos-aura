@@ -794,11 +794,18 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        {focus !== 'REVIEW' && (
-          <Pressable onPress={() => router.push('/review')} hitSlop={6}>
-            <Text style={styles.aiHint}>Gün sonu değerlendirmesi ve kopyala-yapıştır yolu ›</Text>
-          </Pressable>
-        )}
+        <Pressable
+          onPress={() => router.push({ pathname: '/review', params: { manual: '1' } })}
+          style={styles.activityCard}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={styles.activityTitle}>🤖 Yapay zekâya kopyala-yapıştır</Text>
+            <Text style={styles.activitySub}>
+              Günün özetini kopyala, Gemini / ChatGPT / Claude'a yapıştır, cevabı buraya geri getir. Ücretsiz.
+            </Text>
+          </View>
+          <Text style={styles.activityArrow}>›</Text>
+        </Pressable>
 
         {backupHint && (
           <View style={styles.hintCard}>
