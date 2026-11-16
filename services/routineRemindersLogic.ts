@@ -17,6 +17,8 @@ export interface PlannedReminder {
   body: string;
   /** Bildirime dokununca açılacak ekran (ör. '/morning'); yoksa ana ekran açılır */
   route?: string;
+  /** Rutin hatırlatmalarında bildirimin ait olduğu gün (yyyy-mm-dd); düğme cevapları bu güne işlenir */
+  day?: string;
 }
 
 export const REMINDER_ID_PREFIX = 'rtn-';
@@ -95,6 +97,7 @@ export function planReminders(
         out.push({
           id: `${REMINDER_ID_PREFIX}${r.id}-snooze`,
           routineId: r.id,
+          day: dayKey(at),
           at,
           title: r.title,
           body: 'Sonra demiştin. Şimdi uygun mu? Açıp cevap verebilirsin.',
@@ -116,6 +119,7 @@ export function planReminders(
       out.push({
         id: `${REMINDER_ID_PREFIX}${r.id}-${dayKey(at)}`,
         routineId: r.id,
+        day: dayKey(at),
         at,
         title: r.title,
         body:

@@ -6,6 +6,7 @@ import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
 import type { RoutineBrief } from '../database/types';
+import { ROUTINE_ACTIONS, ROUTINE_CATEGORY } from './routineActionLogic';
 import {
   REMINDER_CAP,
   REMINDER_DAYS,
@@ -65,6 +66,7 @@ export type ReminderStatus = 'ok' | 'no-permission' | 'unavailable';
 
 let handlerSet = false;
 let channelReady = false;
+let categoryReady = false;
 let lastSignature: string | null = null;
 
 function setup(): void {
@@ -88,6 +90,23 @@ async function ensureChannel(): Promise<void> {
     description: 'Günlük rutinlerin için "bugün yapacak mısın?" hatırlatmaları',
   });
   channelReady = true;
+}
+
+/**
+ * Rutin bildirimlerine "Yaptım / Yapacağım / Bugün değil" düğmeleri ekler. Düğme uygulamayı kısa süre açar:
+ * cevabın kaybolmaması için (uygulama kapalıyken arka planda çalıştırmaya güvenmiyoruz).
+ */
+async function ensureCategory(): Promise<void> {
+  if (categoryReady || Platform.OS !== 'android') return;
+  await Notifications.setNotificationCategoryAsync(
+    ROUTINE_CATEGORY,
+    ROUTINE_ACTIONS.map((a) => ({
+      identifier: a.identifier,
+      buttonTitle: a.title,
+      options: { opensAppToForeground: true },
+    }))
+  );
+  categoryReady = true;
 }
 
 export async function hasNotificationPermission(): Promise<boolean> {
@@ -124,6 +143,7 @@ export async function syncRoutineReminders(
     setup();
     if (!(await hasNotificationPermission())) return 'no-permission';
     await ensureChannel();
+    await ensureCategory().catch(() => undefined);
 
     const morning = await getMorningSettings();
     const plan = planReminders(briefs, now, REMINDER_DAYS, REMINDER_CAP, {
@@ -143,7 +163,13 @@ export async function syncRoutineReminders(
     for (const p of plan) {
       await Notifications.scheduleNotificationAsync({
         identifier: p.id,
-        content: { title: p.title, body: p.body, data: p.route ? { route: p.route } : {} },
+        content: {
+          title: p.title,
+          body: p.body,
+          data: p.route ? { route: p.route } : p.routineId ? { routineId: p.routineId, day: p.day } : {},
+          // Yalnızca rutin hatırlatmalarında düğmeler görünür (sabah brifingi, su, değerlendirme gibilerde değil)
+          ...(p.routineId && !p.route && categoryReady ? { categoryIdentifier: ROUTINE_CATEGORY } : {}),
+        },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
           date: p.at,

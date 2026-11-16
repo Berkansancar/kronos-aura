@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, DeviceEventEmitter, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -7,6 +7,7 @@ import { RoutineEditor, type RoutineDraft } from '../components/RoutineEditor';
 import { colors, radius, spacing } from '../constants/theme';
 import { listRoutines, updateRoutine } from '../database/repository';
 import type { Routine, RoutineBrief, RoutineCategory } from '../database/types';
+import { DATA_CHANGED_EVENT } from '../services/notificationActionQueue';
 import { loadRoutineBriefs } from '../services/routineBriefs';
 import {
   addCustomRoutine,
@@ -53,6 +54,14 @@ export default function RoutinesScreen() {
       load().catch(() => undefined);
     }, [load])
   );
+
+  // Bildirimdeki düğmeden bir cevap işlenince listeyi tazele.
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(DATA_CHANGED_EVENT, () => {
+      load().catch(() => undefined);
+    });
+    return () => sub.remove();
+  }, [load]);
 
   const run = useCallback(
     async (fn: () => Promise<void>) => {

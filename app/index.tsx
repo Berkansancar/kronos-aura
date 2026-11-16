@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, DeviceEventEmitter, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -88,6 +88,7 @@ import { materializePlannedRoutines, reviewAvailable, reviewDayOf } from '../ser
 import { loadBackupNudge, snoozeBackupNudge } from '../services/backupNudge';
 import { loadTypicalCommute } from '../services/commute';
 import { loadGame, takeLevelUp } from '../services/game';
+import { DATA_CHANGED_EVENT } from '../services/notificationActionQueue';
 import { countParked } from '../services/weekPlan';
 import { loadGuide, type GuideData } from '../services/dayGuide';
 import { guideLines, guideNow } from '../services/dayGuideLogic';
@@ -259,6 +260,15 @@ export default function HomeScreen() {
       loadActivity();
     }, [load, loadActivity])
   );
+
+  // Bildirimdeki düğmeden (ör. "Yaptım") bir cevap işlenince ekranı tazele.
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(DATA_CHANGED_EVENT, () => {
+      load();
+      loadActivity();
+    });
+    return () => sub.remove();
+  }, [load, loadActivity]);
 
   // Aktivite verisi beş dakikada bir tazelenir.
   useEffect(() => {

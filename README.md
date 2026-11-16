@@ -73,6 +73,7 @@ npm run test:vocab        kelime defteri: Leitner kutuları, tekrar seansı, yed
 npm run test:runmode      rutin modu: sıra, bölümler, Yaptım/Sonra/Atla, sayaç, 37 kontrol
 npm run test:monthly      aylık karne: toplamlar, ruh hali, seviye, önceki ayla karşılaştırma, 34 kontrol
 npm run test:quests       haftalık görevler: seçim, ilerleme, bonus XP, geçmişe bonus verilmemesi, 43 kontrol
+npm run test:notifyactions  bildirimden Yaptım / Yapacağım / Bugün değil: ayrıştırma, karar, kuyruk, kayıt, 48 kontrol
 npm run test:weekplan     hafta planı (güne ayırma, kapasite, otomatik dağıtım, veritabanı v11), 41 kontrol
 npm run test:game         oyunlaştırma (XP, seviye, altın, seri, rozet, ödül, veritabanından türetme, yedek), 62 kontrol
 npm run test:language     dil öğrenme (uygulama süresi, kalem-kağıt, hedef, geçmiş, gün analizi, yedek, veritabanı v10), 52 kontrol
@@ -437,6 +438,15 @@ Saatleri sen verdin; uygulama günü saat saat yönlendirir. Ana ekranın üstü
 - **Kelime defteri** (Dil öğrenme > Kelime defteri): yolda ya da işte gördüğün kelimeyi hızla yaz (kelime, anlam, isteğe bağlı not). Aynı kelime ikinci kez eklenmez (Türkçe harf duyarlı). Tekrar kartları Leitner kutularıyla çalışır: bilince kart 1-3-7-16-35 gün aralıklarla geri gelir, "Tekrar göreceğim" denince iki kutu geri düşer (sıfırlanmaz). Bir seans en çok 12 kart; biten seansın süresi dil çalışmasına ("Dinleme / konuşma") yazılır. Yedeğe `Vocab` tablosu dahildir.
 - **Aylık karne** (ana ekran > Aylık karne): ayın tek sayfalık özeti. Etkin gün, tamamlanan rutin, biten iş, dil çalışması, en uzun rutin serisi, en dolu gün, ruh hali dağılımı ve ortalaması, uyku/adım/su ortalamaları, Kahraman seviyesi. Önceki ayla kıyas yargısızdır: düşüşte "biraz daha sakin geçti" denir; süren ay, önceki ayın aynı sayıdaki gününe göre kıyaslanır. Aylar arasında gezilir.
 - **Haftalık görevler** (Kahraman ekranı): her Pazartesi 3 yeni görev ("Bu hafta 3 gün dil çalış", "5 gün en az bir rutin yap", "Su hedefini 4 gün tamamla", "4 gün ruh halini yaz" gibi). Seçim haftaya göre sabittir ve her görev farklı bir alandandır; su hedefi yoksa su görevi çıkmaz. İlerleme geçmişten türetilir, tamamlanan görevin XP'si (20-40) ve altını eklenir, "İlk görev" ve "10 görev" rozetleri vardır. Görevler ilk görüldüğü haftadan başlar: eski haftalara bonus yağmaz, seviye birden sıçramaz. Tamamlanmayan görev puan düşürmez.
+
+## Bildirimden cevap (Yaptım / Yapacağım / Bugün değil)
+
+Rutin hatırlatma bildiriminde üç düğme çıkar: **Yaptım ✓**, **Yapacağım**, **Bugün değil**. Bildirimi açıp rutini aramana gerek kalmaz; düğmeye basınca uygulama bir an açılır, cevap kaydedilir ve küçük bir mesajla onaylanır (ana ekran ve Rutinlerim kendiliğinden tazelenir). Düğmeler yalnızca rutin hatırlatmalarında vardır; sabah brifingi, su ve gün sonu bildirimlerinde yoktur.
+
+- Cevap, bildirimin ait olduğu güne işlenir: dünkü bildirimdeki "Yaptım" dünü işaretler; "Yapacağım" ve "Bugün değil" yalnızca bugünün bildirimleri için geçerlidir.
+- Güvenli: zaten yapılmış rutin sonradan "Bugün değil" ile bozulmaz; aynı cevap iki kez yazılmaz; planlı olmayan günde (ör. Pazar rutini Pazartesi) bir şey değişmez; 36 saatten eski bildirim cevabı işlenmez.
+- Düğme uygulamayı bilerek açar: uygulama kapalıyken arka planda çalışmaya güvenilmediği için cevabın kaybolmaması tercih edildi.
+- Eski bildirimler uygulama ilk açıldığında düğmeli olarak yeniden kurulur.
 
 ## Logo ve ikon
 

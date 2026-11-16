@@ -8,6 +8,9 @@ import { colors } from '../constants/theme';
 import { DB_NAME, migrateDbIfNeeded } from '../database/schema';
 import { ensureWorkSeed } from '../services/workSettings';
 import { ensureTracking } from '../services/activity';
+import { RoutineActionRunner } from '../components/RoutineActionRunner';
+import { enqueueAction } from '../services/notificationActionQueue';
+import { actionKey, isStale, parseRoutineAction } from '../services/routineActionLogic';
 
 /** Bildirime dokunulunca bildirimin belirttiği ekranı (sabah brifingi, gün sonu) açar. */
 const ALLOWED_ROUTES = new Set(['/morning', '/review', '/nutrition', '/goals', '/mark', '/day']);
@@ -31,6 +34,15 @@ function useNotificationOpen(): void {
     let handled: string | null = null;
     const handle = (r: Notifications.NotificationResponse | null | undefined) => {
       if (!alive || !r) return;
+      // Rutin bildirimindeki düğme ("Yaptım" gibi): cevabı kuyruğa al; veritabanı hazır olunca işlenir
+      const action = parseRoutineAction(r.actionIdentifier, r.notification.request.content.data);
+      if (action) {
+        const date = r.notification.date;
+        if (!isStale(date, Date.now())) {
+          enqueueAction({ key: actionKey(r.notification.request.identifier, r.actionIdentifier, date), action });
+        }
+        return;
+      }
       if (handled === r.notification.request.identifier) return;
       handled = r.notification.request.identifier;
       openFromNotification(r);
@@ -77,6 +89,7 @@ export default function RootLayout() {
     <Suspense fallback={<Loading />}>
       <SQLiteProvider databaseName={DB_NAME} onInit={initDatabase} useSuspense>
         <StatusBar style="light" />
+        <RoutineActionRunner />
         <Stack
           screenOptions={{
             headerShown: false,
