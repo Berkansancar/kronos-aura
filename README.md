@@ -65,6 +65,7 @@ npm run test:backup       yedek ve geri yükleme (bozuk metin, eski sürüm, tek
 npm run test:taskedit     görev düzenleme ve yanlış işareti geri alma, 17 kontrol
 npm run test:commute      yolda yapılabilir işler, günün özet satırı, yedek hatırlatması, 39 kontrol
 npm run test:work         haftalık iş programı (Cmt yarım gün, Pazar boş), planlayıcı, hatırlatma, boş gün planı, 43 kontrol
+npm run test:game         oyunlaştırma (XP, seviye, altın, seri, rozet, ödül, veritabanından türetme, yedek), 62 kontrol
 npm run test:language     dil öğrenme (uygulama süresi, kalem-kağıt, hedef, geçmiş, gün analizi, yedek, veritabanı v10), 52 kontrol
 ```
 
@@ -362,6 +363,22 @@ dakikalık adımlarla saat ayarı vardır.
 - **Boş gün kartı:** iş saatleri açıkken çalışılmayan günde (Pazar) ana ekranda "🌿 Boş gün" çıkar: odak isteyen, uzun
   ve ertelenmiş işlerden en çok 5 tanesi, toplam ≈5 saati geçmeyecek şekilde önerilir (gün baştan sona doldurulmaz;
   yargı içermez).
+
+## Kahraman: seviye, altın, ödüller, seri, rozetler (Habitica benzeri)
+
+Ana ekranda tarihin altında tek satır ("🌱 Sv 3 · Yolcu · 🪙 85 · 🔥 5" ve ince bir XP çubuğu); dokununca **Kahraman**
+ekranı açılır (Daha fazla > Kahraman).
+- **Puan kayıtlarından hesaplanır** (ayrı puan tablosu yok): iş bitirmek 10 XP + her 5 dakika için 1 (günde en çok 8 saat),
+  rutin 5 (günde en çok 50), su hedefi 10, dil çalışması 2 dakikada 1 (günde en çok 60 dk; dil hedefi tamamlanırsa +10).
+  Bu yüzden bir işi geri alırsan puanı da geri gider; eski kayıtların puanı da sayılır (son 2 yıl).
+- **Seviye:** 1. seviyeden 2'ye 100 XP, her seviye 50 XP fazla. Ünvanlar: Çaylak, Yolcu (3), Kâşif (6), Usta (10),
+  Üstat (15), Efsane (20). Seviye atlayınca ana ekranda bir kez tebrik kartı çıkar.
+- **Altın:** XP'nin yarısı. **Ödüller** (kahve molası, tatlı, 30 dk dizi… ya da kendi yazdığın, 1–1000 altın, en çok 20)
+  altınla "satın alınır"; satın alma "Geri al" ile geri alınır, altın geri döner. Ödül listesi ayarlarda durur
+  (yedeğe girer).
+- **Seri:** puan kazanılan günlerin zinciri; iki gün arasında bir boş gün (dinlenme günü) seriyi bozmaz, bugün henüz
+  bitmediği için bozmaz. **Rozetler:** iş sayısı, seri, su, dil saati, rutin ve seviye için 17 rozet.
+- **Habitica'dan farkı:** can kaybı, ceza ya da puan düşmesi yoktur (Aura yargılamaz).
 
 ## Logo ve ikon
 

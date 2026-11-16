@@ -86,6 +86,8 @@ import { refreshReminders } from '../services/reminderSync';
 import { materializePlannedRoutines, reviewAvailable, reviewDayOf } from '../services/dayReview';
 import { loadBackupNudge, snoozeBackupNudge } from '../services/backupNudge';
 import { loadTypicalCommute } from '../services/commute';
+import { loadGame, takeLevelUp } from '../services/game';
+import type { GameSummary } from '../services/gameLogic';
 import { loadLanguageDay, type LanguageDayState } from '../services/language';
 import { languageLine } from '../services/languageLogic';
 import { commuteLine, commuteState, commuteSuggestions, remainingMinutes } from '../services/commuteLogic';
@@ -144,6 +146,8 @@ export default function HomeScreen() {
   const [editing, setEditing] = useState<Task | null>(null);
   const [typicalCommute, setTypicalCommute] = useState<number | null>(null);
   const [lang, setLang] = useState<LanguageDayState | null>(null);
+  const [game, setGame] = useState<GameSummary | null>(null);
+  const [levelMsg, setLevelMsg] = useState<string | null>(null);
   const [backupHint, setBackupHint] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -193,7 +197,18 @@ export default function HomeScreen() {
     }
     setBackupHint(await loadBackupNudge(db, current));
     // Dil öğrenme (Duolingo ekran süresi + elle kayıtlar); hata verirse satır ve tuş gizlenir
-    setLang(await loadLanguageDay(db, current).catch(() => null));
+    const langState = await loadLanguageDay(db, current).catch(() => null);
+    setLang(langState);
+    // Oyunlaştırma: seviye, altın, seri (hata verirse satır gizlenir)
+    try {
+      const bundle = await getGoalBundle();
+      const gm = await loadGame(db, current, { waterGoalMl: bundle.waterGoalMl, languageGoalMin: langState ? langState.settings.goalMin : null });
+      setGame(gm.summary);
+      const msg = await takeLevelUp(db, gm.summary.level);
+      if (msg) setLevelMsg(msg);
+    } catch {
+      setGame(null);
+    }
     // Hedefler özeti (hata verirse kart yine de açılır)
     try {
       const gs = await loadGoalState(db, current, await getGoalBundle());
@@ -528,6 +543,17 @@ export default function HomeScreen() {
             <Text style={styles.date}>{formatDayTitle(planDay)}</Text>
             <Text style={styles.subtitle}>{isTomorrow ? 'Yarın için plan' : 'Bugünün akışı'}</Text>
             {summaryLine && <Text style={styles.todayLine}>{summaryLine}</Text>}
+            {game && (
+              <Pressable onPress={() => router.push('/hero')} style={styles.heroLine} hitSlop={6}>
+                <Text style={styles.heroText}>
+                  {game.rank.icon} Sv {game.level} · {game.rank.title} · 🪙 {game.gold}
+                  {game.streak.current > 0 ? ` · 🔥 ${game.streak.current}` : ''}
+                </Text>
+                <View style={styles.heroTrack}>
+                  <View style={[styles.heroFill, { width: `${Math.round(game.levelInfo.ratio * 100)}%` }]} />
+                </View>
+              </Pressable>
+            )}
           </View>
           <Pressable onPress={() => router.push('/settings')} hitSlop={10}>
             <Text style={styles.gear}>⚙</Text>
@@ -539,6 +565,13 @@ export default function HomeScreen() {
             </Text>
           </Pressable>
         </View>
+
+        {levelMsg && (
+          <Pressable onPress={() => setLevelMsg(null)} style={styles.freeCard}>
+            <Text style={styles.activityTitle}>{levelMsg}</Text>
+            <Text style={styles.activitySub}>Kahraman ekranında rozetlerine ve ödüllerine bakabilirsin. Kapatmak için dokun.</Text>
+          </Pressable>
+        )}
 
         <CoachConsole
           kronos={ai.kronos ?? coaches.kronos}
@@ -765,6 +798,11 @@ export default function HomeScreen() {
               onPress={() => router.push('/nutrition')}
             />
             <HomeTile
+              title="Kahraman"
+              subtitle={game ? `Seviye ${game.level} · 🪙 ${game.gold} · ödüller ve rozetler` : 'Seviye, ödüller ve rozetler'}
+              onPress={() => router.push('/hero')}
+            />
+            <HomeTile
               title="Dil öğrenme"
               subtitle={lang ? (languageLine(lang.summary.total, lang.settings.goalMin) ?? 'Duolingo otomatik, kalem-kağıt elle') : 'Duolingo otomatik, kalem-kağıt elle'}
               onPress={() => router.push('/language')}
@@ -901,6 +939,10 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.sm,
   },
+  heroLine: { marginTop: 6, gap: 4, alignSelf: 'stretch' },
+  heroText: { color: colors.text, fontSize: 12, fontWeight: '700' },
+  heroTrack: { height: 4, borderRadius: 2, backgroundColor: colors.surfaceAlt, overflow: 'hidden' },
+  heroFill: { height: 4, borderRadius: 2, backgroundColor: colors.aura },
   freeCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,
