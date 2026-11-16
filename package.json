@@ -35,7 +35,8 @@
     "test:backfill": "tsx scripts/test-backfill.ts",
     "test:vocab": "tsx scripts/test-vocab.ts",
     "test:runmode": "tsx scripts/test-runmode.ts",
-    "test:monthly": "tsx scripts/test-monthly.ts"
+    "test:monthly": "tsx scripts/test-monthly.ts",
+    "test:quests": "tsx scripts/test-quests.ts"
   },
   "dependencies": {
     "expo": "~58.0.0"

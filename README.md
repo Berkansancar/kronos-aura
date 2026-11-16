@@ -68,6 +68,11 @@ npm run test:work         haftalık iş programı (Cmt yarım gün, Pazar boş),
 npm run test:guide        gün rehberi (iş günü/Cumartesi/Pazar çizelgesi, öneriler, şimdi-sıradaki), 38 kontrol
 npm run test:habits       şablon paketleri, simge/renk, alışkanlık takvimi, ruh hali, rutin tarzı testi, veritabanı v12, 119 kontrol
 npm run test:days         rutinleri belirli günlere bağlama (Pazar'a özel, hafta içi, seri, hatırlatma, haftalık özet, takvim), 57 kontrol
+npm run test:backfill     takvimden geçmiş günü sonradan işaretleme ve geri alma, 21 kontrol
+npm run test:vocab        kelime defteri: Leitner kutuları, tekrar seansı, yedek, 41 kontrol
+npm run test:runmode      rutin modu: sıra, bölümler, Yaptım/Sonra/Atla, sayaç, 37 kontrol
+npm run test:monthly      aylık karne: toplamlar, ruh hali, seviye, önceki ayla karşılaştırma, 34 kontrol
+npm run test:quests       haftalık görevler: seçim, ilerleme, bonus XP, geçmişe bonus verilmemesi, 43 kontrol
 npm run test:weekplan     hafta planı (güne ayırma, kapasite, otomatik dağıtım, veritabanı v11), 41 kontrol
 npm run test:game         oyunlaştırma (XP, seviye, altın, seri, rozet, ödül, veritabanından türetme, yedek), 62 kontrol
 npm run test:language     dil öğrenme (uygulama süresi, kalem-kağıt, hedef, geçmiş, gün analizi, yedek, veritabanı v10), 52 kontrol
@@ -424,6 +429,14 @@ Saatleri sen verdin; uygulama günü saat saat yönlendirir. Ana ekranın üstü
 - **Günlere bağlı rutinler** (Rutinlerim > Düzenle > Hangi günler?): her gün, iş günleri (Pzt–Cmt), hafta içi, hafta sonu, yalnız Pazar ya da tek tek günler. Planlı olmayan günde rutin sorulmaz, bildirim gitmez, ana ekran ve sabah brifinginde görünmez; gün sonu değerlendirmesinde "açık kalan" sayılmaz; haftalık özette o gün "yapma şansı" sayılmaz. Seri yalnızca planlı günlere göre sayılır (haftalık bir rutinin serisi üst üste Pazarlardır). Gün sonu ekranında "yarın" listesi de yalnızca yarın planlı rutinleri gösterir.
 - **Pazar paketi** ("Pazar: boş gün"): haftayı planla, uzun yürüyüş, ev işleri ve çamaşır, sevdiklerinle bir kahve; hepsi yalnızca Pazar günleri sorulur. "Yolda" şablonları (nefes, dil çalışması) Pzt–Cmt günlerine bağlıdır.
 - Yedeğe `MoodLog` tablosu ve rutin simge/renk/günleri dahildir.
+
+## Sonradan işaretleme, rutin modu, kelime defteri, aylık karne, haftalık görevler
+
+- **Geçmiş günü sonradan işaretleme** (Alışkanlık takvimi > bir güne dokun): işte telefona bakamadığın günleri akşam ya da Pazar günü düzeltirsin. Her rutinin yanında "Yaptım" (geçmiş ve bugün için) ve "Geri al" düğmesi vardır; gelecek gün işaretlenemez. Kayıt, rutinin sorulma saatine yazılır, yani "en iyi saat" gibi istatistikler bozulmaz. Seri, takvim, haftalık özet ve Kahraman puanı kendiliğinden güncellenir. Bir görevden doğan "yapıldı" kaydı kilitlidir (görev "Günü işaretle"den geri alınır).
+- **Rutin modu** (ana ekran > Rutin modu ya da Rutinlerim > "Rutin modunu başlat"): bugünün açık rutinlerini tek ekranda, sorulma saatine göre sırayla yürütür. Tur seçimi: Sabah / Akşam / Hepsi (saate göre önerilir). Her adımda yalnızca o rutin görünür: simge, ad, tahmini süre ve isteğe bağlı geri sayım sayacı (süre dolunca "+" ile fazlası gösterilir, baskı yoktur). "Yaptım" rutini tamamlar (açık görevi de kapatır), "Sonra" turun sonuna alır (bir kez), "Bugün atla" bugünü kapatır ve yarın yine sorulur. Pazar rutini Pazartesi turunda çıkmaz.
+- **Kelime defteri** (Dil öğrenme > Kelime defteri): yolda ya da işte gördüğün kelimeyi hızla yaz (kelime, anlam, isteğe bağlı not). Aynı kelime ikinci kez eklenmez (Türkçe harf duyarlı). Tekrar kartları Leitner kutularıyla çalışır: bilince kart 1-3-7-16-35 gün aralıklarla geri gelir, "Tekrar göreceğim" denince iki kutu geri düşer (sıfırlanmaz). Bir seans en çok 12 kart; biten seansın süresi dil çalışmasına ("Dinleme / konuşma") yazılır. Yedeğe `Vocab` tablosu dahildir.
+- **Aylık karne** (ana ekran > Aylık karne): ayın tek sayfalık özeti. Etkin gün, tamamlanan rutin, biten iş, dil çalışması, en uzun rutin serisi, en dolu gün, ruh hali dağılımı ve ortalaması, uyku/adım/su ortalamaları, Kahraman seviyesi. Önceki ayla kıyas yargısızdır: düşüşte "biraz daha sakin geçti" denir; süren ay, önceki ayın aynı sayıdaki gününe göre kıyaslanır. Aylar arasında gezilir.
+- **Haftalık görevler** (Kahraman ekranı): her Pazartesi 3 yeni görev ("Bu hafta 3 gün dil çalış", "5 gün en az bir rutin yap", "Su hedefini 4 gün tamamla", "4 gün ruh halini yaz" gibi). Seçim haftaya göre sabittir ve her görev farklı bir alandandır; su hedefi yoksa su görevi çıkmaz. İlerleme geçmişten türetilir, tamamlanan görevin XP'si (20-40) ve altını eklenir, "İlk görev" ve "10 görev" rozetleri vardır. Görevler ilk görüldüğü haftadan başlar: eski haftalara bonus yağmaz, seviye birden sıçramaz. Tamamlanmayan görev puan düşürmez.
 
 ## Logo ve ikon
 

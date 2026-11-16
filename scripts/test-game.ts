@@ -133,8 +133,9 @@ async function main(): Promise<void> {
   check('seviye ve ünvan toplam XP\'ten', sum.level === levelFromXp(total).level && sum.rank.title === rankOf(sum.level).title);
   check('rozetler: ilk adım kazanıldı, 100 iş kazanılmadı', sum.badges.find((b) => b.id === 'task-1')!.earned && !sum.badges.find((b) => b.id === 'task-100')!.earned && sum.earnedBadges >= 1);
   check('boş geçmişte çökmez', buildGame([], goals, EMPTY_GAME_STATE).gold === 0 && buildGame([], goals, EMPTY_GAME_STATE).level === 1);
-  const bd = buildBadges({ tasks: 250, routines: 20, waterDays: 30, languageMinutes: 3000, bestStreak: 30, level: 10 });
-  check('tüm rozetler kazanılabilir', bd.every((b) => b.earned) && bd.length === 17);
+  const bd = buildBadges({ tasks: 250, routines: 20, waterDays: 30, languageMinutes: 3000, bestStreak: 30, level: 10, quests: 10 });
+  check('tüm rozetler kazanılabilir', bd.every((b) => b.earned) && bd.length === 19);
+  check('görev rozetleri: görev sayısı verilmezse kazanılmaz', !buildBadges({ tasks: 0, routines: 0, waterDays: 0, languageMinutes: 0, bestStreak: 0, level: 1 }).some((b) => b.id.startsWith('quest') && b.earned));
   check('rozet adları/ipuçlarında yargı yok', bd.every((b) => !hasBannedWords(b.title) && !hasBannedWords(b.hint)));
   check('seviye atlama mesajları', levelUpMessage(null, 1) === null && /başlıyorsun/.test(levelUpMessage(null, 4) ?? '') && /Seviye 5!/.test(levelUpMessage(4, 5) ?? '') && levelUpMessage(5, 5) === null && levelUpMessage(6, 5) === null);
 

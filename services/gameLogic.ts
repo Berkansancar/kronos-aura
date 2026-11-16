@@ -20,6 +20,8 @@ export interface GameDay {
   routinesDone: number;
   waterMl: number | null;
   languageMinutes?: number | null;
+  /** O gün ruh hali yazıldı mı (haftalık görevler için) */
+  moodLogged?: boolean;
 }
 
 export interface GameGoals {
@@ -174,6 +176,8 @@ export interface GameState {
   purchases: Purchase[];
   /** Listeden eskiyen satın almaların toplam altını (bakiye doğru kalsın) */
   spentTrimmed: number;
+  /** Haftalık görevlerin başladığı haftanın Pazartesi'si (yyyy-mm-dd); geçmişe bonus verilmesin diye saklanır */
+  questsStart?: string;
 }
 
 export const EMPTY_GAME_STATE: GameState = { rewards: [], purchases: [], spentTrimmed: 0 };
@@ -212,7 +216,13 @@ export function parseGameState(raw: string | null): GameState {
         purchases.push({ id: x.id, rewardId: x.rewardId, title, price, at: x.at });
       }
     }
-    return { rewards, purchases: purchases.slice(-MAX_PURCHASES), spentTrimmed: num(o.spentTrimmed, 0, 10_000_000) ?? 0 };
+    const questsStart = typeof o.questsStart === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(o.questsStart) ? o.questsStart : undefined;
+    return {
+      rewards,
+      purchases: purchases.slice(-MAX_PURCHASES),
+      spentTrimmed: num(o.spentTrimmed, 0, 10_000_000) ?? 0,
+      ...(questsStart ? { questsStart } : {}),
+    };
   } catch {
     return { rewards: [], purchases: [], spentTrimmed: 0 };
   }
@@ -272,6 +282,8 @@ export interface BadgeStats {
   languageMinutes: number;
   bestStreak: number;
   level: number;
+  /** Tamamlanan haftalık görev sayısı */
+  quests?: number;
 }
 
 export function buildBadges(st: BadgeStats): Badge[] {
@@ -292,6 +304,8 @@ export function buildBadges(st: BadgeStats): Badge[] {
   add('lang-600', '📚', 'Dil: 10 saat', 'Toplam 10 saat dil çalış', st.languageMinutes >= 600);
   add('lang-3000', '🎓', 'Dil: 50 saat', 'Toplam 50 saat dil çalış', st.languageMinutes >= 3000);
   add('routine-20', '🔁', 'Rutin: 20', '20 rutin tamamla', st.routines >= 20);
+  add('quest-1', '🎯', 'İlk görev', 'Bir haftalık görevi tamamla', (st.quests ?? 0) >= 1);
+  add('quest-10', '🎖️', '10 görev', '10 haftalık görev tamamla', (st.quests ?? 0) >= 10);
   add('level-5', '⭐', 'Seviye 5', 'Seviye 5\'e ulaş', st.level >= 5);
   add('level-10', '🌠', 'Seviye 10', 'Seviye 10\'a ulaş', st.level >= 10);
   return out;
@@ -314,13 +328,20 @@ export interface GameSummary {
   badges: Badge[];
   earnedBadges: number;
   tasksTotal: number;
+  /** Haftalık görevlerden gelen toplam XP */
+  questXp: number;
 }
 
 /** `days` eskiden yeniye; sonuncusu bugün. */
-export function buildGame(days: GameDay[], goals: GameGoals, state: GameState): GameSummary {
+export function buildGame(
+  days: GameDay[],
+  goals: GameGoals,
+  state: GameState,
+  quests: { xp: number; completed: number } = { xp: 0, completed: 0 }
+): GameSummary {
   const perDay = days.map((d) => dayXp(d, goals));
-  const totalXp = perDay.reduce((a, d) => a + d.xp, 0);
-  const earnedGold = perDay.reduce((a, d) => a + d.gold, 0);
+  const totalXp = perDay.reduce((a, d) => a + d.xp, 0) + quests.xp;
+  const earnedGold = perDay.reduce((a, d) => a + d.gold, 0) + goldOf(quests.xp);
   const spentGold = spentTotal(state);
   const levelInfo = levelFromXp(totalXp);
   const streak = computeStreak(perDay.map((d) => d.xp > 0));
@@ -332,6 +353,7 @@ export function buildGame(days: GameDay[], goals: GameGoals, state: GameState): 
     languageMinutes: days.reduce((a, d) => a + (d.languageMinutes ?? 0), 0),
     bestStreak: streak.best,
     level: levelInfo.level,
+    quests: quests.completed,
   });
   const today = perDay[perDay.length - 1] ?? { day: '', xp: 0, gold: 0, parts: [] };
   return {
@@ -348,6 +370,7 @@ export function buildGame(days: GameDay[], goals: GameGoals, state: GameState): 
     badges,
     earnedBadges: badges.filter((b) => b.earned).length,
     tasksTotal,
+    questXp: quests.xp,
   };
 }
 

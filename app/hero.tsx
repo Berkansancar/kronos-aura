@@ -6,6 +6,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { colors, radius, spacing } from '../constants/theme';
 import { addGameReward, buyGameReward, deleteGameReward, loadGame, refundGamePurchase, type GameData } from '../services/game';
 import { REWARD_SUGGESTIONS, GameError } from '../services/gameLogic';
+import { questLine } from '../services/questsLogic';
 import { getGoalBundle } from '../services/goalsSettings';
 import { getLanguageSettings } from '../services/language';
 import type { GameGoals } from '../services/gameLogic';
@@ -121,6 +122,34 @@ export default function HeroScreen() {
                 <Stat label="Bitirilen" value={`${sum.tasksTotal} iş`} />
               </View>
             </View>
+
+            {data && (
+              <>
+                <Text style={styles.section}>Haftalık görevler</Text>
+                <View style={styles.card}>
+                  {data.quests.current.quests.map((q) => (
+                    <View key={q.id} style={styles.questRow}>
+                      <Text style={styles.questIcon}>{q.done ? '✅' : q.icon}</Text>
+                      <View style={{ flex: 1, gap: 4 }}>
+                        <Text style={[styles.questTitle, q.done && { color: colors.aura }]}>{q.title}</Text>
+                        <View style={styles.track}>
+                          <View style={[styles.fill, { width: `${Math.round(q.ratio * 100)}%` }]} />
+                        </View>
+                        <Text style={styles.muted}>
+                          {Math.min(q.progress, q.target)} / {q.target} {q.unit} · {q.done ? `+${q.xp} XP kazandın` : `+${q.xp} XP`}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
+                  <Text style={styles.muted}>
+                    {questLine(data.quests.current, new Date().getDay() === 0)}
+                  </Text>
+                  <Text style={styles.muted}>
+                    Görevler her Pazartesi yenilenir. Tamamlamazsan puan düşmez. Toplam {data.quests.totalCompleted} görev · +{data.quests.totalXp} XP.
+                  </Text>
+                </View>
+              </>
+            )}
 
             <Text style={styles.section}>Bugün</Text>
             <View style={styles.card}>
@@ -293,6 +322,9 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md },
   rowLabel: { flex: 1, color: colors.text, fontSize: 14 },
   rowValue: { color: colors.aura, fontSize: 14, fontWeight: '800' },
+  questRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  questIcon: { fontSize: 22, width: 30, textAlign: 'center' },
+  questTitle: { color: colors.text, fontSize: 14, fontWeight: '700', lineHeight: 20 },
   rewardRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   rewardTitle: { color: colors.text, fontSize: 15, fontWeight: '700' },
   buyBtn: {

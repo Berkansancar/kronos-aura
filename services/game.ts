@@ -1,8 +1,9 @@
 /** Oyunlaştırma: veriyi okur, ödül listesini ayarlarda saklar. Mantık: services/gameLogic.ts (SecureStore yok). */
 import type { SQLiteDatabase } from 'expo-sqlite';
-import { getSetting, setSetting } from '../database/repository';
+import { getSetting, listMoodLogsSince, setSetting } from '../database/repository';
 import { newId } from '../database/ids';
 import { gatherHistory } from './history';
+import { buildQuests, weekStartOf, type QuestsSummary } from './questsLogic';
 import {
   GAME_DAYS,
   GAME_SEEN_KEY,
@@ -24,6 +25,7 @@ import {
 export interface GameData {
   summary: GameSummary;
   state: GameState;
+  quests: QuestsSummary;
 }
 
 export async function getGameState(db: SQLiteDatabase): Promise<GameState> {
@@ -35,8 +37,9 @@ async function saveGameState(db: SQLiteDatabase, s: GameState): Promise<void> {
 }
 
 export async function loadGame(db: SQLiteDatabase, now: Date, goals: GameGoals): Promise<GameData> {
-  const state = await getGameState(db);
-  const { days } = await gatherHistory(db, now, GAME_DAYS);
+  let state = await getGameState(db);
+  const { days, endDay } = await gatherHistory(db, now, GAME_DAYS);
+  const moodDays = new Set((await listMoodLogsSince(db, days[0]?.day ?? endDay).catch(() => [])).map((m) => m.day));
   const gameDays: GameDay[] = days.map((d) => ({
     day: d.day,
     tasksDone: d.tasksDone,
@@ -44,8 +47,15 @@ export async function loadGame(db: SQLiteDatabase, now: Date, goals: GameGoals):
     routinesDone: d.routinesDone,
     waterMl: d.waterMl,
     languageMinutes: d.languageMinutes ?? null,
+    moodLogged: moodDays.has(d.day),
   }));
-  return { summary: buildGame(gameDays, goals, state), state };
+  // Haftalık görevler ilk kez görüldüğü haftadan başlar: eski haftalara bonus yağmaz, seviye birden sıçramaz
+  if (!state.questsStart) {
+    state = { ...state, questsStart: weekStartOf(endDay) };
+    await saveGameState(db, state);
+  }
+  const quests = buildQuests(gameDays, goals, state.questsStart, endDay);
+  return { summary: buildGame(gameDays, goals, state, { xp: quests.totalXp, completed: quests.totalCompleted }), state, quests };
 }
 
 export async function addGameReward(db: SQLiteDatabase, title: string, price: number): Promise<GameState> {
