@@ -530,19 +530,19 @@ export default function HomeScreen() {
           </Pressable>
         )}
 
-        {reviewAvailable(now) && (
-          <Pressable onPress={() => router.push('/review')} style={styles.reviewCard}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.reviewTitle}>Gün sonu değerlendirmesi</Text>
-              <Text style={styles.activitySub}>
-                {hasReview
+        <Pressable onPress={() => router.push('/review')} style={styles.reviewCard}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.reviewTitle}>Gün sonu değerlendirmesi</Text>
+            <Text style={styles.activitySub}>
+              {!reviewAvailable(now)
+                ? 'Akşam 20:00\'den sonra kendiliğinden hazır olur · kopyala-yapıştır yolu şimdi de açık'
+                : hasReview
                   ? 'Hazır · yarın için rutinlerine bak'
                   : 'Bugünü birlikte değerlendirelim, yarını planlayalım'}
-              </Text>
-            </View>
-            <Text style={styles.activityArrow}>›</Text>
-          </Pressable>
-        )}
+            </Text>
+          </View>
+          <Text style={styles.activityArrow}>›</Text>
+        </Pressable>
 
         {deviceActivityAvailable && (
           <Pressable onPress={() => router.push('/activity')} style={styles.activityCard}>

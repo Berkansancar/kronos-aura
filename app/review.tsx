@@ -98,7 +98,9 @@ export default function ReviewScreen() {
       const n = new Date();
       setNow(n);
       if (!reviewAvailable(n)) {
+        // Gün bitmeden otomatik yorum yazılmaz; ama elle (kopyala-yapıştır) yol ve rutin listesi açık kalır
         setLoading(false);
+        void loadLists();
         return;
       }
       generate(false);
@@ -219,14 +221,16 @@ export default function ReviewScreen() {
         <Text style={styles.heading}>Gün sonu</Text>
         <Text style={styles.sub}>{formatDayTitle(reviewDay)}</Text>
 
-        {!reviewAvailable(now) ? (
+        {!reviewAvailable(now) && (
           <View style={styles.card}>
             <Text style={styles.cardText}>
-              Gün sonu değerlendirmesi akşam 20:00'den sonra açılır; gün bitmeden yorumlamak eksik kalır.
-              Akşam tekrar bak.
+              Gün henüz bitmedi, o yüzden yorumu kendiliğinden yazmıyorum; akşam 20:00'den sonra hazır olur. İstersen
+              şimdiden aşağıdaki kopyala-yapıştır yolunu kullanabilirsin: yorum şimdiye kadarki verilere göre olur.
+              Akşam yeniden hazırlamak istersen en alttaki "Yeniden hazırla"ya bas.
             </Text>
           </View>
-        ) : loading && !review ? (
+        )}
+        {loading && !review ? (
           <View style={styles.loading}>
             <ActivityIndicator color={colors.aura} />
             <Text style={styles.cardText}>Günü değerlendiriyorum…</Text>
@@ -478,7 +482,7 @@ export default function ReviewScreen() {
               </Text>
             </Pressable>
             <Pressable onPress={() => router.back()} style={styles.done}>
-              <Text style={styles.doneText}>Tamam, iyi geceler</Text>
+              <Text style={styles.doneText}>{reviewAvailable(now) ? 'Tamam, iyi geceler' : 'Tamam'}</Text>
             </Pressable>
           </>
         )}
