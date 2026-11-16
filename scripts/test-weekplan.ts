@@ -97,7 +97,7 @@ async function main(): Promise<void> {
   const { db } = makeTestDb();
   await migrateDbIfNeeded(db);
   await ensureWorkSeed(db);
-  check('sürüm 11', DATABASE_VERSION === 11);
+  check('sürüm 12', DATABASE_VERSION === 12);
   const day0 = planningDay(at(9));
   const startISO = dayBounds(day0).start.toISOString();
   const t1 = await createTask(db, { title: 'Bugünkü iş', estimatedDuration: 20, cognitiveWeight: 'LOW' });
@@ -139,11 +139,12 @@ async function main(): Promise<void> {
   check('ayrılan günler yedekle geri gelir', res.ok && (await getTask(fresh.db, t3.id))?.plannedDay === key(22), JSON.stringify(res));
   const old = makeTestDb();
   old.raw.exec(`CREATE TABLE Task (id TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL, estimatedDuration INTEGER NOT NULL, cognitiveWeight TEXT NOT NULL, status TEXT NOT NULL, createdAt TEXT NOT NULL, startedAt TEXT, routineId TEXT, workOk INTEGER NOT NULL DEFAULT 0, commuteOk INTEGER NOT NULL DEFAULT 0);
+    CREATE TABLE Routine (id TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL, category TEXT NOT NULL, estimatedDuration INTEGER NOT NULL, cognitiveWeight TEXT NOT NULL, askHour INTEGER NOT NULL, askMinute INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'ACTIVE', createdAt TEXT NOT NULL, retiredAt TEXT, templateId TEXT);
     INSERT INTO Task (id,title,estimatedDuration,cognitiveWeight,status,createdAt) VALUES ('t1','Eski görev',20,'LOW','PENDING','2026-11-01T08:00:00.000Z');
     PRAGMA user_version = 10;`);
   await migrateDbIfNeeded(old.db);
   const up = await getTask(old.db, 't1');
-  check('v10 → v11: görev korunur, günü boş', up?.title === 'Eski görev' && up.plannedDay === null && (old.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version === DATABASE_VERSION);
+  check('v10 → son sürüm: görev korunur, günü boş', up?.title === 'Eski görev' && up.plannedDay === null && (old.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version === DATABASE_VERSION);
 }
 
 main()

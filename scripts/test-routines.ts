@@ -67,6 +67,8 @@ const routine = (over: Partial<Routine> = {}): Routine => ({
   createdAt: new Date(2026, 9, 1).toISOString(),
   retiredAt: null,
   templateId: null,
+  icon: null,
+  color: null,
   ...over,
 });
 let logSeq = 0;

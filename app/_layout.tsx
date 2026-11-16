@@ -101,6 +101,8 @@ export default function RootLayout() {
           <Stack.Screen name="hero" />
           <Stack.Screen name="week" />
           <Stack.Screen name="guide" />
+          <Stack.Screen name="habits" />
+          <Stack.Screen name="quiz" />
         </Stack>
       </SQLiteProvider>
     </Suspense>

@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 export const DB_NAME = 'kronos-aura.db';
-export const DATABASE_VERSION = 11;
+export const DATABASE_VERSION = 12;
 
 /**
  * Not: SQLite'ın gerçek bir DATETIME tipi yoktur. Zaman alanlarını ISO-8601 (UTC) TEXT
@@ -233,6 +233,18 @@ CREATE TABLE IF NOT EXISTS SleepLog (
 );
 `;
 
+/** v12: rutine simge ve renk (isteğe bağlı) + günlük ruh hali kaydı. */
+const CREATE_TABLES_V12 = `
+CREATE TABLE IF NOT EXISTS MoodLog (
+  day       TEXT PRIMARY KEY NOT NULL,
+  mood      INTEGER NOT NULL CHECK (mood BETWEEN 1 AND 5),
+  note      TEXT,
+  updatedAt TEXT NOT NULL
+);
+`;
+const ADD_ROUTINE_ICON = `ALTER TABLE Routine ADD COLUMN icon TEXT;`;
+const ADD_ROUTINE_COLOR = `ALTER TABLE Routine ADD COLUMN color TEXT;`;
+
 /** Sütun ekleme tekrar çalıştırılırsa hata verir; bu yüzden önce var mı diye bakılır. */
 const ADD_TASK_ROUTINE_ID = `
 ALTER TABLE Task ADD COLUMN routineId TEXT REFERENCES Routine(id) ON DELETE SET NULL;
@@ -320,8 +332,15 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {
     current = 11;
   }
 
+  if (current === 11) {
+    await db.execAsync(CREATE_TABLES_V12);
+    if (!(await hasColumn(db, 'Routine', 'icon'))) await db.execAsync(ADD_ROUTINE_ICON);
+    if (!(await hasColumn(db, 'Routine', 'color'))) await db.execAsync(ADD_ROUTINE_COLOR);
+    current = 12;
+  }
+
   // Gelecekteki migrasyonlar:
-  // if (current === 11) { await db.execAsync(`ALTER TABLE ...`); current = 12; }
+  // if (current === 12) { await db.execAsync(`ALTER TABLE ...`); current = 13; }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
 }

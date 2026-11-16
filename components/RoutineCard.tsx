@@ -2,6 +2,7 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, radius, spacing } from '../constants/theme';
 import type { RoutineBrief } from '../database/types';
 import { formatAskTime } from '../services/routineLogic';
+import { routineColor, routineIcon } from '../services/routineLook';
 
 interface Props {
   brief: RoutineBrief;
@@ -27,13 +28,16 @@ export function RoutineCard({ brief, busy, onAccept, onDone, onLater, onSkipToda
       ]
     );
 
+  const accent = routineColor(routine);
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { borderColor: accent }]}>
       <View style={styles.top}>
-        <Text style={styles.time}>{formatAskTime(routine)}</Text>
+        <Text style={[styles.time, { color: accent }]}>{formatAskTime(routine)}</Text>
         <Text style={styles.meta}>{routine.estimatedDuration} dk</Text>
       </View>
-      <Text style={styles.title}>{routine.title}</Text>
+      <Text style={styles.title}>
+        {routineIcon(routine)} {routine.title}
+      </Text>
       <Text style={styles.question}>
         {stats.streak >= 2 ? `${stats.streak} gündür devam ediyorsun. Bugün de yapacak mısın?` : 'Bugün bunu yapacak mısın?'}
       </Text>

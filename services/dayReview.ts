@@ -10,6 +10,7 @@ import {
   addRoutineLog,
   getDailyStat,
   getDayReview,
+  getMoodLog,
   getOrCreateUser,
   isHardDay,
   getTask,
@@ -24,6 +25,7 @@ import {
 } from '../database/repository';
 import type { DayReview, DayReviewPayload, Routine, RoutineIdea, TaskStatus } from '../database/types';
 import { dayKey } from './activityLogic';
+import { moodInfo } from './moodLogic';
 import { buildFlow } from './dayFlowLogic';
 import { getSmokeLimit } from './dayFlow';
 import {
@@ -192,6 +194,8 @@ export async function gatherDayFacts(
     key === nutritionDay(now)
   );
 
+  const moodLog = await getMoodLog(db, key).catch(() => null);
+
   return {
     day: key,
     tasksDone,
@@ -215,6 +219,7 @@ export async function gatherDayFacts(
     workWindow: work,
     timeUse,
     smoke,
+    mood: moodLog ? { value: moodLog.mood, label: moodInfo(moodLog.mood).label } : null,
   };
 }
 

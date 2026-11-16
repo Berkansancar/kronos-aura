@@ -17,6 +17,7 @@ import type {
 import { extractJsonObject } from './ai/claudeClient';
 import { nutritionPromptLines, type DayNutrition } from './nutritionLogic';
 import { formatDuration } from './format';
+import { moodInfo } from './moodLogic';
 import { ROUTINE_TEMPLATES } from './routineTemplates';
 import { smokePromptLine, type SmokeStats } from './smokeLogic';
 import { reasonLabel } from './taskOutcomeLogic';
@@ -57,6 +58,8 @@ export interface DayFacts {
   /** "Zaman nereye gitti" dökümü */
   timeUse?: TimeUse | null;
   smoke?: SmokeStats | null;
+  /** Kullanıcının seçtiği günlük ruh hali (not hiçbir yere gitmez; yalnızca seçim) */
+  mood?: { value: number; label: string } | null;
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -70,6 +73,7 @@ export function factChips(f: DayFacts): string[] {
   if (f.steps !== null) chips.push(`${f.steps.toLocaleString('tr-TR')} adım${f.stepsReliable ? '' : ' (eksik olabilir)'}`);
   if (f.screenMinutes !== null) chips.push(`${formatDuration(f.screenMinutes)} ekran`);
   if (f.sleepMinutes !== null) chips.push(`uyku ~${formatDuration(f.sleepMinutes)}`);
+  if (f.mood) chips.push(`ruh hali ${moodInfo(f.mood.value).emoji}`);
   if (f.driftMinutes > 0) chips.push(`${formatDuration(f.driftMinutes)} akıp giden`);
   if (f.nutrition && !f.nutrition.quiet) chips.push(...f.nutrition.chips.slice(0, 3));
   const missed = (f.outcomes ?? []).filter((o) => o.outcome !== 'DONE').length;
@@ -155,6 +159,11 @@ export function buildRulesReview(
     else if (f.energy.DISTRACTED > 0) parts.push('Zihin zaman zaman dolaştı; bu olağan, yarın küçük adımlarla toparlarız.');
     else parts.push('Bu ritim kayda geçti.');
   }
+  if (f.mood && f.mood.value <= 2) {
+    parts.push('Bugünü ağır olarak işaretlemiştin; böyle günlerde küçük adımlar bile yeter, kendine nazik ol.');
+  } else if (f.mood && f.mood.value >= 4) {
+    parts.push('Ruh halini iyi işaretlemişsin; bu güzel bir gün olarak kayda geçti.');
+  }
   if (f.sleepMinutes !== null && f.sleepMinutes < 360) {
     parts.push('Dünkü uykun kısa görünüyor; bu gece erken kapanmak iyi gelir.');
   }
@@ -234,6 +243,7 @@ export function buildReviewPrompt(
     lines.push(`- Görev sonu hisleri: ${e.HIGH} enerjik, ${e.EXHAUSTED} yorgun, ${e.DISTRACTED} dağınık`);
   }
   if (f.driftMinutes > 0) lines.push(`- Not edilen akıp giden zaman: ${formatDuration(f.driftMinutes)} (yargılama, yalnızca veri)`);
+  if (f.mood) lines.push(`- Ruh hali (kullanıcı seçti, 1 çok zor – 5 harika): ${f.mood.label} (${f.mood.value}/5)`);
   if (shareActivity) {
     if (f.steps !== null) lines.push(`- Adım: ${f.steps}${f.stepsReliable ? '' : ' (eksik olabilir)'}`);
     if (f.screenMinutes !== null) lines.push(`- Ekran süresi: ${formatDuration(f.screenMinutes)}`);

@@ -123,6 +123,22 @@ export interface Routine {
   retiredAt: string | null;
   /** Hazır örnekten eklendiyse şablon id'si */
   templateId: string | null;
+  /** Seçilen simge (emoji); yoksa kategorinin varsayılanı gösterilir */
+  icon: string | null;
+  /** Seçilen renk (#rrggbb); yoksa kategorinin varsayılanı gösterilir */
+  color: string | null;
+}
+
+// ───────────────────────── Ruh hali ─────────────────────────
+
+/** 1 (çok zor) … 5 (harika). Gün başına tek kayıt; istenirse kısa bir not. */
+export type MoodValue = 1 | 2 | 3 | 4 | 5;
+
+export interface MoodLog {
+  day: string;
+  mood: MoodValue;
+  note: string | null;
+  updatedAt: string;
 }
 
 /**

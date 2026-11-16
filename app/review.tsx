@@ -485,7 +485,7 @@ export default function ReviewScreen() {
                 </Text>
               )}
               <Text style={styles.hint}>
-                Kopyalanan metinde görev ve rutin adların ile adım, ekran süresi ve uyku bilgin var. Ücretsiz
+                Kopyalanan metinde görev ve rutin adların ile adım, ekran süresi, uyku bilgin ve o gün seçtiğin ruh hali (notun değil) var. Ücretsiz
                 sohbet uygulamaları konuşmaları kendi ürünlerini geliştirmek için kullanabilir; istemediğin bir
                 şey varsa yapıştırmadan önce metinden sil.
               </Text>

@@ -66,6 +66,7 @@ npm run test:taskedit     görev düzenleme ve yanlış işareti geri alma, 17 k
 npm run test:commute      yolda yapılabilir işler, günün özet satırı, yedek hatırlatması, 39 kontrol
 npm run test:work         haftalık iş programı (Cmt yarım gün, Pazar boş), planlayıcı, hatırlatma, boş gün planı, 43 kontrol
 npm run test:guide        gün rehberi (iş günü/Cumartesi/Pazar çizelgesi, öneriler, şimdi-sıradaki), 38 kontrol
+npm run test:habits       şablon paketleri, simge/renk, alışkanlık takvimi, ruh hali, rutin tarzı testi, veritabanı v12, 119 kontrol
 npm run test:weekplan     hafta planı (güne ayırma, kapasite, otomatik dağıtım, veritabanı v11), 41 kontrol
 npm run test:game         oyunlaştırma (XP, seviye, altın, seri, rozet, ödül, veritabanından türetme, yedek), 62 kontrol
 npm run test:language     dil öğrenme (uygulama süresi, kalem-kağıt, hedef, geçmiş, gün analizi, yedek, veritabanı v10), 52 kontrol
@@ -409,6 +410,17 @@ Saatleri sen verdin; uygulama günü saat saat yönlendirir. Ana ekranın üstü
   "bugüne sığmayanlar"da yazılır); iş saatine denk gelenler İş parçasının notunda görünür.
 - **Öneriler (yok sayılabilir):** dil öğrenme (kalan hedef kadar, en çok 30 dk; boş günde 45 dk), kısa yürüyüş, serbest
   zaman. Yargı içermez.
+
+## Rutin paketleri, simge/renk, alışkanlık takvimi, ruh hali (Me+ benzeri)
+
+- **Hazır paketler** (Rutinlerim > Hazır paketler): "Güne güzel başla", "Yolda ve iş çıkışı", "Akşam sakinliği", "Kendine bakım", "Hareket ve enerji". Tek dokunuşla paketteki tüm rutinler eklenir; zaten ekli olanlar atlanır. Şablon sayısı 25'e çıktı; saatler iş saatlerine göre ayarlıdır ve sonradan değiştirilebilir.
+- **Simge ve renk**: her rutine 24 simgeden ve 8 renkten biri seçilir (Rutinlerim > Düzenle). Seçilmezse kategorinin varsayılanı kullanılır. Rutin listesinde ve ana ekrandaki rutin kartında görünür.
+- **Alışkanlık takvimi** (ana ekran > Daha fazla > Alışkanlık takvimi ya da ruh hali kartındaki "Takvim ›"): ay görünümü, yapılan rutin sayısına göre koyulaşan günler, tek rutine göre süzme, güncel ve en uzun seri, gün ayrıntısı. Yapılmayan gün boş bir hücredir; kimse suçlanmaz.
+- **Ruh hali kaydı**: ana ekranda "Bugün nasılsın?" kartı (5 seçenek + isteğe bağlı kısa not). Düşük günlerde Aura yargılamadan planı hafifletmeyi önerir; üst üste 3 düşük günde nazikçe konuşmayı önerir. Takvimde geçmiş günler düzeltilebilir, haftalık çubuklar ve ay dağılımı görünür. Yeterli veri varsa ve fark olumluysa "rutin yaptığın günlerde ruh halin ortalama X" gözlemi çıkar.
+- **Gün sonu değerlendirmesi**: seçilen ruh hali değerlendirmeye ve kopyala-yapıştır özetine girer; notun hiçbir yere gitmez.
+- **Rutin tarzı testi** (Rutinlerim > Rutin tarzı testi): altı soru, sana uygun iki paket önerir.
+- **Günün küçük ipucu**: takvim ekranının üstünde, her gün farklı (30 ipucu).
+- Yedeğe `MoodLog` tablosu ve rutin simge/renkleri dahildir.
 
 ## Logo ve ikon
 

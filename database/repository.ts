@@ -33,6 +33,8 @@ import type {
   MealKind,
   MealLog,
   WaterLog,
+  MoodLog,
+  MoodValue,
 } from './types';
 
 // ───────────────────────── Kullanıcı ─────────────────────────
@@ -472,6 +474,8 @@ export interface NewRoutine {
   askHour: number;
   askMinute?: number;
   templateId?: string | null;
+  icon?: string | null;
+  color?: string | null;
 }
 
 export async function createRoutine(db: SQLiteDatabase, input: NewRoutine): Promise<Routine> {
@@ -493,11 +497,13 @@ export async function createRoutine(db: SQLiteDatabase, input: NewRoutine): Prom
     createdAt: new Date().toISOString(),
     retiredAt: null,
     templateId: input.templateId ?? null,
+    icon: input.icon ?? null,
+    color: input.color ?? null,
   };
   await db.runAsync(
     `INSERT INTO Routine (id, title, category, estimatedDuration, cognitiveWeight, askHour, askMinute,
-                          status, createdAt, retiredAt, templateId)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                          status, createdAt, retiredAt, templateId, icon, color)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       routine.id,
       routine.title,
@@ -510,6 +516,8 @@ export async function createRoutine(db: SQLiteDatabase, input: NewRoutine): Prom
       routine.createdAt,
       routine.retiredAt,
       routine.templateId,
+      routine.icon,
+      routine.color,
     ]
   );
   return routine;
@@ -533,7 +541,10 @@ export async function updateRoutine(
   db: SQLiteDatabase,
   id: string,
   patch: Partial<
-    Pick<Routine, 'title' | 'category' | 'estimatedDuration' | 'cognitiveWeight' | 'askHour' | 'askMinute'>
+    Pick<
+      Routine,
+      'title' | 'category' | 'estimatedDuration' | 'cognitiveWeight' | 'askHour' | 'askMinute' | 'icon' | 'color'
+    >
   >
 ): Promise<void> {
   const current = await getRoutine(db, id);
@@ -546,7 +557,7 @@ export async function updateRoutine(
   }
   await db.runAsync(
     `UPDATE Routine SET title = ?, category = ?, estimatedDuration = ?, cognitiveWeight = ?,
-                        askHour = ?, askMinute = ? WHERE id = ?`,
+                        askHour = ?, askMinute = ?, icon = ?, color = ? WHERE id = ?`,
     [
       title,
       next.category,
@@ -554,6 +565,8 @@ export async function updateRoutine(
       next.cognitiveWeight,
       next.askHour,
       next.askMinute,
+      next.icon ?? null,
+      next.color ?? null,
       id,
     ]
   );
@@ -1030,4 +1043,38 @@ export async function listStudyLogsSince(db: SQLiteDatabase, sinceDay: string): 
 
 export async function deleteStudyLog(db: SQLiteDatabase, id: string): Promise<void> {
   await db.runAsync('DELETE FROM StudyLog WHERE id = ?', [id]);
+}
+
+// ───────────────────────── Ruh hali ─────────────────────────
+
+/** Günün ruh halini yazar; aynı gün tekrar yazılırsa günceller. `note` verilmezse eski not korunur. */
+export async function setMoodLog(
+  db: SQLiteDatabase,
+  day: string,
+  mood: MoodValue,
+  at: Date,
+  note?: string | null
+): Promise<MoodLog> {
+  if (!Number.isInteger(mood) || mood < 1 || mood > 5) throw new Error('Ruh hali 1 ile 5 arasında olmalı.');
+  const current = await db.getFirstAsync<MoodLog>('SELECT * FROM MoodLog WHERE day = ?', [day]);
+  const cleaned = note === undefined ? (current?.note ?? null) : note && note.trim() ? note.trim().slice(0, 280) : null;
+  const log: MoodLog = { day, mood, note: cleaned, updatedAt: at.toISOString() };
+  await db.runAsync(
+    `INSERT INTO MoodLog (day, mood, note, updatedAt) VALUES (?, ?, ?, ?)
+     ON CONFLICT(day) DO UPDATE SET mood = excluded.mood, note = excluded.note, updatedAt = excluded.updatedAt`,
+    [log.day, log.mood, log.note, log.updatedAt]
+  );
+  return log;
+}
+
+export async function getMoodLog(db: SQLiteDatabase, day: string): Promise<MoodLog | null> {
+  return db.getFirstAsync<MoodLog>('SELECT * FROM MoodLog WHERE day = ?', [day]);
+}
+
+export async function listMoodLogsSince(db: SQLiteDatabase, sinceDay: string): Promise<MoodLog[]> {
+  return db.getAllAsync<MoodLog>('SELECT * FROM MoodLog WHERE day >= ? ORDER BY day ASC', [sinceDay]);
+}
+
+export async function deleteMoodLog(db: SQLiteDatabase, day: string): Promise<void> {
+  await db.runAsync('DELETE FROM MoodLog WHERE day = ?', [day]);
 }

@@ -6,6 +6,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { CoachConsole } from '../components/CoachConsole';
 import { EnergyCheckModal } from '../components/EnergyCheckModal';
 import { HomeTile } from '../components/HomeTile';
+import { MoodCard } from '../components/MoodCard';
 import { ReasonModal } from '../components/ReasonModal';
 import { RoutineCard } from '../components/RoutineCard';
 import { SnoozeModal } from '../components/SnoozeModal';
@@ -629,6 +630,8 @@ export default function HomeScreen() {
           </Text>
         )}
 
+        <MoodCard hardDay={hardDay} onSuggestHardDay={toggleHardDay} />
+
         {hardDay ? (
           <View style={styles.hardCard}>
             <View style={{ flex: 1 }}>
@@ -856,6 +859,7 @@ export default function HomeScreen() {
               subtitle={lang ? (languageLine(lang.summary.total, lang.settings.goalMin) ?? 'Duolingo otomatik, kalem-kağıt elle') : 'Duolingo otomatik, kalem-kağıt elle'}
               onPress={() => router.push('/language')}
             />
+            <HomeTile title="Alışkanlık takvimi" subtitle="Ay görünümü, seriler ve ruh hali" onPress={() => router.push('/habits')} />
             <HomeTile title="Hedefler" subtitle={goalLine ?? 'Su, kalori, ekran, yatış, boş zaman'} onPress={() => router.push('/goals')} />
             <HomeTile title="İlerleme ve geçmiş" subtitle="Günlük çubuk grafikler, 7-30 gün" onPress={() => router.push('/history')} />
             <HomeTile title="Gün akışı" subtitle="Damgalar, süreler, sigara sayacı" onPress={() => router.push('/day')} />

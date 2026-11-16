@@ -27,12 +27,16 @@ import type { Routine, RoutineLog, Task } from '../database/types';
 import { dayKey } from './activityLogic';
 import { DAY_END_HOUR, replanDay } from './planner';
 import { snoozeTarget, type SnoozeOption } from './routineLogic';
-import { getTemplate } from './routineTemplates';
+import { getPack, getTemplate } from './routineTemplates';
 
 // ───────────────────────── Ekleme ve düzenleme ─────────────────────────
 
-/** Hazır örnekten ekler. Aynı örnek zaten aktifse yenisini oluşturmaz. */
-export async function addRoutineFromTemplate(db: SQLiteDatabase, templateId: string): Promise<Routine> {
+/** Hazır örnekten ekler. Aynı örnek zaten aktifse yenisini oluşturmaz. `at` verilirse sorulma saati o olur. */
+export async function addRoutineFromTemplate(
+  db: SQLiteDatabase,
+  templateId: string,
+  at?: { hour: number; minute: number }
+): Promise<Routine> {
   const t = getTemplate(templateId);
   if (!t) throw new Error('Bu örnek rutin bulunamadı.');
   const existing = (await listRoutines(db, 'ACTIVE')).find((r) => r.templateId === templateId);
@@ -42,10 +46,39 @@ export async function addRoutineFromTemplate(db: SQLiteDatabase, templateId: str
     category: t.category,
     estimatedDuration: t.estimatedDuration,
     cognitiveWeight: t.cognitiveWeight,
-    askHour: t.askHour,
-    askMinute: t.askMinute,
+    askHour: at?.hour ?? t.askHour,
+    askMinute: at?.minute ?? t.askMinute,
     templateId: t.id,
+    icon: t.icon,
   });
+}
+
+/** Paketteki tüm rutinleri ekler; zaten aktif olanlar atlanır. */
+export async function addRoutinePack(
+  db: SQLiteDatabase,
+  packId: string
+): Promise<{ added: number; skipped: number }> {
+  const pack = getPack(packId);
+  if (!pack) throw new Error('Bu paket bulunamadı.');
+  const active = new Set(
+    (await listRoutines(db, 'ACTIVE')).map((r) => r.templateId).filter((x): x is string => !!x)
+  );
+  let added = 0;
+  let skipped = 0;
+  for (const item of pack.items) {
+    if (active.has(item.templateId)) {
+      skipped += 1;
+      continue;
+    }
+    await addRoutineFromTemplate(
+      db,
+      item.templateId,
+      item.hour !== undefined ? { hour: item.hour, minute: item.minute ?? 0 } : undefined
+    );
+    active.add(item.templateId);
+    added += 1;
+  }
+  return { added, skipped };
 }
 
 export async function addCustomRoutine(db: SQLiteDatabase, input: NewRoutine): Promise<Routine> {

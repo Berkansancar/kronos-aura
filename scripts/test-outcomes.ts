@@ -237,7 +237,7 @@ check('bildirim metinlerinde yargı yok', r1.every((r) => !hasBannedWords(r.titl
 async function dbTests(): Promise<void> {
   const { db } = makeTestDb();
   await migrateDbIfNeeded(db);
-  check('şema sürümü 10', DATABASE_VERSION === 11);
+  check('şema sürümü 12', DATABASE_VERSION === 12);
   const tables = (await db.getAllAsync<{ name: string }>("SELECT name FROM sqlite_master WHERE type='table'")).map((t) => t.name);
   check('yeni tablolar var', ['TaskOutcome', 'Setting', 'DayEvent', 'SmokeLog'].every((t) => tables.includes(t)));
   await migrateDbIfNeeded(db);

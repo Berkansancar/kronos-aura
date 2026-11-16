@@ -13,6 +13,7 @@ import {
 import { colors, radius, spacing } from '../constants/theme';
 import type { CognitiveWeight, Routine, RoutineCategory } from '../database/types';
 import { CATEGORY_LABEL } from '../services/routineTemplates';
+import { ROUTINE_COLORS, ROUTINE_ICONS, routineColor, routineIcon } from '../services/routineLook';
 
 const DURATIONS = [5, 10, 15, 20, 30, 45, 60];
 const MINUTES = [0, 15, 30, 45];
@@ -30,6 +31,8 @@ export interface RoutineDraft {
   cognitiveWeight: CognitiveWeight;
   askHour: number;
   askMinute: number;
+  icon: string;
+  color: string;
 }
 
 interface Props {
@@ -49,6 +52,8 @@ export function RoutineEditor({ visible, routine, onClose, onSubmit }: Props) {
   const [weight, setWeight] = useState<CognitiveWeight>('LOW');
   const [hour, setHour] = useState(9);
   const [minute, setMinute] = useState(0);
+  const [icon, setIcon] = useState<string | null>(null);
+  const [color, setColor] = useState<string | null>(null);
 
   // Pencere her açıldığında alanlar rutinden (ya da varsayılandan) doldurulur.
   useEffect(() => {
@@ -59,6 +64,8 @@ export function RoutineEditor({ visible, routine, onClose, onSubmit }: Props) {
     setWeight(routine?.cognitiveWeight ?? 'LOW');
     setHour(routine?.askHour ?? 9);
     setMinute(routine?.askMinute ?? 0);
+    setIcon(routine?.icon ?? null);
+    setColor(routine?.color ?? null);
   }, [visible, routine]);
 
   const canSubmit = title.trim().length > 0;
@@ -71,8 +78,14 @@ export function RoutineEditor({ visible, routine, onClose, onSubmit }: Props) {
       cognitiveWeight: weight,
       askHour: hour,
       askMinute: minute,
+      icon: shownIcon,
+      color: shownColor,
     });
   };
+
+  // Seçim yapılmadıysa kategorinin varsayılanı gösterilir ve kaydedilir.
+  const shownIcon = routineIcon({ icon, category });
+  const shownColor = routineColor({ color, category });
 
   const hours = HOURS.includes(hour) ? HOURS : [...HOURS, hour].sort((a, b) => a - b);
   const durations = DURATIONS.includes(duration) ? DURATIONS : [...DURATIONS, duration].sort((a, b) => a - b);
@@ -94,6 +107,42 @@ export function RoutineEditor({ visible, routine, onClose, onSubmit }: Props) {
               style={styles.input}
               returnKeyType="done"
             />
+
+            <View style={[styles.preview, { borderColor: shownColor }]}>
+              <Text style={styles.previewIcon}>{shownIcon}</Text>
+              <Text style={[styles.previewText, { color: shownColor }]} numberOfLines={1}>
+                {title.trim() || 'Rutin adı'}
+              </Text>
+            </View>
+
+            <Text style={styles.label}>Simge</Text>
+            <View style={styles.wrap}>
+              {ROUTINE_ICONS.map((ic) => (
+                <Pressable
+                  key={ic}
+                  onPress={() => setIcon(ic)}
+                  style={[styles.iconBtn, shownIcon === ic && { borderColor: shownColor, backgroundColor: colors.surfaceAlt }]}
+                >
+                  <Text style={styles.iconText}>{ic}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={styles.label}>Renk</Text>
+            <View style={styles.wrap}>
+              {ROUTINE_COLORS.map((c) => (
+                <Pressable
+                  key={c.value}
+                  onPress={() => setColor(c.value)}
+                  accessibilityLabel={c.label}
+                  style={[
+                    styles.swatch,
+                    { backgroundColor: c.value },
+                    shownColor.toLowerCase() === c.value.toLowerCase() && styles.swatchOn,
+                  ]}
+                />
+              ))}
+            </View>
 
             <Text style={styles.label}>Kategori</Text>
             <View style={styles.wrap}>
@@ -198,6 +247,30 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   pillText: { color: colors.textMuted, fontSize: 13, fontWeight: '600' },
+  preview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    borderWidth: 1.5,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.surfaceAlt,
+  },
+  previewIcon: { fontSize: 26 },
+  previewText: { flex: 1, fontSize: 16, fontWeight: '700' },
+  iconBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconText: { fontSize: 22 },
+  swatch: { width: 34, height: 34, borderRadius: 17, borderWidth: 2, borderColor: 'transparent' },
+  swatchOn: { borderColor: colors.text },
   submit: {
     backgroundColor: colors.aura,
     borderRadius: radius.pill,

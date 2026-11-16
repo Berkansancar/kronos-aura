@@ -11,6 +11,7 @@ import { loadRoutineBriefs } from '../services/routineBriefs';
 import {
   addCustomRoutine,
   addRoutineFromTemplate,
+  addRoutinePack,
   changeRoutineDuration,
   changeRoutineTime,
   restoreRoutine,
@@ -19,7 +20,8 @@ import {
 import { formatAskTime, todayProgress } from '../services/routineLogic';
 import { refreshReminders } from '../services/reminderSync';
 import { askNotificationPermission, hasNotificationPermission } from '../services/routineReminders';
-import { CATEGORY_LABEL, ROUTINE_TEMPLATES } from '../services/routineTemplates';
+import { CATEGORY_LABEL, ROUTINE_PACKS, ROUTINE_TEMPLATES } from '../services/routineTemplates';
+import { routineColor, routineIcon } from '../services/routineLook';
 
 const CATEGORY_ORDER: RoutineCategory[] = ['SAGLIK', 'ZIHIN', 'ODAK', 'DUZEN'];
 
@@ -83,6 +85,18 @@ export default function RoutinesScreen() {
     run(async () => {
       await addRoutineFromTemplate(db, id);
       await withPermissionPrompt();
+    });
+
+  const addPack = (packId: string) =>
+    run(async () => {
+      const r = await addRoutinePack(db, packId);
+      await withPermissionPrompt();
+      Alert.alert(
+        r.added > 0 ? 'Paket eklendi' : 'Zaten ekli',
+        r.added > 0
+          ? `${r.added} rutin eklendi${r.skipped > 0 ? `, ${r.skipped} tanesi zaten listendeydi` : ''}. Saatleri istediğin zaman değiştirebilirsin.`
+          : 'Bu paketteki rutinlerin hepsi listende.'
+      );
     });
 
   const submitEditor = (draft: RoutineDraft) => {
@@ -177,10 +191,11 @@ export default function RoutinesScreen() {
             const s = b.stats;
             const label = suggestionLabel(b);
             return (
-              <View key={b.routine.id} style={styles.card}>
+              <View key={b.routine.id} style={[styles.card, { borderLeftWidth: 4, borderLeftColor: routineColor(b.routine) }]}>
                 <View style={styles.cardTop}>
+                  <Text style={styles.cardIcon}>{routineIcon(b.routine)}</Text>
                   <Text style={styles.cardTitle}>{b.routine.title}</Text>
-                  <Text style={styles.cardTime}>{formatAskTime(b.routine)}</Text>
+                  <Text style={[styles.cardTime, { color: routineColor(b.routine) }]}>{formatAskTime(b.routine)}</Text>
                 </View>
                 <Text style={styles.cardMeta}>
                   {b.routine.estimatedDuration} dk ·{' '}
@@ -220,6 +235,37 @@ export default function RoutinesScreen() {
           <Text style={styles.customBtnText}>+ Kendi rutinimi ekle</Text>
         </Pressable>
 
+        <Pressable onPress={() => router.push('/habits')} style={styles.calendarBtn}>
+          <Text style={styles.calendarBtnText}>📅 Alışkanlık takvimi ve ruh hali ›</Text>
+        </Pressable>
+        <Pressable onPress={() => router.push('/quiz')} style={styles.calendarBtn}>
+          <Text style={styles.calendarBtnText}>🧭 Rutin tarzı testi (sana uygun paketi bul) ›</Text>
+        </Pressable>
+
+        <Text style={styles.section}>Hazır paketler</Text>
+        {ROUTINE_PACKS.map((p) => {
+          const missing = p.items.filter((i) => !activeTemplateIds.has(i.templateId)).length;
+          return (
+            <View key={p.id} style={styles.template}>
+              <Text style={styles.packIcon}>{p.icon}</Text>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={styles.templateTitle}>{p.title}</Text>
+                <Text style={styles.templateWhy}>{p.about}</Text>
+                <Text style={styles.templateMeta}>{p.items.length} rutin</Text>
+              </View>
+              <Pressable
+                disabled={missing === 0 || busy}
+                onPress={() => addPack(p.id)}
+                style={[styles.addBtn, missing === 0 && styles.addBtnDone]}
+              >
+                <Text style={[styles.addBtnText, missing === 0 && { color: colors.textMuted }]}>
+                  {missing === 0 ? 'Eklendi' : 'Hepsini ekle'}
+                </Text>
+              </Pressable>
+            </View>
+          );
+        })}
+
         <Text style={styles.section}>Örnek rutinler</Text>
         {CATEGORY_ORDER.map((cat) => (
           <View key={cat} style={{ gap: spacing.sm }}>
@@ -228,6 +274,7 @@ export default function RoutinesScreen() {
               const added = activeTemplateIds.has(t.id);
               return (
                 <View key={t.id} style={styles.template}>
+                  <Text style={styles.packIcon}>{t.icon}</Text>
                   <View style={{ flex: 1, gap: 2 }}>
                     <Text style={styles.templateTitle}>{t.title}</Text>
                     <Text style={styles.templateMeta}>
@@ -326,6 +373,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md },
+  cardIcon: { fontSize: 22 },
   cardTitle: { color: colors.text, fontSize: 16, fontWeight: '700', flex: 1 },
   cardTime: { color: colors.aura, fontSize: 14, fontWeight: '800' },
   cardMeta: { color: colors.textMuted, fontSize: 12, lineHeight: 17 },
@@ -346,6 +394,16 @@ const styles = StyleSheet.create({
   suggestionBtnText: { color: colors.bg, fontSize: 13, fontWeight: '800' },
   actions: { flexDirection: 'row', gap: spacing.xl, marginTop: spacing.xs },
   action: { color: colors.kronos, fontSize: 13, fontWeight: '600' },
+  calendarBtn: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: 14,
+    paddingHorizontal: spacing.lg,
+  },
+  calendarBtnText: { color: colors.text, fontSize: 14, fontWeight: '700' },
+  packIcon: { fontSize: 26 },
   customBtn: {
     borderWidth: 1,
     borderColor: colors.aura,
