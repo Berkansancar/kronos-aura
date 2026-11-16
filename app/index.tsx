@@ -861,6 +861,7 @@ export default function HomeScreen() {
               onPress={() => router.push('/language')}
             />
             <HomeTile title="Alışkanlık takvimi" subtitle="Ay görünümü, seriler ve ruh hali" onPress={() => router.push('/habits')} />
+            <HomeTile title="Aylık karne" subtitle="Ayın tek sayfalık özeti ve önceki ayla kıyas" onPress={() => router.push('/monthly')} />
             <HomeTile title="Hedefler" subtitle={goalLine ?? 'Su, kalori, ekran, yatış, boş zaman'} onPress={() => router.push('/goals')} />
             <HomeTile title="İlerleme ve geçmiş" subtitle="Günlük çubuk grafikler, 7-30 gün" onPress={() => router.push('/history')} />
             <HomeTile title="Gün akışı" subtitle="Damgalar, süreler, sigara sayacı" onPress={() => router.push('/day')} />
