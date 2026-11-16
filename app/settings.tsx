@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { colors, radius, spacing } from '../constants/theme';
@@ -22,6 +23,8 @@ import {
   setFreeKey,
   setFreeProvider,
 } from '../services/ai/freeSettings';
+import { getLastBackup, makeBackupText, restoreFromText } from '../services/backup';
+import { backupStamp, inspectBackup } from '../services/backupLogic';
 import { refreshReminders } from '../services/reminderSync';
 import { KCAL_TARGET_MAX, KCAL_TARGET_MIN, WATER_GOALS, formatWater } from '../services/nutritionLogic';
 import { getKcalTarget, getWaterGoal, saveKcalTarget, setWaterGoal } from '../services/nutritionSettings';
@@ -51,6 +54,9 @@ export default function SettingsScreen() {
   const [freeSaved, setFreeSaved] = useState(false);
   const [freeBusy, setFreeBusy] = useState(false);
   const [freeMessage, setFreeMessage] = useState<{ text: string; ok: boolean } | null>(null);
+  const [lastBackup, setLastBackup] = useState<Date | null>(null);
+  const [dataBusy, setDataBusy] = useState(false);
+  const [dataMessage, setDataMessage] = useState<{ text: string; ok: boolean } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -59,6 +65,7 @@ export default function SettingsScreen() {
       setFreeSaved((await getFreeKey(fp)) !== null);
       setSaved((await getApiKey()) !== null);
       setModelState(await getModel());
+      setLastBackup(await getLastBackup(db));
       setReviewReminder(await getReviewReminderEnabled());
       setMorning(await getMorningSettings());
       setWaterGoalState(await getWaterGoal());
@@ -162,6 +169,93 @@ export default function SettingsScreen() {
   };
 
   const info = FREE_PROVIDERS[freeProvider];
+
+  /** Yedek metnini paylaşım ekranına verir: Gmail, Drive ya da Keep seçilerek kendi Google hesabına gider. */
+  const shareBackup = async () => {
+    setDataBusy(true);
+    setDataMessage(null);
+    try {
+      const text = await makeBackupText(db);
+      setLastBackup(new Date());
+      const kb = Math.round(text.length / 1024);
+      await Share.share({ message: text, title: 'Kronos & Aura yedeği' });
+      setDataMessage({
+        text:
+          kb > 700
+            ? `Yedek büyük (${kb} KB). Paylaşım ekranı açılmadıysa "Yedeği kopyala"yı kullan.`
+            : `Yedek hazırlandı (${kb} KB). Gmail'de kendine gönder ya da Drive/Keep'e kaydet.`,
+        ok: true,
+      });
+    } catch (e) {
+      setDataMessage({ text: `Yedek hazırlanamadı: ${e instanceof Error ? e.message : String(e)}`, ok: false });
+    } finally {
+      setDataBusy(false);
+    }
+  };
+
+  const copyBackup = async () => {
+    setDataBusy(true);
+    setDataMessage(null);
+    try {
+      const text = await makeBackupText(db);
+      await Clipboard.setStringAsync(text);
+      setLastBackup(new Date());
+      setDataMessage({ text: 'Yedek kopyalandı. Keep, Notlar ya da bir e-postaya yapıştırıp sakla.', ok: true });
+    } catch (e) {
+      setDataMessage({ text: `Kopyalanamadı: ${e instanceof Error ? e.message : String(e)}`, ok: false });
+    } finally {
+      setDataBusy(false);
+    }
+  };
+
+  const restoreFromClipboard = async () => {
+    setDataMessage(null);
+    let text = '';
+    try {
+      text = await Clipboard.getStringAsync();
+    } catch {
+      setDataMessage({ text: 'Pano okunamadı.', ok: false });
+      return;
+    }
+    const check = inspectBackup(text);
+    if (!check.ok) {
+      setDataMessage({ text: check.error, ok: false });
+      return;
+    }
+    const when = check.summary.exportedAt ? backupStamp(new Date(check.summary.exportedAt)) : 'tarihi bilinmiyor';
+    Alert.alert(
+      'Yedek geri yüklensin mi?',
+      `Yedek: ${when}\n${check.summary.lines.join('\n') || 'Kayıt yok'}\n\nŞu anki kayıtların silinip bunlarla değiştirilir. Bu geri alınamaz.`,
+      [
+        { text: 'Vazgeç', style: 'cancel' },
+        {
+          text: 'Geri yükle',
+          style: 'destructive',
+          onPress: async () => {
+            setDataBusy(true);
+            try {
+              const r = await restoreFromText(db, text);
+              if (!r.ok) {
+                setDataMessage({ text: r.error, ok: false });
+                return;
+              }
+              setWaterGoalState(await getWaterGoal());
+              const kt = await getKcalTarget();
+              setKcalInput(kt === null ? '' : String(kt));
+              setReviewReminder(await getReviewReminderEnabled());
+              setMorning(await getMorningSettings());
+              setLastBackup(await getLastBackup(db));
+              setDataMessage({ text: `Geri yüklendi (${r.summary.totalRows} kayıt). Ana ekrana dönünce her şey yenilenir.`, ok: true });
+            } catch (e) {
+              setDataMessage({ text: `Geri yüklenemedi: ${e instanceof Error ? e.message : String(e)}`, ok: false });
+            } finally {
+              setDataBusy(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -415,6 +509,36 @@ export default function SettingsScreen() {
             Hedefler ekranında kalori hedefini hesaplatabilir; yemek saati, ekran süresi, yatış saati ve hatırlatma hedefleri koyabilirsin ›
           </Text>
         </Pressable>
+
+        <View style={styles.sectionDivider} />
+        <Text style={styles.heading2}>Verilerim ve yedek</Text>
+        <Text style={styles.sub}>
+          Kayıtların yalnızca bu telefonda durur. Telefon değişir ya da uygulama silinirse gider; bu yüzden ara sıra
+          yedek al. {lastBackup ? `Son yedek: ${backupStamp(lastBackup)}.` : 'Henüz yedek almadın.'}
+        </Text>
+        <Pressable disabled={dataBusy} onPress={shareBackup} style={styles.primary}>
+          <Text style={styles.primaryText}>Yedeği Google hesabıma gönder</Text>
+        </Pressable>
+        <Text style={styles.switchText}>
+          Paylaşım ekranı açılır: Gmail'i seçip kendi adresine gönder, ya da Drive / Keep'e kaydet. Başka bir işlem
+          gerekmez; Google'a giriş yapman da istenmez, telefondaki hesabın kullanılır.
+        </Text>
+        <Pressable disabled={dataBusy} onPress={copyBackup} style={styles.secondary}>
+          <Text style={styles.secondaryText}>Yedeği kopyala</Text>
+        </Pressable>
+        <Pressable disabled={dataBusy} onPress={restoreFromClipboard} style={styles.secondary}>
+          <Text style={styles.secondaryText}>Panodan geri yükle</Text>
+        </Pressable>
+        <Text style={styles.switchText}>
+          Geri yüklemek için yedek metnini (Gmail, Drive ya da Keep'ten) tamamen kopyala, sonra "Panodan geri yükle"ye
+          bas. Önce neyin yükleneceğini gösterir, sen onaylamadan hiçbir şey değişmez. Yedekte görevler, rutinler, su,
+          yemek, sigara, gün akışı, uyku ve hedef ayarların bulunur. Yapay zekâ anahtarların ve koç sohbet geçmişi
+          bulunmaz; anahtarları yeniden girersin. Hedefler bölümündeki kilo ve boy da yedek metnindedir, o yüzden
+          metni başkasıyla paylaşma.
+        </Text>
+        {dataMessage && (
+          <Text style={[styles.message, { color: dataMessage.ok ? colors.aura : colors.danger }]}>{dataMessage.text}</Text>
+        )}
 
         <View style={styles.note}>
           <Text style={styles.noteTitle}>Bilmen gerekenler</Text>

@@ -61,6 +61,7 @@ npm run test:nutrition    su, yemek, kalori tahmini ve koç/gün sonu/haftalık 
 npm run test:goals        hedefler, kalori hesabı güvenlik sınırları, ilerleme, zaman dengesi, hatırlatmalar, 95 kontrol
 npm run test:outcomes     yaptım/yapmadım/yapamadım, iş saatleri, gün akışı, sigara sayacı, zaman analizi, 98 kontrol
 npm run test:history      ilerleme ve geçmiş (günlük seriler, ortalamalar, sebepler, veri toplama), 31 kontrol
+npm run test:backup       yedek ve geri yükleme (bozuk metin, eski sürüm, tek işlemlilik), 27 kontrol
 ```
 
 
@@ -284,6 +285,23 @@ günler / öncesi" kıyası en az 3 kayıtlı günle verilir, yargı içermez. A
 yapamadım** sayıları ve yapamadıkların sebepleri durur; sebep çoğunlukla iş vaktiyse Kronos görevleri "iş vaktinde
 yapılabilir" diye işaretlemeyi önerir. Veri `services/history.ts` içinde toplanır, hesap `services/historyLogic.ts`
 içindedir (veritabanı değişmedi).
+
+## Yedek ve geri yükleme (Ayarlar > Verilerim ve yedek)
+
+Kayıtlar yalnızca telefondadır; uygulama silinir ya da telefon değişirse giderler. **Yedeği Google hesabıma gönder**
+düğmesi yedeği tek bir metin olarak Android paylaşım ekranına verir: Gmail'de kendine gönder, ya da Drive / Keep'e
+kaydet. Uygulama Google'a giriş istemez ve internet hesabı tutmaz; telefondaki hesabın kullanılır. (Otomatik ve
+arka planda Google Drive eşitlemesi, Google Cloud'da OAuth ayarı ve uygulama imza kaydı gerektirir; şimdilik yok.)
+**Yedeği kopyala** aynı metni panoya koyar. **Panodan geri yükle** metni okur, neyin yükleneceğini gösterir,
+onay alır ve yükler.
+
+- Yedeğe giren: görevler, rutinler, zaman/su/yemek/sigara kayıtları, gün akışı, görev sonuçları, uyku, gün sonu
+  değerlendirmeleri, iş saati ve sigara sınırı ayarları, su/kalori/hedef/hatırlatma ayarları, kilo-boy bilgisi.
+- Yedeğe **girmeyen**: yapay zekâ API anahtarları (hiçbir koşulda) ve koç sohbet geçmişi.
+- Geri yükleme **tek işlemdir**: hata olursa (bozuk metin, uyumsuz sürüm, kopuk ilişki) eski kayıtlar olduğu gibi
+  kalır. Metne bir sağlama kodu konur; kısaltılmış ya da bozulmuş metin yüklenmez. Yedekte olmayan tablolara
+  dokunulmaz; eski sürümden alınmış yedekler yüklenir (eksik alanlar varsayılanla dolar), daha yeni sürümün
+  yedeği reddedilir. Mantık `services/backupLogic.ts` içindedir.
 
 ## Logo ve ikon
 
