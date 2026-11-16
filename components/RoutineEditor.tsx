@@ -14,6 +14,7 @@ import { colors, radius, spacing } from '../constants/theme';
 import type { CognitiveWeight, Routine, RoutineCategory } from '../database/types';
 import { CATEGORY_LABEL } from '../services/routineTemplates';
 import { ROUTINE_COLORS, ROUTINE_ICONS, routineColor, routineIcon } from '../services/routineLook';
+import { DAY_SHORT, DAYS_PRESETS, WEEK_ORDER, daysLabel, parseDays } from '../services/routineDaysLogic';
 
 const DURATIONS = [5, 10, 15, 20, 30, 45, 60];
 const MINUTES = [0, 15, 30, 45];
@@ -33,6 +34,8 @@ export interface RoutineDraft {
   askMinute: number;
   icon: string;
   color: string;
+  /** Yapılacağı günler (0 = Pazar); null her gün */
+  days: number[] | null;
 }
 
 interface Props {
@@ -54,6 +57,7 @@ export function RoutineEditor({ visible, routine, onClose, onSubmit }: Props) {
   const [minute, setMinute] = useState(0);
   const [icon, setIcon] = useState<string | null>(null);
   const [color, setColor] = useState<string | null>(null);
+  const [days, setDays] = useState<number[] | null>(null);
 
   // Pencere her açıldığında alanlar rutinden (ya da varsayılandan) doldurulur.
   useEffect(() => {
@@ -66,6 +70,7 @@ export function RoutineEditor({ visible, routine, onClose, onSubmit }: Props) {
     setMinute(routine?.askMinute ?? 0);
     setIcon(routine?.icon ?? null);
     setColor(routine?.color ?? null);
+    setDays(parseDays(routine?.days));
   }, [visible, routine]);
 
   const canSubmit = title.trim().length > 0;
@@ -80,12 +85,21 @@ export function RoutineEditor({ visible, routine, onClose, onSubmit }: Props) {
       askMinute: minute,
       icon: shownIcon,
       color: shownColor,
+      days,
     });
   };
 
   // Seçim yapılmadıysa kategorinin varsayılanı gösterilir ve kaydedilir.
   const shownIcon = routineIcon({ icon, category });
   const shownColor = routineColor({ color, category });
+
+  // En az bir gün seçili kalır; yedi günün hepsi "her gün" demektir.
+  const toggleDay = (d: number) => {
+    const current = days ?? [0, 1, 2, 3, 4, 5, 6];
+    const next = current.includes(d) ? current.filter((x) => x !== d) : [...current, d];
+    if (next.length === 0) return;
+    setDays(next.length === 7 ? null : [...next].sort((a, b) => a - b));
+  };
 
   const hours = HOURS.includes(hour) ? HOURS : [...HOURS, hour].sort((a, b) => a - b);
   const durations = DURATIONS.includes(duration) ? DURATIONS : [...DURATIONS, duration].sort((a, b) => a - b);
@@ -161,6 +175,32 @@ export function RoutineEditor({ visible, routine, onClose, onSubmit }: Props) {
               {minutes.map((m) => (
                 <Chip key={m} active={minute === m} onPress={() => setMinute(m)} label={`:${pad(m)}`} />
               ))}
+            </View>
+
+            <Text style={styles.label}>Hangi günler? ({daysLabel(days)})</Text>
+            <View style={styles.wrap}>
+              {DAYS_PRESETS.map((p) => (
+                <Chip
+                  key={p.id}
+                  active={daysLabel(p.days) === daysLabel(days)}
+                  onPress={() => setDays(p.days)}
+                  label={p.label}
+                />
+              ))}
+            </View>
+            <View style={styles.dayRow}>
+              {WEEK_ORDER.map((d) => {
+                const on = days === null || days.includes(d);
+                return (
+                  <Pressable
+                    key={d}
+                    onPress={() => toggleDay(d)}
+                    style={[styles.dayBtn, on && { backgroundColor: shownColor, borderColor: shownColor }]}
+                  >
+                    <Text style={[styles.dayText, on && { color: colors.bg }]}>{DAY_SHORT[d]}</Text>
+                  </Pressable>
+                );
+              })}
             </View>
 
             <Text style={styles.label}>Ne kadar sürer?</Text>
@@ -269,6 +309,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   iconText: { fontSize: 22 },
+  dayRow: { flexDirection: 'row', gap: 6 },
+  dayBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  dayText: { color: colors.textMuted, fontSize: 12, fontWeight: '700' },
   swatch: { width: 34, height: 34, borderRadius: 17, borderWidth: 2, borderColor: 'transparent' },
   swatchOn: { borderColor: colors.text },
   submit: {

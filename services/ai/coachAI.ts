@@ -30,6 +30,7 @@ const ROUTINE_STATE_TR = {
   ACCEPTED: 'bugün yapacağını söyledi (planda)',
   DONE: 'bugün yapıldı',
   SKIPPED: 'bugün yapmayacak',
+  OFF: 'bugün planlı değil',
 } as const;
 const ENERGY_TR = { HIGH: 'enerjik', EXHAUSTED: 'yorgun', DISTRACTED: 'dağınık' } as const;
 
@@ -65,7 +66,7 @@ export function describeSituation(ctx: CoachContext): string {
   }
 
   // Rutinler kullanıcının kendi eklediği veridir (görevler gibi); her zaman paylaşılır.
-  const routines = (ctx.routines ?? []).slice(0, 12);
+  const routines = (ctx.routines ?? []).filter((b) => b.state !== 'OFF').slice(0, 12);
   if (routines.length > 0) {
     lines.push('Günlük rutinler (kullanıcı kendi seçti; erteleme ya da bırakma bir kusur değildir):');
     for (const b of routines) {

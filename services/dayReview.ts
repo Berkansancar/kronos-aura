@@ -118,6 +118,7 @@ export async function gatherDayFacts(
     const own = dayLogs.filter((l) => l.routineId === r.id);
     // Gün bittiği için saat koşulu önemsiz: akşamın sonunda durumu sorarız
     const { state } = routineDayState(r, own, (id) => taskStatus.get(id) ?? null, endOfDay(day));
+    if (state === 'OFF') continue; // o gün planlı değildi
     if (state === 'DONE') routinesDone.push(r.title);
     else if (state === 'SKIPPED') routinesSkipped.push(r.title);
     else routinesOpen.push(r.title);

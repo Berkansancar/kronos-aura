@@ -16,6 +16,8 @@ export interface RoutineTemplate {
   why: string;
   /** Varsayılan simge (emoji) */
   icon: string;
+  /** Yalnızca bu günlerde yapılır (0 = Pazar); yoksa her gün */
+  days?: number[];
 }
 
 export const CATEGORY_LABEL: Record<RoutineCategory, string> = {
@@ -296,6 +298,7 @@ export const ROUTINE_TEMPLATES: RoutineTemplate[] = [
     askHour: 7,
     askMinute: 5,
     why: 'Minibüste de yapılır; güne sakin başlamanı sağlar.',
+    days: [1, 2, 3, 4, 5, 6],
   },
   {
     id: 'yolda-dil',
@@ -307,6 +310,56 @@ export const ROUTINE_TEMPLATES: RoutineTemplate[] = [
     askHour: 7,
     askMinute: 10,
     why: 'Yol süresi, küçük ama düzenli bir öğrenme alanına dönüşür.',
+    days: [1, 2, 3, 4, 5, 6],
+  },
+  // Pazar (boş gün)
+  {
+    id: 'pazar-plan',
+    icon: '🗓️',
+    title: 'Pazar: haftayı planla',
+    category: 'ODAK',
+    estimatedDuration: 20,
+    cognitiveWeight: 'MEDIUM',
+    askHour: 10,
+    askMinute: 0,
+    days: [0],
+    why: 'Pazar sabahı yapılan 20 dakikalık plan, haftanın geri kalanını hafifletir.',
+  },
+  {
+    id: 'pazar-yuruyus',
+    icon: '🥾',
+    title: 'Pazar: uzun yürüyüş',
+    category: 'SAGLIK',
+    estimatedDuration: 45,
+    cognitiveWeight: 'LOW',
+    askHour: 11,
+    askMinute: 0,
+    days: [0],
+    why: 'Boş günün en güzel yatırımı: açık hava ve hareket.',
+  },
+  {
+    id: 'pazar-ev',
+    icon: '🧺',
+    title: 'Pazar: ev işleri ve çamaşır',
+    category: 'DUZEN',
+    estimatedDuration: 60,
+    cognitiveWeight: 'LOW',
+    askHour: 13,
+    askMinute: 0,
+    days: [0],
+    why: 'Haftanın birikenlerini tek seferde toplamak, hafta içini rahatlatır.',
+  },
+  {
+    id: 'pazar-sevdikler',
+    icon: '☕',
+    title: 'Pazar: sevdiklerinle bir kahve',
+    category: 'ZIHIN',
+    estimatedDuration: 60,
+    cognitiveWeight: 'LOW',
+    askHour: 15,
+    askMinute: 30,
+    days: [0],
+    why: 'Birlikte geçirilen vakit, enerjini yeniler.',
   },
 ];
 
@@ -383,6 +436,18 @@ export const ROUTINE_PACKS: RoutinePack[] = [
       { templateId: 'esneme', hour: 18, minute: 20 },
       { templateId: 'egzersiz', hour: 18, minute: 45 },
       { templateId: 'evi-toparla', hour: 19, minute: 15 },
+    ],
+  },
+  {
+    id: 'pazar',
+    title: 'Pazar: boş gün',
+    icon: '🌿',
+    about: 'İşin olmadığı günü hem dinlendiren hem toparlayan küçük bir düzen. Yalnızca Pazar günleri sorulur.',
+    items: [
+      { templateId: 'pazar-plan', hour: 10, minute: 0 },
+      { templateId: 'pazar-yuruyus', hour: 11, minute: 0 },
+      { templateId: 'pazar-ev', hour: 13, minute: 0 },
+      { templateId: 'pazar-sevdikler', hour: 15, minute: 30 },
     ],
   },
 ];

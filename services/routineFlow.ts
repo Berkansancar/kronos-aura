@@ -27,6 +27,7 @@ import type { Routine, RoutineLog, Task } from '../database/types';
 import { dayKey } from './activityLogic';
 import { DAY_END_HOUR, replanDay } from './planner';
 import { snoozeTarget, type SnoozeOption } from './routineLogic';
+import { serializeDays } from './routineDaysLogic';
 import { getPack, getTemplate } from './routineTemplates';
 
 // ───────────────────────── Ekleme ve düzenleme ─────────────────────────
@@ -50,6 +51,7 @@ export async function addRoutineFromTemplate(
     askMinute: at?.minute ?? t.askMinute,
     templateId: t.id,
     icon: t.icon,
+    days: serializeDays(t.days ?? null),
   });
 }
 

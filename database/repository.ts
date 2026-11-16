@@ -1,4 +1,5 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
+import { parseDays, serializeDays } from '../services/routineDaysLogic';
 import { newId } from './ids';
 import type {
   ChatMessage,
@@ -466,6 +467,11 @@ export async function getTask(db: SQLiteDatabase, id: string): Promise<Task | nu
 
 // ───────────────────────── Rutinler ─────────────────────────
 
+/** Gün metnini temizler: geçersiz, boş ya da yedi günün hepsi null olur. */
+function normalizeDays(text: string | null | undefined): string | null {
+  return serializeDays(parseDays(text));
+}
+
 export interface NewRoutine {
   title: string;
   category: RoutineCategory;
@@ -476,6 +482,8 @@ export interface NewRoutine {
   templateId?: string | null;
   icon?: string | null;
   color?: string | null;
+  /** "1,2,5" (0 = Pazar); boş ya da yedi günün hepsi: her gün */
+  days?: string | null;
 }
 
 export async function createRoutine(db: SQLiteDatabase, input: NewRoutine): Promise<Routine> {
@@ -499,11 +507,12 @@ export async function createRoutine(db: SQLiteDatabase, input: NewRoutine): Prom
     templateId: input.templateId ?? null,
     icon: input.icon ?? null,
     color: input.color ?? null,
+    days: normalizeDays(input.days),
   };
   await db.runAsync(
     `INSERT INTO Routine (id, title, category, estimatedDuration, cognitiveWeight, askHour, askMinute,
-                          status, createdAt, retiredAt, templateId, icon, color)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                          status, createdAt, retiredAt, templateId, icon, color, days)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       routine.id,
       routine.title,
@@ -518,6 +527,7 @@ export async function createRoutine(db: SQLiteDatabase, input: NewRoutine): Prom
       routine.templateId,
       routine.icon,
       routine.color,
+      routine.days,
     ]
   );
   return routine;
@@ -543,7 +553,7 @@ export async function updateRoutine(
   patch: Partial<
     Pick<
       Routine,
-      'title' | 'category' | 'estimatedDuration' | 'cognitiveWeight' | 'askHour' | 'askMinute' | 'icon' | 'color'
+      'title' | 'category' | 'estimatedDuration' | 'cognitiveWeight' | 'askHour' | 'askMinute' | 'icon' | 'color' | 'days'
     >
   >
 ): Promise<void> {
@@ -557,7 +567,7 @@ export async function updateRoutine(
   }
   await db.runAsync(
     `UPDATE Routine SET title = ?, category = ?, estimatedDuration = ?, cognitiveWeight = ?,
-                        askHour = ?, askMinute = ?, icon = ?, color = ? WHERE id = ?`,
+                        askHour = ?, askMinute = ?, icon = ?, color = ?, days = ? WHERE id = ?`,
     [
       title,
       next.category,
@@ -567,6 +577,7 @@ export async function updateRoutine(
       next.askMinute,
       next.icon ?? null,
       next.color ?? null,
+      normalizeDays(next.days),
       id,
     ]
   );

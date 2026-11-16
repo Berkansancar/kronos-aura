@@ -7,6 +7,7 @@
  */
 import type { MoodLog, Routine, RoutineLog } from '../database/types';
 import { dayKey, parseDayKey } from './activityLogic';
+import { isRoutineDay } from './routineDaysLogic';
 
 const MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 export const WEEKDAY_SHORT = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
@@ -127,7 +128,6 @@ export function buildMonth(
 ): { weeks: (CalendarCell | null)[][]; doneDays: number; activeDays: number } {
   const done = doneByDay(logs, routineId);
   const moodByDay = new Map(moods.map((m) => [m.day, m.mood as number]));
-  const total = routineId ? 1 : routines.length;
   const today = dayKey(now);
   let doneDays = 0;
   let activeDays = 0;
@@ -137,6 +137,12 @@ export function buildMonth(
       const ids = done.get(day);
       const n = ids ? (routineId ? ids.size : [...ids].filter((id) => routines.some((r) => r.id === id)).length) : 0;
       const isFuture = day > today;
+      // O gün planlı rutin sayısı (belirli günlere bağlı rutinler yalnız o günlerde sayılır); yapılan fazlaysa onu al
+      const date = parseDayKey(day);
+      const scheduled = routineId
+        ? 1
+        : routines.filter((r) => isRoutineDay(r, date)).length;
+      const total = Math.max(scheduled, n);
       if (!isFuture) activeDays += 1;
       if (n > 0) doneDays += 1;
       return {

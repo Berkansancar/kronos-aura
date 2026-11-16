@@ -233,7 +233,7 @@ CREATE TABLE IF NOT EXISTS SleepLog (
 );
 `;
 
-/** v12: rutine simge ve renk (isteğe bağlı) + günlük ruh hali kaydı. */
+/** v12: rutine simge, renk ve günler (isteğe bağlı) + günlük ruh hali kaydı. */
 const CREATE_TABLES_V12 = `
 CREATE TABLE IF NOT EXISTS MoodLog (
   day       TEXT PRIMARY KEY NOT NULL,
@@ -244,6 +244,8 @@ CREATE TABLE IF NOT EXISTS MoodLog (
 `;
 const ADD_ROUTINE_ICON = `ALTER TABLE Routine ADD COLUMN icon TEXT;`;
 const ADD_ROUTINE_COLOR = `ALTER TABLE Routine ADD COLUMN color TEXT;`;
+/** Hangi günler yapılır: "1,2,3" (0 = Pazar); boş = her gün */
+const ADD_ROUTINE_DAYS = `ALTER TABLE Routine ADD COLUMN days TEXT;`;
 
 /** Sütun ekleme tekrar çalıştırılırsa hata verir; bu yüzden önce var mı diye bakılır. */
 const ADD_TASK_ROUTINE_ID = `
@@ -336,6 +338,7 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {
     await db.execAsync(CREATE_TABLES_V12);
     if (!(await hasColumn(db, 'Routine', 'icon'))) await db.execAsync(ADD_ROUTINE_ICON);
     if (!(await hasColumn(db, 'Routine', 'color'))) await db.execAsync(ADD_ROUTINE_COLOR);
+    if (!(await hasColumn(db, 'Routine', 'days'))) await db.execAsync(ADD_ROUTINE_DAYS);
     current = 12;
   }
 

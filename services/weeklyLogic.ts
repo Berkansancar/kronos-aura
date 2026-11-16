@@ -4,7 +4,7 @@
  * Kıyaslar yalnızca bilgi içindir: "az yaptın" gibi bir cümle kurulmaz.
  */
 import type { EnergyState } from '../database/types';
-import { formatSteps } from './activityLogic';
+import { formatSteps, parseDayKey } from './activityLogic';
 import { formatDuration } from './format';
 import { DEFAULT_WATER_GOAL, formatKcal, formatWater } from './nutritionLogic';
 
@@ -31,6 +31,8 @@ export interface WeekRoutineInput {
   createdDay: string;
   /** İki haftalık pencerede yapıldığı günler */
   doneDays: string[];
+  /** Yapılacağı hafta günleri (0 = Pazar); yoksa ya da null her gün. Planlı olmayan günler "şans" sayılmaz. */
+  days?: number[] | null;
 }
 
 export interface WeekFacts {
@@ -143,6 +145,11 @@ function avg(values: number[], minCount: number): number | null {
   return values.length >= minCount ? Math.round(values.reduce((a, b) => a + b, 0) / values.length) : null;
 }
 
+/** Rutin bu gün planlı mı? (gün anahtarı yyyy-mm-dd) */
+function scheduledOn(r: WeekRoutineInput, key: string): boolean {
+  return !r.days || r.days.length === 0 || r.days.includes(parseDayKey(key).getDay());
+}
+
 export function totalsOf(
   days: WeekDay[],
   routines: WeekRoutineInput[],
@@ -158,6 +165,8 @@ export function totalsOf(
       const done = r.doneDays.includes(k);
       if (done) routinesDone += 1;
       if (k < r.createdDay) continue;
+      // Planlı olmayan gün yapılmadıysa şansa katılmaz
+      if (!done && !scheduledOn(r, k)) continue;
       // Henüz bitmemiş son gün, yapılmadıysa şansa katılmaz (sabah bakınca oran düşmesin)
       if (k === last && !countEndDay && !done) continue;
       routineChances += 1;
@@ -202,6 +211,7 @@ function routineRows(routines: WeekRoutineInput[], days: WeekDay[], countEndDay:
         const d = r.doneDays.includes(k);
         if (d) done += 1;
         if (k < r.createdDay) continue;
+        if (!d && !scheduledOn(r, k)) continue;
         if (k === last && !countEndDay && !d) continue;
         chances += 1;
       }

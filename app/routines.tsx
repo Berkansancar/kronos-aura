@@ -22,6 +22,7 @@ import { refreshReminders } from '../services/reminderSync';
 import { askNotificationPermission, hasNotificationPermission } from '../services/routineReminders';
 import { CATEGORY_LABEL, ROUTINE_PACKS, ROUTINE_TEMPLATES } from '../services/routineTemplates';
 import { routineColor, routineIcon } from '../services/routineLook';
+import { daysLabel, routineDaysLabel, serializeDays } from '../services/routineDaysLogic';
 
 const CATEGORY_ORDER: RoutineCategory[] = ['SAGLIK', 'ZIHIN', 'ODAK', 'DUZEN'];
 
@@ -103,10 +104,11 @@ export default function RoutinesScreen() {
     const editing = editor.routine;
     setEditor({ open: false, routine: null });
     run(async () => {
+      const input = { ...draft, days: serializeDays(draft.days) };
       if (editing) {
-        await updateRoutine(db, editing.id, draft);
+        await updateRoutine(db, editing.id, input);
       } else {
-        await addCustomRoutine(db, draft);
+        await addCustomRoutine(db, input);
         await withPermissionPrompt();
       }
     });
@@ -198,12 +200,13 @@ export default function RoutinesScreen() {
                   <Text style={[styles.cardTime, { color: routineColor(b.routine) }]}>{formatAskTime(b.routine)}</Text>
                 </View>
                 <Text style={styles.cardMeta}>
-                  {b.routine.estimatedDuration} dk ·{' '}
+                  {routineDaysLabel(b.routine)} · {b.routine.estimatedDuration} dk ·{' '}
                   {s.closedDays > 0
                     ? `son 14 günde ${s.doneDays}/${s.closedDays} gün yaptın`
                     : 'henüz veri yok'}
                   {s.streak >= 2 ? ` · ${s.streak} gün seri` : ''}
                 </Text>
+                {b.state === 'OFF' && <Text style={styles.cardMeta}>Bugün planlı değil, sorulmaz.</Text>}
                 {b.suggestion && (
                   <View style={styles.suggestion}>
                     <Text style={styles.suggestionText}>{b.suggestion.text}</Text>
@@ -279,7 +282,7 @@ export default function RoutinesScreen() {
                     <Text style={styles.templateTitle}>{t.title}</Text>
                     <Text style={styles.templateMeta}>
                       {String(t.askHour).padStart(2, '0')}:{String(t.askMinute).padStart(2, '0')} ·{' '}
-                      {t.estimatedDuration} dk
+                      {t.estimatedDuration} dk{t.days ? ` · ${daysLabel(t.days)}` : ''}
                     </Text>
                     <Text style={styles.templateWhy}>{t.why}</Text>
                   </View>

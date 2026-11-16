@@ -159,7 +159,7 @@ export function buildMorningBrief(f: MorningFacts): MorningBrief {
   const top = pickTopTask(f.tasks, f.hardDay);
 
   const routinesOpen = f.routines
-    .filter((r) => r.state !== 'DONE' && r.state !== 'SKIPPED')
+    .filter((r) => r.state !== 'DONE' && r.state !== 'SKIPPED' && r.state !== 'OFF')
     .sort((a, b) => a.time.localeCompare(b.time));
   const routinesDone = f.routines.filter((r) => r.state === 'DONE').length;
 

@@ -127,6 +127,8 @@ export interface Routine {
   icon: string | null;
   /** Seçilen renk (#rrggbb); yoksa kategorinin varsayılanı gösterilir */
   color: string | null;
+  /** Yapılacağı günler, "1,2,5" (0 = Pazar); boş (null) her gün demektir */
+  days: string | null;
 }
 
 // ───────────────────────── Ruh hali ─────────────────────────
@@ -161,7 +163,8 @@ export interface RoutineLog {
 }
 
 /** Bir rutinin bugünkü durumu. */
-export type RoutineDayState = 'WAITING' | 'DUE' | 'SNOOZED' | 'ACCEPTED' | 'DONE' | 'SKIPPED';
+/** OFF: rutin bugün planlı değil (belirli günlere bağlanmış) */
+export type RoutineDayState = 'WAITING' | 'DUE' | 'SNOOZED' | 'ACCEPTED' | 'DONE' | 'SKIPPED' | 'OFF';
 
 export interface RoutineStats {
   /** Cevap verilen (kapanmış) gün sayısı */

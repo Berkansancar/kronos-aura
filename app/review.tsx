@@ -38,6 +38,7 @@ import { formatDayTitle, formatDuration } from '../services/format';
 import { addTask } from '../services/taskFlow';
 import { refreshReminders } from '../services/reminderSync';
 import { retireRoutine } from '../services/routineFlow';
+import { isRoutineDay } from '../services/routineDaysLogic';
 import { formatAskTime } from '../services/routineLogic';
 import { askNotificationPermission, hasNotificationPermission } from '../services/routineReminders';
 
@@ -220,6 +221,9 @@ export default function ReviewScreen() {
   const reviewDay = reviewDayOf(now);
   const tomorrowTitle = formatDayTitle(new Date(reviewDay.getFullYear(), reviewDay.getMonth(), reviewDay.getDate() + 1));
   const existing = new Set(routines.map((r) => norm(r.title)));
+  // Belirli günlere bağlı rutinler yalnızca o gün için sorulur
+  const tomorrowDate = new Date(reviewDay.getFullYear(), reviewDay.getMonth(), reviewDay.getDate() + 1);
+  const tomorrowRoutines = routines.filter((r) => isRoutineDay(r, tomorrowDate));
   const ideas = review?.payload.ideas ?? [];
   const freshIdeas = ideas.filter((i) => !existing.has(norm(i.title)));
 
@@ -350,14 +354,16 @@ export default function ReviewScreen() {
             )}
 
             <Text style={styles.section}>Yarın ({tomorrowTitle}) için rutinlerin</Text>
-            {routines.length === 0 ? (
+            {tomorrowRoutines.length === 0 ? (
               <View style={styles.card}>
                 <Text style={styles.cardText}>
-                  Henüz rutinin yok. Aşağıdaki fikirlerden ekleyebilir ya da Rutinlerim sayfasından seçebilirsin.
+                  {routines.length === 0
+                    ? 'Henüz rutinin yok. Aşağıdaki fikirlerden ekleyebilir ya da Rutinlerim sayfasından seçebilirsin.'
+                    : 'Yarın için planlı rutinin yok. İstediğin gün Rutinlerim sayfasından günlerini değiştirebilirsin.'}
                 </Text>
               </View>
             ) : (
-              routines.map((r) => {
+              tomorrowRoutines.map((r) => {
                 const a = answers.get(r.id);
                 return (
                   <View key={r.id} style={styles.card}>
@@ -392,7 +398,7 @@ export default function ReviewScreen() {
                 );
               })
             )}
-            {routines.length > 0 && (
+            {tomorrowRoutines.length > 0 && (
               <Text style={styles.hint}>
                 "Yarın yapacağım" dediklerini sabah plana yerleştiririm; cevap vermediklerini her zamanki
                 saatinde yine sorarım.

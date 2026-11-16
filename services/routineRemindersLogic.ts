@@ -6,6 +6,7 @@
  */
 import type { RoutineBrief } from '../database/types';
 import { dayKey } from './activityLogic';
+import { isRoutineDay } from './routineDaysLogic';
 
 export interface PlannedReminder {
   /** Bildirim kimliği: aynı rutin + gün için tekil */
@@ -104,6 +105,8 @@ export function planReminders(
     for (let d = 0; d < days; d += 1) {
       const at = new Date(now.getFullYear(), now.getMonth(), now.getDate() + d, r.askHour, r.askMinute);
       if (at.getTime() <= now.getTime()) continue;
+      // Belirli günlere bağlı rutin, planlı olmayan günde sorulmaz
+      if (!isRoutineDay(r, at)) continue;
       // Bugün zaten cevap verilmiş ya da kapanmışsa bugünün bildirimi gönderilmez
       if (d === 0 && (b.state === 'DONE' || b.state === 'SKIPPED' || b.state === 'ACCEPTED')) continue;
       // Yarın için zaten cevap verildiyse yarın bir daha sorulmaz

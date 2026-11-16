@@ -1,5 +1,6 @@
 /** Haftalık özet için veriyi veritabanından toplar. Mantık: services/weeklyLogic.ts */
 import type { SQLiteDatabase } from 'expo-sqlite';
+import { parseDays } from './routineDaysLogic';
 import {
   getOrCreateUser,
   listDailyStats,
@@ -114,6 +115,7 @@ export async function gatherWeekFacts(
       title: r.title,
       createdDay: dayKey(new Date(r.createdAt)),
       doneDays: [...(doneSets.get(r.id) ?? [])],
+      days: parseDays(r.days),
     })),
     energy,
     driftMinutes,

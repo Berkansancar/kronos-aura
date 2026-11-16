@@ -67,9 +67,9 @@ export const STYLE_QUIZ: QuizQuestion[] = [
     id: 'bosgun',
     text: 'Boş bir gün (ör. Pazar) nasıl olsun?',
     options: [
-      { label: 'Dışarıda, hareketli', points: { hareket: 2 } },
-      { label: 'Evde, dinlenerek', points: { 'kendine-bakim': 2, aksam: 1 } },
-      { label: 'Planlı: işleri toparlamak', points: { aksam: 1, yolda: 1 } },
+      { label: 'Dışarıda, hareketli', points: { hareket: 2, pazar: 1 } },
+      { label: 'Evde, dinlenerek', points: { 'kendine-bakim': 2, aksam: 1, pazar: 1 } },
+      { label: 'Planlı: işleri toparlamak', points: { aksam: 1, yolda: 1, pazar: 2 } },
     ],
   },
 ];
@@ -91,6 +91,10 @@ export const STYLE_RESULT: Record<string, { title: string; text: string }> = {
   'kendine-bakim': {
     title: 'Kendine zaman ayıran',
     text: 'Hafif ve keyifli adımlar seni motive ediyor. Kendine ayırdığın küçük anlar enerjini yeniler.',
+  },
+  pazar: {
+    title: 'Boş günü değerlendiren',
+    text: 'Boş günlerde hem dinlenmek hem toparlanmak istiyorsun. Pazar için küçük bir düzen sana iyi gelir.',
   },
   hareket: {
     title: 'Hareketle açılan',

@@ -67,6 +67,7 @@ npm run test:commute      yolda yapılabilir işler, günün özet satırı, yed
 npm run test:work         haftalık iş programı (Cmt yarım gün, Pazar boş), planlayıcı, hatırlatma, boş gün planı, 43 kontrol
 npm run test:guide        gün rehberi (iş günü/Cumartesi/Pazar çizelgesi, öneriler, şimdi-sıradaki), 38 kontrol
 npm run test:habits       şablon paketleri, simge/renk, alışkanlık takvimi, ruh hali, rutin tarzı testi, veritabanı v12, 119 kontrol
+npm run test:days         rutinleri belirli günlere bağlama (Pazar'a özel, hafta içi, seri, hatırlatma, haftalık özet, takvim), 57 kontrol
 npm run test:weekplan     hafta planı (güne ayırma, kapasite, otomatik dağıtım, veritabanı v11), 41 kontrol
 npm run test:game         oyunlaştırma (XP, seviye, altın, seri, rozet, ödül, veritabanından türetme, yedek), 62 kontrol
 npm run test:language     dil öğrenme (uygulama süresi, kalem-kağıt, hedef, geçmiş, gün analizi, yedek, veritabanı v10), 52 kontrol
@@ -420,7 +421,9 @@ Saatleri sen verdin; uygulama günü saat saat yönlendirir. Ana ekranın üstü
 - **Gün sonu değerlendirmesi**: seçilen ruh hali değerlendirmeye ve kopyala-yapıştır özetine girer; notun hiçbir yere gitmez.
 - **Rutin tarzı testi** (Rutinlerim > Rutin tarzı testi): altı soru, sana uygun iki paket önerir.
 - **Günün küçük ipucu**: takvim ekranının üstünde, her gün farklı (30 ipucu).
-- Yedeğe `MoodLog` tablosu ve rutin simge/renkleri dahildir.
+- **Günlere bağlı rutinler** (Rutinlerim > Düzenle > Hangi günler?): her gün, iş günleri (Pzt–Cmt), hafta içi, hafta sonu, yalnız Pazar ya da tek tek günler. Planlı olmayan günde rutin sorulmaz, bildirim gitmez, ana ekran ve sabah brifinginde görünmez; gün sonu değerlendirmesinde "açık kalan" sayılmaz; haftalık özette o gün "yapma şansı" sayılmaz. Seri yalnızca planlı günlere göre sayılır (haftalık bir rutinin serisi üst üste Pazarlardır). Gün sonu ekranında "yarın" listesi de yalnızca yarın planlı rutinleri gösterir.
+- **Pazar paketi** ("Pazar: boş gün"): haftayı planla, uzun yürüyüş, ev işleri ve çamaşır, sevdiklerinle bir kahve; hepsi yalnızca Pazar günleri sorulur. "Yolda" şablonları (nefes, dil çalışması) Pzt–Cmt günlerine bağlıdır.
+- Yedeğe `MoodLog` tablosu ve rutin simge/renk/günleri dahildir.
 
 ## Logo ve ikon
 

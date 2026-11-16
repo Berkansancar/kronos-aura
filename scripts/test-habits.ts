@@ -64,6 +64,7 @@ const routine = (over: Partial<Routine> = {}): Routine => ({
   templateId: null,
   icon: null,
   color: null,
+  days: null,
   ...over,
 });
 let seq = 0;
@@ -88,8 +89,8 @@ async function main(): Promise<void> {
   const ids = ROUTINE_TEMPLATES.map((t) => t.id);
   check('şablon id\'leri benzersiz', new Set(ids).size === ids.length);
   check('her şablonun simgesi, saati ve nedeni var', ROUTINE_TEMPLATES.every((t) => t.icon.length > 0 && t.askHour >= 0 && t.askHour <= 23 && t.askMinute >= 0 && t.askMinute <= 59 && t.why.length > 5));
-  check('şablonlar en az 24', ROUTINE_TEMPLATES.length >= 24);
-  check('beş paket, benzersiz id', ROUTINE_PACKS.length === 5 && new Set(ROUTINE_PACKS.map((p) => p.id)).size === 5);
+  check('şablonlar en az 28', ROUTINE_TEMPLATES.length >= 28);
+  check('altı paket, benzersiz id', ROUTINE_PACKS.length === 6 && new Set(ROUTINE_PACKS.map((p) => p.id)).size === 6);
   check('paketlerdeki her şablon var', ROUTINE_PACKS.every((p) => p.items.every((i) => getTemplate(i.templateId))));
   check('paket içinde aynı şablon iki kez yok', ROUTINE_PACKS.every((p) => new Set(p.items.map((i) => i.templateId)).size === p.items.length));
   check('paket saatleri geçerli', ROUTINE_PACKS.every((p) => p.items.every((i) => (i.hour ?? 0) >= 0 && (i.hour ?? 0) <= 23 && (i.minute ?? 0) >= 0 && (i.minute ?? 0) < 60)));
@@ -114,13 +115,13 @@ async function main(): Promise<void> {
   // v11'den yükseltme: eski rutin korunur, simge/renk boş
   const old = makeTestDb();
   await migrateDbIfNeeded(old.db);
-  old.raw.exec('ALTER TABLE Routine DROP COLUMN icon; ALTER TABLE Routine DROP COLUMN color; DROP TABLE MoodLog; PRAGMA user_version = 11;');
+  old.raw.exec('ALTER TABLE Routine DROP COLUMN icon; ALTER TABLE Routine DROP COLUMN color; ALTER TABLE Routine DROP COLUMN days; DROP TABLE MoodLog; PRAGMA user_version = 11;');
   old.raw
     .prepare("INSERT INTO Routine (id,title,category,estimatedDuration,cognitiveWeight,askHour,askMinute,status,createdAt) VALUES ('e1','Eski','ZIHIN',10,'LOW',9,0,'ACTIVE','2026-10-01T10:00:00.000Z')")
     .run();
   await migrateDbIfNeeded(old.db);
   const upgraded = await listRoutines(old.db, 'ACTIVE');
-  check('v11 → v12: rutin korunur, simge ve renk boş', upgraded.length === 1 && upgraded[0].title === 'Eski' && upgraded[0].icon === null && upgraded[0].color === null);
+  check('v11 → v12: rutin korunur, simge, renk ve günler boş', upgraded.length === 1 && upgraded[0].title === 'Eski' && upgraded[0].icon === null && upgraded[0].color === null && upgraded[0].days === null);
   await migrateDbIfNeeded(old.db);
   check('yükseltme tekrar çalışırsa hata vermez', (old.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version === 12);
 

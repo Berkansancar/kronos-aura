@@ -69,6 +69,7 @@ const routine = (over: Partial<Routine> = {}): Routine => ({
   templateId: null,
   icon: null,
   color: null,
+  days: null,
   ...over,
 });
 let logSeq = 0;

@@ -14,6 +14,7 @@ import type {
   TaskStatus,
 } from '../database/types';
 import { dayKey } from './activityLogic';
+import { isRoutineDay } from './routineDaysLogic';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -52,6 +53,8 @@ export function routineDayState(
   });
 
   if (todayLogs.some((l) => l.outcome === 'DONE')) return { state: 'DONE', snoozeUntil: null };
+  // Belirli günlere bağlı rutin, planlı olmayan günde sorulmaz ve hiçbir sayıma girmez
+  if (!isRoutineDay(routine, now)) return { state: 'OFF', snoozeUntil: null };
   const last = todayLogs[todayLogs.length - 1];
   if (!last) return waitingOrDue();
 
@@ -179,13 +182,19 @@ export function computeRoutineStats(
   }
 
   // Seri: bugünden (yapıldıysa) ya da dünden başlayarak üst üste yapılan günler.
+  // Rutin belirli günlere bağlıysa planlı olmayan günler seriyi bozmaz ve sayılmaz.
   const doneSet = new Set<string>();
   for (const l of logs) if (l.routineId === routine.id && l.outcome === 'DONE') doneSet.add(l.day);
   let streak = 0;
-  let cursor = doneSet.has(today) ? 0 : 1;
-  while (cursor < 365 && doneSet.has(dayKey(addDays(now, -cursor)))) {
-    streak += 1;
-    cursor += 1;
+  for (let cursor = 0; cursor < 365; cursor += 1) {
+    const d = addDays(now, -cursor);
+    if (doneSet.has(dayKey(d))) {
+      streak += 1;
+      continue;
+    }
+    if (!isRoutineDay(routine, d)) continue; // planlı olmayan gün: atla
+    if (cursor === 0) continue; // bugün henüz bitmedi
+    break;
   }
 
   let bestHour: number | null = null;
@@ -290,6 +299,7 @@ export function todayProgress(briefs: RoutineBrief[]): { done: number; open: num
   let open = 0;
   let skipped = 0;
   for (const b of briefs) {
+    if (b.state === 'OFF') continue; // bugün planlı değil
     if (b.state === 'DONE') done += 1;
     else if (b.state === 'SKIPPED') skipped += 1;
     else open += 1;
