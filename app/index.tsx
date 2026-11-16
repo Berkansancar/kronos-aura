@@ -93,6 +93,8 @@ import {
   restoreTask,
   startTask,
   toggleWorkOk,
+  undoOutcome,
+  updateTaskDetails,
 } from '../services/taskFlow';
 
 const STATUS_RANK: Record<Task['status'], number> = {
@@ -130,6 +132,7 @@ export default function HomeScreen() {
   const [couldNot, setCouldNot] = useState<Task | null>(null);
   const [dayFlow, setDayFlow] = useState<DayFlowState | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [editing, setEditing] = useState<Task | null>(null);
 
   const load = useCallback(async () => {
     const current = new Date();
@@ -688,8 +691,15 @@ export default function HomeScreen() {
                 onStart={() => run(() => startTask(db, task))}
                 onFinish={() => setFinishing(task)}
                 onPostpone={() => run(() => postponeTasks(db, [task.id]))}
-                onRestore={() => run(() => restoreTask(db, task.id))}
+                // "Plana al": bugünkü "yapmadım / yapamadım" kaydı varsa o da geri alınır, yoksa yalnızca plana girer
+                onRestore={() =>
+                  run(async () => {
+                    if ((await undoOutcome(db, task)) === null) await restoreTask(db, task.id);
+                  })
+                }
                 onDelete={() => run(() => removeTask(db, task.id))}
+                onEdit={() => setEditing(task)}
+                onUndoDone={() => run(async () => void (await undoOutcome(db, task)))}
               />
             ))}
           </View>
@@ -701,12 +711,19 @@ export default function HomeScreen() {
       </Pressable>
 
       <TaskComposer
-        visible={composerOpen}
+        visible={composerOpen || editing !== null}
         workEnabled={workEnabled}
-        onClose={() => setComposerOpen(false)}
-        onSubmit={(input) => {
+        editTask={editing}
+        onClose={() => {
           setComposerOpen(false);
-          run(() => addTask(db, input));
+          setEditing(null);
+        }}
+        onSubmit={(input) => {
+          const target = editing;
+          setComposerOpen(false);
+          setEditing(null);
+          if (target) run(() => updateTaskDetails(db, target.id, input));
+          else run(() => addTask(db, input));
         }}
       />
       <EnergyCheckModal

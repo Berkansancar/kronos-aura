@@ -22,7 +22,8 @@
     "test:goals": "tsx scripts/test-goals.ts",
     "test:outcomes": "tsx scripts/test-outcomes.ts",
     "test:history": "tsx scripts/test-history.ts",
-    "test:backup": "tsx scripts/test-backup.ts"
+    "test:backup": "tsx scripts/test-backup.ts",
+    "test:taskedit": "tsx scripts/test-taskedit.ts"
   },
   "dependencies": {
     "expo": "~58.0.0"

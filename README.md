@@ -62,6 +62,7 @@ npm run test:goals        hedefler, kalori hesabı güvenlik sınırları, ilerl
 npm run test:outcomes     yaptım/yapmadım/yapamadım, iş saatleri, gün akışı, sigara sayacı, zaman analizi, 98 kontrol
 npm run test:history      ilerleme ve geçmiş (günlük seriler, ortalamalar, sebepler, veri toplama), 31 kontrol
 npm run test:backup       yedek ve geri yükleme (bozuk metin, eski sürüm, tek işlemlilik), 27 kontrol
+npm run test:taskedit     görev düzenleme ve yanlış işareti geri alma, 17 kontrol
 ```
 
 
@@ -302,6 +303,15 @@ onay alır ve yükler.
   kalır. Metne bir sağlama kodu konur; kısaltılmış ya da bozulmuş metin yüklenmez. Yedekte olmayan tablolara
   dokunulmaz; eski sürümden alınmış yedekler yüklenir (eksik alanlar varsayılanla dolar), daha yeni sürümün
   yedeği reddedilir. Mantık `services/backupLogic.ts` içindedir.
+
+## Görev düzenleme ve geri alma
+
+Görev kartında **Düzenle** (bekleyen ve ertelenmiş görevlerde): ad, süre, zihinsel yük ve "iş vaktinde de
+yapılabilir" işareti değişir, gün yeniden yerleştirilir. Süre listesinde olmayan değerler (ör. rutinden gelen 25 dk)
+seçenek olarak görünür. Yanlış işaretler geri alınır: biten görevde **Geri al** (onaylı), ertelenmiş görevde
+**Plana al**. Geri alınca sonuç kaydı, süre kaydı ve rutine yazılan "yaptım" silinir; geçmiş grafikleri ve sayılar
+da buna göre düşer. Dünün ya da yarına taşınmış kayıtlar silinmez. Mantık `services/taskFlow.ts` (`undoOutcome`,
+`updateTaskDetails`) içindedir.
 
 ## Logo ve ikon
 

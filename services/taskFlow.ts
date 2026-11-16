@@ -7,13 +7,18 @@ import {
   addTaskOutcome,
   addTimeLog,
   createTask,
+  deleteRoutineDoneLogsForTask,
   deleteTask,
+  deleteTaskOutcome,
+  deleteTimeLogForTask,
+  getLatestTaskOutcome,
   getTask,
   listUncarriedMisses,
   markOutcomeCarried,
   pauseOtherInProgress,
   setTaskStatus,
   setTaskWorkOk,
+  updateTask,
 } from '../database/repository';
 import type { CognitiveWeight, EnergyState, Task, TaskOutcomeKind, TaskOutcomeReason } from '../database/types';
 import { buildCompletionNotes, buildDriftNote } from './coachEngine';
@@ -185,4 +190,46 @@ export async function addDoneTask(
     workOk: input.workOk,
   });
   await completeTask(db, task, input.energy, now, { loggedAt, minutes: input.minutes });
+}
+
+/** Görevin adını, süresini, yükünü ve iş vaktinde yapılabilir işaretini değiştirir; günü yeniden planlar. */
+export async function updateTaskDetails(
+  db: SQLiteDatabase,
+  taskId: string,
+  input: { title: string; estimatedDuration: number; cognitiveWeight: CognitiveWeight; workOk?: boolean },
+  now: Date = new Date()
+): Promise<void> {
+  await updateTask(db, taskId, input);
+  await replanDay(db, now, 'MANUAL');
+}
+
+/**
+ * Yanlış işareti geri alır; görev yeniden bekleyen (PENDING) olur ve plana girer.
+ *  - "Yaptım" (COMPLETED görev): sonuç kaydı, süre kaydı ve rutine yazılan "yaptım" silinir.
+ *  - "Yapmadım / Yapamadım" (POSTPONED görev): yalnızca bugünün, henüz yarına taşınmamış kaydı silinir.
+ * Geri alınacak bir sonuç kaydı yoksa `null` döner (çağıran sıradan "plana al"a düşebilir).
+ */
+export async function undoOutcome(
+  db: SQLiteDatabase,
+  task: Task,
+  now: Date = new Date()
+): Promise<'DONE' | 'MISSED' | null> {
+  if (task.status === 'COMPLETED') {
+    const done = await getLatestTaskOutcome(db, task.id, { kind: 'DONE' });
+    await deleteTimeLogForTask(db, task.id, done ? done.loggedAt : null);
+    if (done) await deleteTaskOutcome(db, done.id);
+    await deleteRoutineDoneLogsForTask(db, task.id);
+    await setTaskStatus(db, task.id, 'PENDING', now);
+    await replanDay(db, now, 'MANUAL');
+    return 'DONE';
+  }
+  if (task.status === 'POSTPONED') {
+    const missed = await getLatestTaskOutcome(db, task.id, { kind: 'MISSED', day: nutritionDay(now) });
+    if (!missed) return null;
+    await deleteTaskOutcome(db, missed.id);
+    await setTaskStatus(db, task.id, 'PENDING', now);
+    await replanDay(db, now, 'MANUAL');
+    return 'MISSED';
+  }
+  return null;
 }

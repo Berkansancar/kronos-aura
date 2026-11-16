@@ -26,6 +26,10 @@ interface Props {
   onPostpone: () => void;
   onRestore: () => void;
   onDelete: () => void;
+  /** Görevin adını, süresini, yükünü değiştirir */
+  onEdit?: () => void;
+  /** Biten görevin "yaptım" işaretini kaldırır (süre kaydı da silinir) */
+  onUndoDone?: () => void;
 }
 
 export function TaskItem({
@@ -41,6 +45,8 @@ export function TaskItem({
   onPostpone,
   onRestore,
   onDelete,
+  onEdit,
+  onUndoDone,
 }: Props) {
   const weight = WEIGHT_META[task.cognitiveWeight];
   const done = task.status === 'COMPLETED';
@@ -54,6 +60,12 @@ export function TaskItem({
     ]);
 
   const open = task.status === 'PENDING' || running;
+
+  const confirmUndoDone = () =>
+    Alert.alert('"Yaptım" kaldırılsın mı?', `"${task.title}" yeniden bekleyen göreve döner; süre kaydı silinir.`, [
+      { text: 'Vazgeç', style: 'cancel' },
+      { text: 'Geri al', onPress: () => onUndoDone?.() },
+    ]);
 
   return (
     <Pressable
@@ -92,6 +104,11 @@ export function TaskItem({
             <Pressable onPress={onPostpone} hitSlop={8}>
               <Text style={styles.link}>Ertele</Text>
             </Pressable>
+            {onEdit && (
+              <Pressable onPress={onEdit} hitSlop={8}>
+                <Text style={styles.link}>Düzenle</Text>
+              </Pressable>
+            )}
           </>
         )}
         {running && (
@@ -100,11 +117,27 @@ export function TaskItem({
           </Pressable>
         )}
         {postponed && (
-          <Pressable onPress={onRestore} style={[styles.btn, styles.btnGhost]}>
-            <Text style={styles.btnGhostText}>Plana al</Text>
-          </Pressable>
+          <>
+            <Pressable onPress={onRestore} style={[styles.btn, styles.btnGhost]}>
+              <Text style={styles.btnGhostText}>Plana al</Text>
+            </Pressable>
+            {onEdit && (
+              <Pressable onPress={onEdit} hitSlop={8}>
+                <Text style={styles.link}>Düzenle</Text>
+              </Pressable>
+            )}
+          </>
         )}
-        {done && <Text style={styles.check}>✓</Text>}
+        {done && (
+          <>
+            <Text style={styles.check}>✓</Text>
+            {onUndoDone && (
+              <Pressable onPress={confirmUndoDone} hitSlop={8}>
+                <Text style={styles.link}>Geri al</Text>
+              </Pressable>
+            )}
+          </>
+        )}
       </View>
       </View>
 

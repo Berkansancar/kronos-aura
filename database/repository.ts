@@ -190,6 +190,30 @@ export async function deleteTask(db: SQLiteDatabase, id: string): Promise<void> 
   await db.runAsync('DELETE FROM Task WHERE id = ?', [id]);
 }
 
+/** Görevin adını, süresini, yükünü ve (verilirse) iş vaktinde yapılabilir işaretini değiştirir. */
+export async function updateTask(
+  db: SQLiteDatabase,
+  id: string,
+  patch: { title: string; estimatedDuration: number; cognitiveWeight: CognitiveWeight; workOk?: boolean }
+): Promise<void> {
+  const title = patch.title.trim();
+  if (!title) throw new Error('Görev başlığı boş olamaz.');
+  const duration = Math.max(5, Math.round(patch.estimatedDuration));
+  if (patch.workOk === undefined) {
+    await db.runAsync('UPDATE Task SET title = ?, estimatedDuration = ?, cognitiveWeight = ? WHERE id = ?', [
+      title,
+      duration,
+      patch.cognitiveWeight,
+      id,
+    ]);
+  } else {
+    await db.runAsync(
+      'UPDATE Task SET title = ?, estimatedDuration = ?, cognitiveWeight = ?, workOk = ? WHERE id = ?',
+      [title, duration, patch.cognitiveWeight, patch.workOk ? 1 : 0, id]
+    );
+  }
+}
+
 // ───────────────────────── Zaman blokları ─────────────────────────
 
 /** Verilen günün planını tamamen değiştirir (tek transaction). */
@@ -829,6 +853,54 @@ export async function listUncarriedMisses(db: SQLiteDatabase, beforeDay: string)
 
 export async function markOutcomeCarried(db: SQLiteDatabase, id: string): Promise<void> {
   await db.runAsync('UPDATE TaskOutcome SET carried = 1 WHERE id = ?', [id]);
+}
+
+/**
+ * Bir görevin en son sonuç kaydı. `DONE`: "Yaptım" kaydı (hangi günden olursa olsun);
+ * `MISSED`: o günkü, henüz plana geri alınmamış "yapmadım / yapamadım" kaydı.
+ */
+export async function getLatestTaskOutcome(
+  db: SQLiteDatabase,
+  taskId: string,
+  filter: { kind: 'DONE' } | { kind: 'MISSED'; day: string }
+): Promise<TaskOutcome | null> {
+  const row =
+    filter.kind === 'DONE'
+      ? await db.getFirstAsync<TaskOutcomeRow>(
+          `SELECT * FROM TaskOutcome WHERE taskId = ? AND outcome = 'DONE' ORDER BY loggedAt DESC LIMIT 1`,
+          [taskId]
+        )
+      : await db.getFirstAsync<TaskOutcomeRow>(
+          `SELECT * FROM TaskOutcome
+           WHERE taskId = ? AND day = ? AND carried = 0 AND outcome IN ('NOT_DONE', 'COULD_NOT')
+           ORDER BY loggedAt DESC LIMIT 1`,
+          [taskId, filter.day]
+        );
+  return row ? rowToOutcome(row) : null;
+}
+
+export async function deleteTaskOutcome(db: SQLiteDatabase, id: string): Promise<void> {
+  await db.runAsync('DELETE FROM TaskOutcome WHERE id = ?', [id]);
+}
+
+/** Görevin, verilen anda yazılmış süre kaydını siler; an verilmezse görevin en son kaydını siler. */
+export async function deleteTimeLogForTask(db: SQLiteDatabase, taskId: string, loggedAt: string | null): Promise<void> {
+  if (loggedAt) {
+    await db.runAsync(
+      'DELETE FROM TimeLog WHERE id = (SELECT id FROM TimeLog WHERE taskId = ? AND loggedAt = ? LIMIT 1)',
+      [taskId, loggedAt]
+    );
+  } else {
+    await db.runAsync(
+      'DELETE FROM TimeLog WHERE id = (SELECT id FROM TimeLog WHERE taskId = ? ORDER BY loggedAt DESC LIMIT 1)',
+      [taskId]
+    );
+  }
+}
+
+/** Görev "yapıldı" diye rutine yazılan "bugün yaptım" cevabını siler. */
+export async function deleteRoutineDoneLogsForTask(db: SQLiteDatabase, taskId: string): Promise<void> {
+  await db.runAsync(`DELETE FROM RoutineLog WHERE taskId = ? AND outcome = 'DONE'`, [taskId]);
 }
 
 // ───────────────────────── Ayarlar (anahtar-değer) ─────────────────────────

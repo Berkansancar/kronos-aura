@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import { colors, radius, spacing } from '../constants/theme';
-import type { CognitiveWeight } from '../database/types';
+import type { CognitiveWeight, Task } from '../database/types';
 
 const DURATIONS = [15, 30, 45, 60, 90, 120];
 const WEIGHTS: { value: CognitiveWeight; label: string; hint: string; color: string }[] = [
@@ -25,6 +25,8 @@ interface Props {
   onClose: () => void;
   /** İş saatleri açıksa "iş vaktinde de yapılabilir" anahtarı gösterilir */
   workEnabled?: boolean;
+  /** Verilirse "Görevi düzenle" olarak açılır ve alanlar bu görevle dolar */
+  editTask?: Task | null;
   onSubmit: (input: {
     title: string;
     estimatedDuration: number;
@@ -33,21 +35,44 @@ interface Props {
   }) => void;
 }
 
-export function TaskComposer({ visible, onClose, onSubmit, workEnabled }: Props) {
+export function TaskComposer({ visible, onClose, onSubmit, workEnabled, editTask }: Props) {
   const [title, setTitle] = useState('');
   const [duration, setDuration] = useState(30);
   const [weight, setWeight] = useState<CognitiveWeight>('MEDIUM');
   const [workOk, setWorkOk] = useState(false);
 
+  // Her açılışta alanlar baştan kurulur: yeni görevde boş, düzenlemede görevin kendi değerleri
+  useEffect(() => {
+    if (!visible) return;
+    setTitle(editTask?.title ?? '');
+    setDuration(editTask?.estimatedDuration ?? 30);
+    setWeight(editTask?.cognitiveWeight ?? 'MEDIUM');
+    setWorkOk(editTask?.workOk === true);
+    // editTask nesnesi değil kimliği izlenir; yazarken alanlar sıfırlanmasın
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, editTask?.id]);
+
+  // Görevin süresi listede yoksa (ör. rutinden gelen 25 dk) o da seçenek olarak gösterilir
+  const extraDuration = editTask?.estimatedDuration;
+  const durations = useMemo(
+    () =>
+      extraDuration !== undefined && !DURATIONS.includes(extraDuration)
+        ? [...DURATIONS, extraDuration].sort((a, b) => a - b)
+        : DURATIONS,
+    [extraDuration]
+  );
+
   const canSubmit = title.trim().length > 0;
 
   const submit = () => {
     if (!canSubmit) return;
-    onSubmit({ title: title.trim(), estimatedDuration: duration, cognitiveWeight: weight, workOk: workEnabled ? workOk : false });
-    setTitle('');
-    setDuration(30);
-    setWeight('MEDIUM');
-    setWorkOk(false);
+    onSubmit({
+      title: title.trim(),
+      estimatedDuration: duration,
+      cognitiveWeight: weight,
+      // İş saatleri kapalıyken düzenlemede görevin mevcut işareti bozulmaz
+      workOk: workEnabled ? workOk : editTask?.workOk === true,
+    });
   };
 
   return (
@@ -58,7 +83,7 @@ export function TaskComposer({ visible, onClose, onSubmit, workEnabled }: Props)
       >
         <Pressable style={styles.dismiss} onPress={onClose} />
         <View style={styles.sheet}>
-          <Text style={styles.heading}>Yeni görev</Text>
+          <Text style={styles.heading}>{editTask ? 'Görevi düzenle' : 'Yeni görev'}</Text>
 
           <TextInput
             value={title}
@@ -66,14 +91,14 @@ export function TaskComposer({ visible, onClose, onSubmit, workEnabled }: Props)
             placeholder="Ne yapılacak?"
             placeholderTextColor={colors.textMuted}
             style={styles.input}
-            autoFocus
+            autoFocus={!editTask}
             returnKeyType="done"
             onSubmitEditing={submit}
           />
 
           <Text style={styles.label}>Tahmini süre</Text>
           <View style={styles.wrap}>
-            {DURATIONS.map((d) => (
+            {durations.map((d) => (
               <Pressable
                 key={d}
                 onPress={() => setDuration(d)}
@@ -125,7 +150,7 @@ export function TaskComposer({ visible, onClose, onSubmit, workEnabled }: Props)
             disabled={!canSubmit}
             style={[styles.submit, !canSubmit && { opacity: 0.4 }]}
           >
-            <Text style={styles.submitText}>Ekle ve yerleştir</Text>
+            <Text style={styles.submitText}>{editTask ? 'Kaydet ve yeniden yerleştir' : 'Ekle ve yerleştir'}</Text>
           </Pressable>
         </View>
       </KeyboardAvoidingView>
