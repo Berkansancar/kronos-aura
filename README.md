@@ -73,7 +73,7 @@ npm run test:vocab        kelime defteri: Leitner kutuları, tekrar seansı, yed
 npm run test:runmode      rutin modu: sıra, bölümler, Yaptım/Sonra/Atla, sayaç, 37 kontrol
 npm run test:monthly      aylık karne: toplamlar, ruh hali, seviye, önceki ayla karşılaştırma, 34 kontrol
 npm run test:quests       haftalık görevler: seçim, ilerleme, bonus XP, geçmişe bonus verilmemesi, 43 kontrol
-npm run test:notifyactions  bildirimden Yaptım / Yapacağım / Bugün değil: ayrıştırma, karar, kuyruk, kayıt, 48 kontrol
+npm run test:notifyactions  bildirimden Yaptım / Yapacağım / Bugün değil: ayrıştırma, karar, kuyruk, kayıt, 47 kontrol
 npm run test:weekplan     hafta planı (güne ayırma, kapasite, otomatik dağıtım, veritabanı v11), 41 kontrol
 npm run test:game         oyunlaştırma (XP, seviye, altın, seri, rozet, ödül, veritabanından türetme, yedek), 62 kontrol
 npm run test:language     dil öğrenme (uygulama süresi, kalem-kağıt, hedef, geçmiş, gün analizi, yedek, veritabanı v10), 52 kontrol
