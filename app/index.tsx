@@ -88,6 +88,8 @@ import { loadBackupNudge, snoozeBackupNudge } from '../services/backupNudge';
 import { loadTypicalCommute } from '../services/commute';
 import { loadGame, takeLevelUp } from '../services/game';
 import { countParked } from '../services/weekPlan';
+import { loadGuide, type GuideData } from '../services/dayGuide';
+import { guideLines, guideNow } from '../services/dayGuideLogic';
 import type { GameSummary } from '../services/gameLogic';
 import { loadLanguageDay, type LanguageDayState } from '../services/language';
 import { languageLine } from '../services/languageLogic';
@@ -149,6 +151,7 @@ export default function HomeScreen() {
   const [lang, setLang] = useState<LanguageDayState | null>(null);
   const [game, setGame] = useState<GameSummary | null>(null);
   const [parked, setParked] = useState(0);
+  const [guide, setGuide] = useState<GuideData | null>(null);
   const [levelMsg, setLevelMsg] = useState<string | null>(null);
   const [backupHint, setBackupHint] = useState<string | null>(null);
 
@@ -201,6 +204,13 @@ export default function HomeScreen() {
     // Dil öğrenme (Duolingo ekran süresi + elle kayıtlar); hata verirse satır ve tuş gizlenir
     const langState = await loadLanguageDay(db, current).catch(() => null);
     setLang(langState);
+    // Gün rehberi: şimdi ve sıradaki (hata verirse kart gizlenir)
+    try {
+      const gb = await getGoalBundle();
+      setGuide(await loadGuide(db, current, { bedtimeMin: gb.settings.bedtime }));
+    } catch {
+      setGuide(null);
+    }
     // Başka bir güne ayrılmış işler (Hafta planı)
     setParked(await countParked(db, current).catch(() => 0));
     // Oyunlaştırma: seviye, altın, seri (hata verirse satır gizlenir)
@@ -535,6 +545,10 @@ export default function HomeScreen() {
         )
       : [];
 
+  const guideMidnight = new Date(planningDay(now).getFullYear(), planningDay(now).getMonth(), planningDay(now).getDate()).getTime();
+  const guideNowState = guide ? guideNow(guide.result.segments, Math.floor((now.getTime() - guideMidnight) / 60_000)) : null;
+  const guideText = guideNowState ? guideLines(guideNowState) : null;
+
   const preset = CHRONOTYPE_PRESETS[user.chronotype];
   const planDay = planningDay(now);
   const isTomorrow = planDay.getDate() !== now.getDate();
@@ -569,6 +583,15 @@ export default function HomeScreen() {
             </Text>
           </Pressable>
         </View>
+
+        {guideNowState && guideText && (
+          <Pressable onPress={() => router.push('/guide')} style={styles.guideCard}>
+            <Text style={styles.guideLabel}>ŞİMDİ</Text>
+            <Text style={styles.guideNow}>{guideText.now}</Text>
+            {guideNowState.current?.note && <Text style={styles.activitySub}>{guideNowState.current.note}</Text>}
+            {guideText.next && <Text style={styles.activitySub}>Sıradaki · {guideText.next} ›</Text>}
+          </Pressable>
+        )}
 
         {parked > 0 && (
           <Pressable onPress={() => router.push('/week')} style={styles.hintCard}>
@@ -810,6 +833,7 @@ export default function HomeScreen() {
               }
               onPress={() => router.push('/nutrition')}
             />
+            <HomeTile title="Gün rehberi" subtitle="Saat saat çizelge: yol, iş, yemek, öneriler" onPress={() => router.push('/guide')} />
             <HomeTile
               title="Hafta planı"
               subtitle={parked > 0 ? `${parked} iş başka günlerde · Pazar için öneri` : 'İşleri günlere ayır, Pazar için plan'}
@@ -958,6 +982,16 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.sm,
   },
+  guideCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.aura,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    gap: 2,
+  },
+  guideLabel: { color: colors.aura, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 },
+  guideNow: { color: colors.text, fontSize: 17, fontWeight: '800' },
   heroLine: { marginTop: 6, gap: 4, alignSelf: 'stretch' },
   heroText: { color: colors.text, fontSize: 12, fontWeight: '700' },
   heroTrack: { height: 4, borderRadius: 2, backgroundColor: colors.surfaceAlt, overflow: 'hidden' },

@@ -28,7 +28,8 @@
     "test:language": "tsx scripts/test-language.ts",
     "test:work": "tsx scripts/test-work.ts",
     "test:game": "tsx scripts/test-game.ts",
-    "test:weekplan": "tsx scripts/test-weekplan.ts"
+    "test:weekplan": "tsx scripts/test-weekplan.ts",
+    "test:guide": "tsx scripts/test-guide.ts"
   },
   "dependencies": {
     "expo": "~58.0.0"

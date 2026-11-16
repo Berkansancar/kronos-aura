@@ -65,6 +65,7 @@ npm run test:backup       yedek ve geri yükleme (bozuk metin, eski sürüm, tek
 npm run test:taskedit     görev düzenleme ve yanlış işareti geri alma, 17 kontrol
 npm run test:commute      yolda yapılabilir işler, günün özet satırı, yedek hatırlatması, 39 kontrol
 npm run test:work         haftalık iş programı (Cmt yarım gün, Pazar boş), planlayıcı, hatırlatma, boş gün planı, 43 kontrol
+npm run test:guide        gün rehberi (iş günü/Cumartesi/Pazar çizelgesi, öneriler, şimdi-sıradaki), 38 kontrol
 npm run test:weekplan     hafta planı (güne ayırma, kapasite, otomatik dağıtım, veritabanı v11), 41 kontrol
 npm run test:game         oyunlaştırma (XP, seviye, altın, seri, rozet, ödül, veritabanından türetme, yedek), 62 kontrol
 npm run test:language     dil öğrenme (uygulama süresi, kalem-kağıt, hedef, geçmiş, gün analizi, yedek, veritabanı v10), 52 kontrol
@@ -393,6 +394,21 @@ kaybolmaz). Ana ekranda "📅 N iş başka günlere ayrıldı" ipucu çıkar.
   kadar iş ayrılır; sığmayan yerinde kalır, başlanmış işe dokunulmaz. "Hepsini bugüne al" ile geri alınır.
 - Boş zaman yaklaşıktır: uyanık 07:00–23:00, iş günlerinde yol + hazırlık için 90 dk düşülür.
 - Yedekte `Task.plannedDay` da yer alır; eski yedekler günsüz geri yüklenir.
+
+## Gün rehberi (ana ekranda "ŞİMDİ" kartı, Daha fazla > Gün rehberi)
+
+Saatleri sen verdin; uygulama günü saat saat yönlendirir. Ana ekranın üstünde **ŞİMDİ** kartı ne yapman gerektiğini ("İş ·
+18:00'e kadar") ve sıradakini ("18:00 Yolda · eve") söyler; dokununca tüm gün çizelgesi açılır.
+- **İş günü (Pzt–Cum 07:40–18:00):** hazırlık ve kahvaltı (tipik uyanışa göre; kayıt yoksa çıkıştan 1 saat önce), yolda
+  (tipik yol süresi, kayıt yoksa 25 dk), iş, eve yol, akşam yemeği, gün sonu değerlendirmesi 21:30, yatıştan 30 dk önce
+  "günü yavaşça kapat".
+- **Cumartesi (08:30–13:30):** işten sonra öğle yemeği, öğleden sonra serbest, akşam yemeği 19:30.
+- **Pazar (boş gün):** 08:00'de yavaş başlangıç, öğle 13:00, akşam 19:30, gün boyu serbest; "Haftaya bakış" (Hafta planı)
+  önerisi yalnızca Pazar günü.
+- **İşlerin:** planlayıcının yerleştirdiği işler boş aralıklara oturur (yemek/yolla çakışırsa sonraya kayar, sığmayan
+  "bugüne sığmayanlar"da yazılır); iş saatine denk gelenler İş parçasının notunda görünür.
+- **Öneriler (yok sayılabilir):** dil öğrenme (kalan hedef kadar, en çok 30 dk; boş günde 45 dk), kısa yürüyüş, serbest
+  zaman. Yargı içermez.
 
 ## Logo ve ikon
 
