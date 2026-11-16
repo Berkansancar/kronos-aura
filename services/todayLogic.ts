@@ -8,6 +8,9 @@ export interface TodayFacts {
   waterGoalMl: number | null;
   smoke: number | null;
   smokeLimit: number | null;
+  /** Bugünkü dil çalışması (dk) ve hedef; süre yoksa satırda görünmez */
+  language?: number | null;
+  languageGoal?: number | null;
 }
 
 /** "3 iş bitti, 2 açık · su 1,2 / 2 L · sigara 4/10". Gösterecek bir şey yoksa null. */
@@ -20,6 +23,9 @@ export function todayLine(f: TodayFacts): string | null {
     parts.push(
       f.waterGoalMl !== null ? `su ${formatWater(f.waterMl)} / ${formatWater(f.waterGoalMl)}` : `su ${formatWater(f.waterMl)}`
     );
+  }
+  if (f.language !== undefined && f.language !== null && f.language > 0) {
+    parts.push(f.languageGoal ? `dil ${f.language} / ${f.languageGoal} dk` : `dil ${f.language} dk`);
   }
   if (f.smoke !== null && f.smoke > 0) {
     parts.push(f.smokeLimit !== null ? `sigara ${f.smoke}/${f.smokeLimit}` : `sigara ${f.smoke}`);

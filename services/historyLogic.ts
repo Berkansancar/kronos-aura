@@ -12,6 +12,7 @@ import { rangeLabel, weekdayShort } from './weeklyLogic';
 export type HistoryMetricId =
   | 'TASK_MIN'
   | 'ROUTINES'
+  | 'LANG'
   | 'WATER'
   | 'KCAL'
   | 'SMOKE'
@@ -42,6 +43,8 @@ export interface HistoryDay {
   shopMinutes: number | null;
   /** Yol (işe + eve), en az biri hesaplanabildiyse */
   commuteMinutes: number | null;
+  /** Dil öğrenme (ekrandaki uygulama süresi + elle kayıtlar); ölçülmediyse null */
+  languageMinutes?: number | null;
 }
 
 export interface HistoryOutcome {
@@ -64,6 +67,7 @@ interface MetricDef {
 export const HISTORY_METRICS: MetricDef[] = [
   { id: 'TASK_MIN', label: 'Biten işler', avgWord: 'günlük ortalama', value: (d) => d.taskMinutes, format: (v) => formatDuration(v) },
   { id: 'ROUTINES', label: 'Rutinler', avgWord: 'günlük ortalama', value: (d) => d.routinesDone, format: (v) => `${round1(v)} rutin` },
+  { id: 'LANG', label: 'Dil öğrenme', avgWord: 'günlük ortalama', value: (d) => d.languageMinutes ?? null, format: (v) => formatDuration(v) },
   { id: 'WATER', label: 'Su', avgWord: 'günlük ortalama', value: (d) => d.waterMl, format: (v) => formatWater(v) },
   { id: 'KCAL', label: 'Kalori', avgWord: 'günlük ortalama', value: (d) => d.kcal, format: (v) => `yaklaşık ${formatKcal(v)}` },
   { id: 'SMOKE', label: 'Sigara', avgWord: 'günlük ortalama', value: (d) => d.smoke, format: (v) => `${round1(v)} adet` },

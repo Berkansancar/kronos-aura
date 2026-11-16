@@ -18,6 +18,8 @@ import type {
   RoutineStatus,
   SleepLog,
   SmokeLog,
+  StudyKind,
+  StudyLog,
   Task,
   TaskOutcome,
   TaskOutcomeKind,
@@ -960,4 +962,38 @@ export async function listSmokeLogsSince(db: SQLiteDatabase, sinceDay: string): 
 
 export async function deleteSmokeLog(db: SQLiteDatabase, id: string): Promise<void> {
   await db.runAsync('DELETE FROM SmokeLog WHERE id = ?', [id]);
+}
+
+// ───────────────────────── Dil çalışması ─────────────────────────
+
+export async function addStudyLog(
+  db: SQLiteDatabase,
+  day: string,
+  kind: StudyKind,
+  minutes: number,
+  at: Date
+): Promise<StudyLog> {
+  const m = Math.round(minutes);
+  if (!Number.isFinite(m) || m < 1 || m > 600) throw new Error('Süre 1 ile 600 dakika arasında olmalı.');
+  const log: StudyLog = { id: newId('std'), day, kind, minutes: m, loggedAt: at.toISOString() };
+  await db.runAsync('INSERT INTO StudyLog (id, day, kind, minutes, loggedAt) VALUES (?, ?, ?, ?, ?)', [
+    log.id,
+    log.day,
+    log.kind,
+    log.minutes,
+    log.loggedAt,
+  ]);
+  return log;
+}
+
+export async function listStudyLogs(db: SQLiteDatabase, day: string): Promise<StudyLog[]> {
+  return db.getAllAsync<StudyLog>('SELECT * FROM StudyLog WHERE day = ? ORDER BY loggedAt ASC', [day]);
+}
+
+export async function listStudyLogsSince(db: SQLiteDatabase, sinceDay: string): Promise<StudyLog[]> {
+  return db.getAllAsync<StudyLog>('SELECT * FROM StudyLog WHERE day >= ? ORDER BY loggedAt ASC', [sinceDay]);
+}
+
+export async function deleteStudyLog(db: SQLiteDatabase, id: string): Promise<void> {
+  await db.runAsync('DELETE FROM StudyLog WHERE id = ?', [id]);
 }

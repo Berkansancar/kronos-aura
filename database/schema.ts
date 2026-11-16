@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 export const DB_NAME = 'kronos-aura.db';
-export const DATABASE_VERSION = 9;
+export const DATABASE_VERSION = 10;
 
 /**
  * Not: SQLite'ın gerçek bir DATETIME tipi yoktur. Zaman alanlarını ISO-8601 (UTC) TEXT
@@ -169,6 +169,21 @@ const ADD_TASK_COMMUTE_OK = `
 ALTER TABLE Task ADD COLUMN commuteOk INTEGER NOT NULL DEFAULT 0;
 `;
 
+/**
+ * Sürüm 10: dil çalışması kayıtları (kalem-kağıt, elle girilen uygulama süresi, dinleme/konuşma).
+ * Duolingo gibi uygulamaların süresi ekran süresinden otomatik okunur; burada yalnızca elle eklenenler durur.
+ */
+const CREATE_TABLES_V10 = `
+CREATE TABLE IF NOT EXISTS StudyLog (
+  id       TEXT PRIMARY KEY NOT NULL,
+  day      TEXT NOT NULL,
+  kind     TEXT NOT NULL CHECK (kind IN ('PAPER', 'APP', 'OTHER')),
+  minutes  INTEGER NOT NULL CHECK (minutes > 0 AND minutes <= 600),
+  loggedAt TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_studylog_day ON StudyLog(day);
+`;
+
 const CREATE_TABLES_V5 = `
 CREATE TABLE IF NOT EXISTS DayReview (
   day       TEXT PRIMARY KEY NOT NULL,
@@ -288,8 +303,13 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {
     current = 9;
   }
 
+  if (current === 9) {
+    await db.execAsync(CREATE_TABLES_V10);
+    current = 10;
+  }
+
   // Gelecekteki migrasyonlar:
-  // if (current === 9) { await db.execAsync(`ALTER TABLE ...`); current = 10; }
+  // if (current === 10) { await db.execAsync(`ALTER TABLE ...`); current = 11; }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
 }

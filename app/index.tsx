@@ -84,6 +84,8 @@ import { refreshReminders } from '../services/reminderSync';
 import { materializePlannedRoutines, reviewAvailable, reviewDayOf } from '../services/dayReview';
 import { loadBackupNudge, snoozeBackupNudge } from '../services/backupNudge';
 import { loadTypicalCommute } from '../services/commute';
+import { loadLanguageDay, type LanguageDayState } from '../services/language';
+import { languageLine } from '../services/languageLogic';
 import { commuteLine, commuteState, commuteSuggestions, remainingMinutes } from '../services/commuteLogic';
 import { todayLine } from '../services/todayLogic';
 import {
@@ -138,6 +140,7 @@ export default function HomeScreen() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [editing, setEditing] = useState<Task | null>(null);
   const [typicalCommute, setTypicalCommute] = useState<number | null>(null);
+  const [lang, setLang] = useState<LanguageDayState | null>(null);
   const [backupHint, setBackupHint] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -184,6 +187,8 @@ export default function HomeScreen() {
       setDayFlow(null);
     }
     setBackupHint(await loadBackupNudge(db, current));
+    // Dil öğrenme (Duolingo ekran süresi + elle kayıtlar); hata verirse satır ve tuş gizlenir
+    setLang(await loadLanguageDay(db, current).catch(() => null));
     // Hedefler özeti (hata verirse kart yine de açılır)
     try {
       const gs = await loadGoalState(db, current, await getGoalBundle());
@@ -485,11 +490,20 @@ export default function HomeScreen() {
     waterGoalMl: nutrition ? nutrition.waterGoalMl : null,
     smoke: dayFlow ? dayFlow.smoke.count : null,
     smokeLimit: dayFlow ? dayFlow.smoke.limit : null,
+    language: lang ? lang.summary.total : null,
+    languageGoal: lang ? lang.settings.goalMin : null,
   });
   const commute = commuteState(dayFlow?.events ?? [], now);
   const commuteSugs =
     commute.onBus && commute.direction
-      ? commuteSuggestions(tasks, remainingMinutes(commute, typicalCommute), commute.direction, now.getDate())
+      ? commuteSuggestions(
+          tasks,
+          remainingMinutes(commute, typicalCommute),
+          commute.direction,
+          now.getDate(),
+          3,
+          lang ? { goalMin: lang.settings.goalMin, doneMin: lang.summary.total, appName: lang.settings.apps[0] } : undefined
+        )
       : [];
 
   const preset = CHRONOTYPE_PRESETS[user.chronotype];
@@ -575,7 +589,7 @@ export default function HomeScreen() {
                 <Text style={styles.commuteText} numberOfLines={2}>
                   {sg.title}
                 </Text>
-                <Text style={styles.commuteMin}>{sg.minutes} dk</Text>
+                {sg.minutes > 0 && <Text style={styles.commuteMin}>{sg.kind === 'LANGUAGE' ? '≈ ' : ''}{sg.minutes} dk</Text>}
                 {sg.kind === 'TASK' && (
                   <Pressable
                     disabled={busy}
@@ -722,6 +736,11 @@ export default function HomeScreen() {
                   : 'Su, yemek ve kalori kaydı'
               }
               onPress={() => router.push('/nutrition')}
+            />
+            <HomeTile
+              title="Dil öğrenme"
+              subtitle={lang ? (languageLine(lang.summary.total, lang.settings.goalMin) ?? 'Duolingo otomatik, kalem-kağıt elle') : 'Duolingo otomatik, kalem-kağıt elle'}
+              onPress={() => router.push('/language')}
             />
             <HomeTile title="Hedefler" subtitle={goalLine ?? 'Su, kalori, ekran, yatış, boş zaman'} onPress={() => router.push('/goals')} />
             <HomeTile title="İlerleme ve geçmiş" subtitle="Günlük çubuk grafikler, 7-30 gün" onPress={() => router.push('/history')} />

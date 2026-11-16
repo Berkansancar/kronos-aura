@@ -63,7 +63,8 @@ npm run test:outcomes     yaptım/yapmadım/yapamadım, iş saatleri, gün akı�
 npm run test:history      ilerleme ve geçmiş (günlük seriler, ortalamalar, sebepler, veri toplama), 31 kontrol
 npm run test:backup       yedek ve geri yükleme (bozuk metin, eski sürüm, tek işlemlilik), 27 kontrol
 npm run test:taskedit     görev düzenleme ve yanlış işareti geri alma, 17 kontrol
-npm run test:commute      yolda yapılabilir işler, günün özet satırı, yedek hatırlatması, veritabanı v9, 39 kontrol
+npm run test:commute      yolda yapılabilir işler, günün özet satırı, yedek hatırlatması, 39 kontrol
+npm run test:language     dil öğrenme (uygulama süresi, kalem-kağıt, hedef, geçmiş, gün analizi, yedek, veritabanı v10), 52 kontrol
 ```
 
 
@@ -267,7 +268,7 @@ Gündüz çalışan ve telefona bakamayan biri için: her şey akşam topluca da
   işler, sonra kısa fikirler ("Yarın plana ekle"). Bu bölüm kural tabanlı yolda, ücretsiz/Claude anahtarıyla ve
   **elle kopyala-yapıştır** yolunda aynı şekilde çalışır; elle yol bozulmadı, istem yalnızca yeni alanları ister.
 
-Veritabanı sürümü 9 (`TaskOutcome`, `Setting`, `DayEvent`, `SmokeLog` tabloları, `Task.workOk` ve `Task.commuteOk`).
+Veritabanı sürümü 10 (`TaskOutcome`, `Setting`, `DayEvent`, `SmokeLog`, `StudyLog` tabloları, `Task.workOk` ve `Task.commuteOk`).
 
 ## Ana ekran ve İlerleme ve geçmiş
 
@@ -329,6 +330,24 @@ sayılar; yorum yok.
 
 **Yedek hatırlatması:** en az 30 kaydın varsa ve hiç yedek alınmadıysa ya da son yedek 14 günden eskiyse ana ekranda
 küçük bir satır çıkar. "Şimdi değil" bir hafta susturur; satıra dokununca Ayarlar'daki yedek bölümü açılır.
+
+## Dil öğrenme (Ana ekran > Daha fazla > Dil öğrenme)
+
+Dil çalışması üç kaynaktan toplanır: **uygulama** (varsayılan Duolingo), **kalem kağıt** ve **dinleme / konuşma**.
+- **Uygulama süresi kendiliğinden sayılır.** Gün analizindeki ekran süresi okumasında adı eşleşen uygulamanın dakikası
+  (büyük/küçük harf ve ı/İ fark etmez; adlar Ayarlar bölümünde virgülle değiştirilebilir, en çok 8) dil öğrenme
+  sayılır. Ekran süresi okunamıyorsa (izin yok / iOS) "Uygulama (elle)" ile dakika eklenir. Otomatik süre varken elle
+  uygulama kaydı **çift sayılmaz**.
+- **Kalem kağıt / dinleme:** tür seçip +10 / +15 / +20 / +30 dk ya da kendi süreni yazarak eklersin; bugünkü kayıtlar
+  tek tek silinebilir. Gece 04:00'e kadar yapılanlar önceki güne yazılır.
+- **Günlük hedef** (10–60 dk ya da "Hedef yok", varsayılan 20 dk) ilerleme çubuğuyla gösterilir; baskı ya da yargı yok.
+- **Geçmiş:** "İlerleme ve geçmiş" ekranında "Dil öğrenme" günlük grafiği; dil ekranında son 7 gün / öncesindeki 7 gün.
+- **Gün sonu analizi:** uygulamada geçen dil süresi ekran süresinden **düşülür**, yani "Ekran yerine" önerisi dil
+  öğrenme dakikalarını saymaz ("bunun 40 dk'sı dil öğrenme uygulamasında geçti, kalan …"). Ekran dışı dil çalışması
+  "kayıt dışı" zamandan düşülür ("… dil çalışmasına gitti"). Kopyala-yapıştır yolunda istem aynı satırları ister; dil
+  uygulaması bilgisi yalnızca ekran paylaşımı açıksa isteme girer.
+- **Yolda kartı:** dil öğrenme ilk öneridir (kalan hedef kadar, "bugün 12 / 20 dk"); hedef tamamsa dakika yazılmaz.
+- Günün özet satırına "dil 12 / 20 dk" eklenir; yedek ve geri yükleme `StudyLog` tablosunu da kapsar.
 
 ## Logo ve ikon
 

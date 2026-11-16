@@ -10,6 +10,8 @@ import { DeviceActivity, deviceActivityAvailable } from '../modules/device-activ
 import { getDailyStat, listSleepLogs, upsertDailyStat, upsertSleepLog } from '../database/repository';
 import type { ActivitySummary, SleepSummary } from '../database/types';
 import { buildActivitySummary, dayKey } from './activityLogic';
+import { getLanguageSettings } from './language';
+import { matchesApp } from './languageLogic';
 import { estimateSleep, sleepWindow, summarizeSleep, toSleepLog } from './sleepLogic';
 
 const K_TRACKING = 'activity_tracking';
@@ -220,11 +222,14 @@ export async function refreshActivity(
   await refreshSleep(db, now);
   if (reading.available && (reading.trackingEnabled || reading.screenMinutes !== null)) {
     try {
+      // En çok kullanılan 10 uygulama; dil uygulaması 11-15. sıradaysa o da korunur (dil süresi eksik kalmasın)
+      const langApps = (await getLanguageSettings(db).catch(() => null))?.apps ?? [];
+      const extra = reading.apps.slice(10).filter((a) => matchesApp(a.label, langApps));
       await upsertDailyStat(db, {
         day: dayKey(now),
         steps: reading.steps,
         screenMinutes: reading.screenMinutes,
-        topApps: reading.apps.slice(0, 10),
+        topApps: [...reading.apps.slice(0, 10), ...extra],
       });
     } catch {
       // Kayıt yazılamazsa anlık okuma yine de gösterilir.

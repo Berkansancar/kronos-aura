@@ -193,7 +193,12 @@ export function ruleTimeUse(f: DayFacts): Pick<DayReviewPayload, 'timeUse' | 'sc
   const out: Pick<DayReviewPayload, 'timeUse' | 'screenNote' | 'screenAlternatives'> = {};
   if (f.timeUse) out.timeUse = f.timeUse.text;
   const seed = Number(f.day.slice(8, 10)) || 0;
-  const alt = screenAlternatives(f.screenMinutes, f.openTasks ?? [], seed);
+  // Dil öğrenme uygulamasında geçen süre "ekran yerine" önerilerinin hesabına girmez
+  const alt = screenAlternatives(
+    f.screenMinutes === null ? null : (f.timeUse?.screenNetMinutes ?? f.screenMinutes),
+    f.openTasks ?? [],
+    seed
+  );
   if (alt.items.length > 0 && alt.note) {
     out.screenNote = alt.note;
     out.screenAlternatives = alt.items;

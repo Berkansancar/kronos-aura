@@ -113,7 +113,7 @@ async function main(): Promise<void> {
   console.log('Veritabanı');
   const { db, raw } = makeTestDb();
   await migrateDbIfNeeded(db);
-  check('temiz kurulum sürüm 9', (raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version === 9 && DATABASE_VERSION === 9);
+  check('temiz kurulum son sürüm', (raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version === DATABASE_VERSION && DATABASE_VERSION >= 9);
   const t = await createTask(db, { title: 'Mesaj yaz', estimatedDuration: 10, cognitiveWeight: 'LOW', commuteOk: true });
   const plain = await createTask(db, { title: 'Normal', estimatedDuration: 10, cognitiveWeight: 'LOW' });
   check('yolda işareti yazılır ve okunur; varsayılan kapalı', (await getTask(db, t.id))?.commuteOk === true && (await getTask(db, plain.id))?.commuteOk === false);
@@ -131,7 +131,7 @@ async function main(): Promise<void> {
   old.raw.prepare("INSERT INTO Task (id,title,estimatedDuration,cognitiveWeight,status,createdAt) VALUES ('eski','Eski görev',30,'LOW','PENDING','2026-11-01T10:00:00.000Z')").run();
   await migrateDbIfNeeded(old.db);
   const up = await getTask(old.db, 'eski');
-  check('v8 → v9: görev korunur, yolda işareti kapalı', up?.title === 'Eski görev' && up.commuteOk === false && (old.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version === 9);
+  check('v8 → son sürüm: görev korunur, yolda işareti kapalı', up?.title === 'Eski görev' && up.commuteOk === false && (old.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version === DATABASE_VERSION);
 
   // v8 yedeği (commuteOk sütunu yok) yeni sürüme yüklenir
   const text = await createBackup(db, {}, at(9));

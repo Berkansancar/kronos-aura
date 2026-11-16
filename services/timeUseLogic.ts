@@ -25,6 +25,10 @@ export interface TimeUseInput {
   doneInWorkMinutes: number;
   driftMinutes: number;
   screenMinutes: number | null;
+  /** Dil öğrenme uygulamasında (ekran süresinin içinde) geçen dakika; ekrandan düşülür */
+  languageScreenMinutes?: number;
+  /** Ekran dışı, elle girilen dil çalışması (kalem-kağıt vb.); "kayıt dışı"dan düşülür */
+  languageOffScreenMinutes?: number;
 }
 
 export interface TimeUse {
@@ -41,6 +45,10 @@ export interface TimeUse {
   /** İş dışı serbest zamandan işlere giden çıkınca kalan: kayıt dışı kalan zaman (akıp giden dahil) */
   unaccountedMinutes: number | null;
   screenMinutes: number | null;
+  /** Ekran süresinden dil öğrenme uygulaması düşülmüş hâli */
+  screenNetMinutes: number | null;
+  languageScreenMinutes: number;
+  languageOffScreenMinutes: number;
   /** Kayıt dışı zamanın ekranla örtüşme oranı (0-1+); ikisi de varsa */
   screenVsUnaccounted: number | null;
   chips: string[];
@@ -63,12 +71,16 @@ export function analyzeTimeUse(i: TimeUseInput): TimeUse {
 
   const free = awake !== null ? clamp0(awake - workMinutes - i.commuteMinutes - i.prepMinutes) : null;
   const doneOutside = clamp0(i.doneMinutes - i.doneInWorkMinutes);
-  const unaccounted = free !== null ? clamp0(free - doneOutside) : null;
-  const vs = unaccounted !== null && unaccounted > 0 && i.screenMinutes !== null ? i.screenMinutes / unaccounted : null;
+  const langScreen = clamp0(i.languageScreenMinutes ?? 0);
+  const langOff = clamp0(i.languageOffScreenMinutes ?? 0);
+  const unaccounted = free !== null ? clamp0(free - doneOutside - langOff) : null;
+  const screenNet = i.screenMinutes !== null ? clamp0(i.screenMinutes - langScreen) : null;
+  const vs = unaccounted !== null && unaccounted > 0 && screenNet !== null ? screenNet / unaccounted : null;
 
   const chips: string[] = [];
   if (free !== null) chips.push(`İş dışı uyanık: ${formatDuration(free)}`);
   if (i.doneMinutes > 0) chips.push(`İşlere giden: ${formatDuration(i.doneMinutes)}`);
+  if (langScreen + langOff > 0) chips.push(`Dil öğrenme: ${formatDuration(langScreen + langOff)}`);
   if (unaccounted !== null) chips.push(`Kayıt dışı kalan: ${formatDuration(unaccounted)}`);
   if (i.screenMinutes !== null) chips.push(`Ekran: ${formatDuration(i.screenMinutes)}`);
 
@@ -82,6 +94,7 @@ export function analyzeTimeUse(i: TimeUseInput): TimeUse {
     parts.push(`${head} yaklaşık ${formatDuration(free)} uyanık kaldın.`);
     const inner: string[] = [];
     if (i.doneMinutes > 0) inner.push(`${formatDuration(doneOutside)} işlere gitti`);
+    if (langOff > 0) inner.push(`${formatDuration(langOff)} dil çalışmasına gitti`);
     if (i.driftMinutes > 0) inner.push(`${formatDuration(i.driftMinutes)}'sını akıp giden diye not ettin`);
     if (inner.length > 0) parts.push(`${inner.join('; ')}.`);
     if (unaccounted !== null && unaccounted > 0) {
@@ -90,7 +103,16 @@ export function analyzeTimeUse(i: TimeUseInput): TimeUse {
     parts.push('Bu bir hata değil, sadece veri.');
   }
   if (i.screenMinutes !== null && i.screenMinutes > 0) {
-    if (vs !== null && vs >= 0.5 && unaccounted !== null && unaccounted >= 60) {
+    if (langScreen > 0 && screenNet !== null && screenNet <= 0) {
+      parts.push(`Ekran süren ${formatDuration(i.screenMinutes)}; hepsi dil öğrenme uygulamasında geçti.`);
+    } else if (langScreen > 0 && screenNet !== null) {
+      const head = `Ekran süren ${formatDuration(i.screenMinutes)}; bunun ${formatDuration(langScreen)}'sı dil öğrenme uygulamasında geçti, kalan ${formatDuration(screenNet)}.`;
+      if (vs !== null && vs >= 0.5 && unaccounted !== null && unaccounted >= 60) {
+        parts.push(`${head} Kalan kısım kayıt dışı zamanın önemli bir bölümüyle örtüşüyor olabilir. Küçük bir kısmını başka bir şeye ayırmak yeter.`);
+      } else {
+        parts.push(`${head} Kalan kısmın bir bölümü iş saatine denk gelmiş olabilir.`);
+      }
+    } else if (vs !== null && vs >= 0.5 && unaccounted !== null && unaccounted >= 60) {
       parts.push(`Ekran süren ${formatDuration(i.screenMinutes)}; kayıt dışı zamanın önemli bir bölümüyle örtüşüyor olabilir. Küçük bir kısmını başka bir şeye ayırmak yeter.`);
     } else {
       parts.push(`Ekran süren ${formatDuration(i.screenMinutes)}; bir kısmı iş saatine denk gelmiş olabilir.`);
@@ -109,6 +131,9 @@ export function analyzeTimeUse(i: TimeUseInput): TimeUse {
     driftMinutes: i.driftMinutes,
     unaccountedMinutes: unaccounted,
     screenMinutes: i.screenMinutes,
+    screenNetMinutes: screenNet,
+    languageScreenMinutes: langScreen,
+    languageOffScreenMinutes: langOff,
     screenVsUnaccounted: vs,
     chips,
     text: parts.join(' '),
@@ -125,10 +150,16 @@ export function timeUsePromptLines(t: TimeUse, includeScreen: boolean): string[]
     if (t.prepMinutes > 0) bits.push(`sabah hazırlık ${formatDuration(t.prepMinutes)}`);
     bits.push(`işlere giden ${formatDuration(t.doneOutsideWorkMinutes)}`);
     if (t.driftMinutes > 0) bits.push(`not edilen akıp giden ${formatDuration(t.driftMinutes)}`);
+    if (t.languageOffScreenMinutes > 0) bits.push(`ekran dışı dil çalışması ${formatDuration(t.languageOffScreenMinutes)}`);
     if (t.unaccountedMinutes !== null) bits.push(`kayıt dışı kalan ${formatDuration(t.unaccountedMinutes)}`);
     lines.push(`- Zaman dökümü (ölçülen, tahmin değil): ${bits.join(', ')}`);
   }
-  if (includeScreen && t.screenMinutes !== null) lines.push(`- Ekran süresi (iş saatini de içerebilir): ${formatDuration(t.screenMinutes)}`);
+  if (includeScreen && t.screenMinutes !== null) {
+    lines.push(`- Ekran süresi (iş saatini de içerebilir): ${formatDuration(t.screenMinutes)}`);
+    if (t.languageScreenMinutes > 0) {
+      lines.push(`- Bunun ${formatDuration(t.languageScreenMinutes)}'sı dil öğrenme uygulamasında geçti (kullanıcının hedefi; ekran yerine önerilerde sayma)`);
+    }
+  }
   return lines;
 }
 

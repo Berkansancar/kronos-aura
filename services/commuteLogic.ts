@@ -58,7 +58,7 @@ export function remainingMinutes(state: CommuteState, typical: number | null): n
 }
 
 export interface CommuteSuggestion {
-  kind: 'TASK' | 'IDEA';
+  kind: 'TASK' | 'IDEA' | 'LANGUAGE';
   taskId: string | null;
   title: string;
   minutes: number;
@@ -82,13 +82,48 @@ const IDEA_MINUTES = 5;
  * Yola sığan işleri seçer: önce "yolda yapılabilir" işaretliler, sonra yola sığan hafif işler.
  * Süreler toplamı yolu aşmaz. Hiç iş yoksa iki kısa fikir önerilir (`seed` ile döner).
  */
+export interface CommuteLanguage {
+  /** Günlük hedef (dk); null = hedef yok */
+  goalMin: number | null;
+  /** Bugün şimdiye kadar yapılan (dk) */
+  doneMin: number;
+  /** Sayılan uygulamanın adı (ör. "Duolingo") */
+  appName: string;
+}
+
 export function commuteSuggestions(
   tasks: Task[],
   available: number,
   direction: CommuteDirection,
   seed: number,
-  max = 3
+  max = 3,
+  language?: CommuteLanguage
 ): CommuteSuggestion[] {
+  // Yolda yapabildiğin şey çoğunlukla dil öğrenmekse ilk satır odur; süre otomatik sayılır, düğme gerekmez
+  const lang: CommuteSuggestion[] = [];
+  if (language) {
+    const left = language.goalMin === null ? 10 : Math.max(0, language.goalMin - language.doneMin);
+    const progress =
+      language.goalMin === null ? `bugün ${language.doneMin} dk` : `bugün ${language.doneMin} / ${language.goalMin} dk`;
+    lang.push({
+      kind: 'LANGUAGE',
+      taskId: null,
+      title: `Dil öğrenme (${language.appName}) · ${progress}`,
+      minutes: left > 0 ? Math.min(Math.max(5, left), available) : 0,
+    });
+  }
+  const rest = commuteBaseSuggestions(tasks, available, direction, seed, Math.max(0, max - lang.length));
+  return [...lang, ...rest];
+}
+
+function commuteBaseSuggestions(
+  tasks: Task[],
+  available: number,
+  direction: CommuteDirection,
+  seed: number,
+  max: number
+): CommuteSuggestion[] {
+  if (max <= 0) return [];
   const open = tasks.filter((t) => t.status === 'PENDING' && t.estimatedDuration <= available);
   const flagged = open.filter((t) => t.commuteOk === true).sort((a, b) => b.estimatedDuration - a.estimatedDuration);
   const light = open
@@ -107,12 +142,9 @@ export function commuteSuggestions(
 
   const ideas = direction === 'HOME' ? IDEAS_HOME : IDEAS_TO_WORK;
   const first = Math.abs(Math.floor(seed)) % ideas.length;
-  return [first, (first + 1) % ideas.length].map((i) => ({
-    kind: 'IDEA' as const,
-    taskId: null,
-    title: ideas[i],
-    minutes: IDEA_MINUTES,
-  }));
+  return [first, (first + 1) % ideas.length]
+    .slice(0, Math.min(2, max))
+    .map((i) => ({ kind: 'IDEA' as const, taskId: null, title: ideas[i], minutes: IDEA_MINUTES }));
 }
 
 /** Kartın alt başlığı: "Yolculuğun ≈ 30 dk · 12 dk geçti". */

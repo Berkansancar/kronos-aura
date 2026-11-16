@@ -192,7 +192,7 @@ async function dbTests(): Promise<void> {
   const { db, raw } = makeDb();
   await migrateDbIfNeeded(db);
   const version = (raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;
-  check('temiz kurulum son sürüme gelir', version === DATABASE_VERSION && DATABASE_VERSION === 9);
+  check('temiz kurulum son sürüme gelir', version === DATABASE_VERSION && DATABASE_VERSION === 10);
 
   // v2'den yükseltme: DailyStat yokken sürüm 2 görünür.
   raw.exec('DROP TABLE DailyStat; PRAGMA user_version = 2;');

@@ -310,3 +310,15 @@ export interface SmokeLog {
   day: string;
   at: string;
 }
+
+/** PAPER: kalem-kağıt, APP: uygulamada geçen süre (elle), OTHER: dinleme, konuşma, video vb. */
+export type StudyKind = 'PAPER' | 'APP' | 'OTHER';
+
+/** Elle eklenen dil çalışması. `day` mantıksal gündür (gece 04:00'e kadar önceki gün). */
+export interface StudyLog {
+  id: string;
+  day: string;
+  kind: StudyKind;
+  minutes: number;
+  loggedAt: string;
+}

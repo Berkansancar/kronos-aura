@@ -14,6 +14,7 @@ import {
 import type { DayEvent } from '../database/types';
 import { dayKey } from './activityLogic';
 import { buildFlow } from './dayFlowLogic';
+import { languageForDays } from './language';
 import type { HistoryDay, HistoryOutcome } from './historyLogic';
 import { nutritionDay } from './nutritionLogic';
 import { weekEndDate, windowKeys } from './weeklyLogic';
@@ -74,6 +75,11 @@ export async function gatherHistory(
     events.set(e.day, list);
   }
 
+  // Dil öğrenme (hata verirse bu ölçü boş kalır, diğerleri çalışır)
+  const lang = new Map(
+    (await languageForDays(db, keys).catch(() => [])).map((x) => [x.day, x.summary.measured ? x.summary.total : null])
+  );
+
   const days: HistoryDay[] = keys.map((k) => {
     const st = stats.get(k);
     const sl = sleeps.get(k);
@@ -100,6 +106,7 @@ export async function gatherHistory(
       wakeMin,
       shopMinutes: flow && !flow.shopOpen ? flow.shopMinutes : null,
       commuteMinutes: commuteParts.length > 0 ? commuteParts.reduce((a, b) => a + b, 0) : null,
+      languageMinutes: lang.get(k) ?? null,
     };
   });
 

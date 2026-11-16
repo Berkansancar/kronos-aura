@@ -40,6 +40,7 @@ import { loadDayNutrition, type NutritionOptions } from './nutrition';
 import { nutritionDay } from './nutritionLogic';
 import { analyzeSmoking } from './smokeLogic';
 import { latestOutcomes } from './taskOutcomeLogic';
+import { languageForDay } from './language';
 import { analyzeTimeUse, type OpenTaskInfo } from './timeUseLogic';
 import { getWork } from './workSettings';
 import { workWindowFor } from './workLogic';
@@ -168,6 +169,8 @@ export async function gatherDayFacts(
         .filter((d) => d.at >= dayStartMs + work.startMin * 60_000 && d.at < dayStartMs + work.endMin * 60_000)
         .reduce((sum, d) => sum + d.minutes, 0)
     : 0;
+  // Dil öğrenme: ekrandaki uygulama süresi ekrandan düşülür, ekran dışı elle girilen "kayıt dışı"dan düşülür
+  const lang = await languageForDay(db, key).catch(() => null);
   const timeUse = analyzeTimeUse({
     wakeMin,
     wakeSource,
@@ -179,6 +182,8 @@ export async function gatherDayFacts(
     doneInWorkMinutes: doneInWork,
     driftMinutes,
     screenMinutes: stat ? stat.screenMinutes : null,
+    languageScreenMinutes: lang ? lang.summary.screenMinutes : 0,
+    languageOffScreenMinutes: lang ? lang.summary.offScreenMinutes : 0,
   });
   const smoke = analyzeSmoking(
     (await listSmokeLogs(db, key)).map((l) => new Date(l.at)),
