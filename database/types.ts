@@ -343,3 +343,19 @@ export interface StudyLog {
   minutes: number;
   loggedAt: string;
 }
+
+// ───────────────────────── Kelime defteri ─────────────────────────
+
+/** Aralıklı tekrar kartı. `box` 0 (yeni) … 5 (öğrenildi); `dueDay` tekrar günü (yyyy-mm-dd). */
+export interface VocabCard {
+  id: string;
+  word: string;
+  meaning: string;
+  note: string | null;
+  box: number;
+  dueDay: string;
+  lastDay: string | null;
+  seen: number;
+  known: number;
+  createdAt: string;
+}

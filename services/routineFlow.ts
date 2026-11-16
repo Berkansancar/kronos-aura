@@ -13,6 +13,7 @@ import {
   addRoutineLog,
   createRoutine,
   createTask,
+  deleteManualRoutineDoneLogs,
   deleteTask,
   getRoutine,
   getTask,
@@ -246,4 +247,56 @@ export async function retireRoutine(
 
 export async function restoreRoutine(db: SQLiteDatabase, routineId: string): Promise<void> {
   await setRoutineStatus(db, routineId, 'ACTIVE');
+}
+
+// ───────────────────────── Sonradan işaretleme ─────────────────────────
+
+/**
+ * Takvimden bir gün için rutini "yapıldı" işaretler. Gelecek gün işaretlenemez. Bugün için normal akış çalışır
+ * (açık görev varsa kapanır). Geçmiş günde kayıt, rutinin sorulma saatine yazılır; böylece "en iyi saat" gibi
+ * istatistikler bozulmaz. Daha önce yapıldıysa hiçbir şey yapmaz ve false döner.
+ */
+export async function markRoutineDoneOnDay(
+  db: SQLiteDatabase,
+  routine: Routine,
+  day: string,
+  now: Date = new Date()
+): Promise<boolean> {
+  const today = dayKey(now);
+  if (day > today) throw new Error('Gelecek bir gün işaretlenemez.');
+  if (day === today) {
+    const before = (await todayLogs(db, routine.id, now)).some((l) => l.outcome === 'DONE');
+    if (before) return false;
+    await markRoutineDone(db, routine, now);
+    return true;
+  }
+  const exists = (await listRoutineLogsSince(db, day)).some(
+    (l) => l.routineId === routine.id && l.day === day && l.outcome === 'DONE'
+  );
+  if (exists) return false;
+  const [y, m, d] = day.split('-').map(Number);
+  await addRoutineLog(db, {
+    routineId: routine.id,
+    day,
+    outcome: 'DONE',
+    loggedAt: new Date(y, m - 1, d, routine.askHour, routine.askMinute),
+  });
+  return true;
+}
+
+/**
+ * Takvimden eklenmiş (göreve bağlı olmayan) "yapıldı" işaretini geri alır.
+ * REMOVED: silindi · LOCKED: kayıt bir görevden geldiği için geri alınamaz · NONE: zaten işaretli değildi.
+ */
+export async function unmarkRoutineDay(
+  db: SQLiteDatabase,
+  routineId: string,
+  day: string
+): Promise<'REMOVED' | 'LOCKED' | 'NONE'> {
+  const removed = await deleteManualRoutineDoneLogs(db, routineId, day);
+  if (removed > 0) return 'REMOVED';
+  const locked = (await listRoutineLogsSince(db, day)).some(
+    (l) => l.routineId === routineId && l.day === day && l.outcome === 'DONE' && l.taskId
+  );
+  return locked ? 'LOCKED' : 'NONE';
 }

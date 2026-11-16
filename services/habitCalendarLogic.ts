@@ -194,15 +194,27 @@ export function summarize(
   };
 }
 
-/** Bir günde yapılan ve yapılmayan rutinler (gün ayrıntısı için). */
+/**
+ * Bir günde yapılan ve yapılmayan rutinler (gün ayrıntısı için). Yapılmayanlar yalnızca o gün planlı olanlardır;
+ * belirli günlere bağlı bir rutin planlı olmadığı günde listelenmez (ama yapıldıysa yapılanlarda görünür).
+ */
 export function dayDetail(
   day: string,
   routines: Routine[],
   logs: RoutineLog[]
 ): { done: Routine[]; notDone: Routine[] } {
   const ids = doneByDay(logs).get(day) ?? new Set<string>();
+  const date = parseDayKey(day);
   return {
     done: routines.filter((r) => ids.has(r.id)),
-    notDone: routines.filter((r) => !ids.has(r.id)),
+    notDone: routines.filter((r) => !ids.has(r.id) && isRoutineDay(r, date)),
   };
+}
+
+/**
+ * O gün "yapıldı" kaydı bir göreve bağlı olan rutinler. Bunlar takvimden geri alınamaz (görev tamamlanmış sayılır);
+ * görevi geri almak "Günü işaretle"den yapılır.
+ */
+export function lockedDone(day: string, logs: RoutineLog[]): Set<string> {
+  return new Set(logs.filter((l) => l.day === day && l.outcome === 'DONE' && l.taskId).map((l) => l.routineId));
 }

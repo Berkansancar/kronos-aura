@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -7,13 +7,17 @@ import { colors, radius, spacing } from '../constants/theme';
 import { dayKey, parseDayKey } from '../services/activityLogic';
 import {
   dayDetail,
+  lockedDone,
   monthKeyOf,
   monthTitle,
   shiftMonth,
   WEEKDAY_SHORT,
 } from '../services/habitCalendarLogic';
+import type { Routine } from '../database/types';
 import { loadHabitScreen, setMoodForDay, type HabitScreenData } from '../services/habits';
 import { formatMood, MOODS, moodInfo } from '../services/moodLogic';
+import { markRoutineDoneOnDay, unmarkRoutineDay } from '../services/routineFlow';
+import { refreshReminders } from '../services/reminderSync';
 import { CATEGORY_COLOR, routineColor, routineIcon, withAlpha } from '../services/routineLook';
 import { tipOfDay } from '../services/selfCareTips';
 
@@ -55,6 +59,28 @@ export default function HabitsScreen() {
     try {
       await setMoodForDay(db, selected, v, new Date());
       await load();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Takvimden sonradan işaretleme: telefona bakamadığın günleri düzeltmek için
+  const toggleDone = async (r: Routine, isDone: boolean) => {
+    if (busy || selectedIsFuture) return;
+    setBusy(true);
+    try {
+      if (isDone) {
+        const res = await unmarkRoutineDay(db, r.id, selected);
+        if (res === 'LOCKED') {
+          Alert.alert('Geri alınamıyor', 'Bu, bir görev olarak tamamlanmış. Görevi "Günü işaretle" ekranından geri alabilirsin.');
+        }
+      } else {
+        await markRoutineDoneOnDay(db, r, selected, new Date());
+      }
+      if (selected === today) await refreshReminders(db, new Date()).catch(() => undefined);
+      await load();
+    } catch (e) {
+      Alert.alert('Bir sorun oldu', e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
@@ -181,14 +207,42 @@ export default function HabitsScreen() {
               <View style={styles.detail}>
                 <Text style={styles.detailTitle}>{parseDayKey(selected).getDate()} {monthTitle(selected.slice(0, 7)).split(' ')[0]}</Text>
                 {detail.done.map((r) => (
-                  <Text key={r.id} style={[styles.detailRow, { color: routineColor(r) }]}>
-                    ✓ {routineIcon(r)} {r.title}
-                  </Text>
+                  <View key={r.id} style={styles.markRow}>
+                    <Text style={[styles.detailRow, { color: routineColor(r), flex: 1 }]}>
+                      ✓ {routineIcon(r)} {r.title}
+                    </Text>
+                    {!selectedIsFuture && !lockedDone(selected, data.logs).has(r.id) && (
+                      <Pressable disabled={busy} onPress={() => toggleDone(r, true)} hitSlop={6}>
+                        <Text style={styles.undo}>Geri al</Text>
+                      </Pressable>
+                    )}
+                  </View>
                 ))}
-                {detail.done.length === 0 && <Text style={styles.muted}>Bu güne kayıtlı bir rutin yok.</Text>}
-                {!selectedIsFuture && detail.notDone.length > 0 && detail.done.length > 0 && (
-                  <Text style={styles.muted}>{detail.notDone.length} rutin işaretlenmemiş. Sorun değil.</Text>
+                {detail.notDone.map((r) => (
+                  <View key={r.id} style={styles.markRow}>
+                    <Text style={[styles.detailRow, { color: colors.textMuted, flex: 1 }]}>
+                      ○ {routineIcon(r)} {r.title}
+                    </Text>
+                    {!selectedIsFuture && (
+                      <Pressable
+                        disabled={busy}
+                        onPress={() => toggleDone(r, false)}
+                        style={[styles.markBtn, { borderColor: routineColor(r) }]}
+                      >
+                        <Text style={[styles.markBtnText, { color: routineColor(r) }]}>Yaptım</Text>
+                      </Pressable>
+                    )}
+                  </View>
+                ))}
+                {detail.done.length === 0 && detail.notDone.length === 0 && (
+                  <Text style={styles.muted}>Bu gün için planlı rutin yok.</Text>
                 )}
+                {!selectedIsFuture && detail.notDone.length > 0 && (
+                  <Text style={styles.muted}>
+                    Telefona bakamadığın günleri buradan "Yaptım" diyerek tamamlayabilirsin. İşaretlenmeyen rutin sorun değil.
+                  </Text>
+                )}
+                {selectedIsFuture && <Text style={styles.muted}>Bu gün henüz gelmedi.</Text>}
               </View>
             )}
           </>
@@ -342,6 +396,10 @@ const styles = StyleSheet.create({
   },
   detailTitle: { color: colors.text, fontSize: 15, fontWeight: '700' },
   detailRow: { fontSize: 14, fontWeight: '600' },
+  markRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  markBtn: { borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: 6 },
+  markBtnText: { fontSize: 12, fontWeight: '800' },
+  undo: { color: colors.textMuted, fontSize: 12, textDecorationLine: 'underline' },
   noteText: { color: colors.textMuted, fontSize: 13, fontStyle: 'italic', lineHeight: 19 },
   weekBars: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-end' },
   barCol: { flex: 1, alignItems: 'center', gap: 4 },

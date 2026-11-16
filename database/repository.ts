@@ -36,6 +36,7 @@ import type {
   WaterLog,
   MoodLog,
   MoodValue,
+  VocabCard,
 } from './types';
 
 // ───────────────────────── Kullanıcı ─────────────────────────
@@ -1088,4 +1089,66 @@ export async function listMoodLogsSince(db: SQLiteDatabase, sinceDay: string): P
 
 export async function deleteMoodLog(db: SQLiteDatabase, day: string): Promise<void> {
   await db.runAsync('DELETE FROM MoodLog WHERE day = ?', [day]);
+}
+
+/**
+ * Bir rutinin o günkü, bir göreve bağlı olmayan "yapıldı" kayıtlarını siler (sonradan işareti geri almak için).
+ * Göreve bağlı kayıtlara dokunulmaz. Silinen kayıt sayısını döndürür.
+ */
+export async function deleteManualRoutineDoneLogs(db: SQLiteDatabase, routineId: string, day: string): Promise<number> {
+  const rows = await db.getAllAsync<{ id: string }>(
+    `SELECT id FROM RoutineLog WHERE routineId = ? AND day = ? AND outcome = 'DONE' AND taskId IS NULL`,
+    [routineId, day]
+  );
+  if (rows.length === 0) return 0;
+  await db.runAsync(`DELETE FROM RoutineLog WHERE routineId = ? AND day = ? AND outcome = 'DONE' AND taskId IS NULL`, [
+    routineId,
+    day,
+  ]);
+  return rows.length;
+}
+
+// ───────────────────────── Kelime defteri ─────────────────────────
+
+export async function insertVocab(db: SQLiteDatabase, card: VocabCard): Promise<void> {
+  await db.runAsync(
+    `INSERT INTO Vocab (id, word, meaning, note, box, dueDay, lastDay, seen, known, createdAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [card.id, card.word, card.meaning, card.note, card.box, card.dueDay, card.lastDay, card.seen, card.known, card.createdAt]
+  );
+}
+
+export async function listVocab(db: SQLiteDatabase): Promise<VocabCard[]> {
+  return db.getAllAsync<VocabCard>('SELECT * FROM Vocab ORDER BY createdAt DESC, rowid DESC');
+}
+
+export async function getVocab(db: SQLiteDatabase, id: string): Promise<VocabCard | null> {
+  return db.getFirstAsync<VocabCard>('SELECT * FROM Vocab WHERE id = ?', [id]);
+}
+
+export async function saveVocabProgress(
+  db: SQLiteDatabase,
+  id: string,
+  p: Pick<VocabCard, 'box' | 'dueDay' | 'lastDay' | 'seen' | 'known'>
+): Promise<void> {
+  await db.runAsync('UPDATE Vocab SET box = ?, dueDay = ?, lastDay = ?, seen = ?, known = ? WHERE id = ?', [
+    p.box,
+    p.dueDay,
+    p.lastDay,
+    p.seen,
+    p.known,
+    id,
+  ]);
+}
+
+export async function updateVocabText(
+  db: SQLiteDatabase,
+  id: string,
+  t: Pick<VocabCard, 'word' | 'meaning' | 'note'>
+): Promise<void> {
+  await db.runAsync('UPDATE Vocab SET word = ?, meaning = ?, note = ? WHERE id = ?', [t.word, t.meaning, t.note, id]);
+}
+
+export async function deleteVocab(db: SQLiteDatabase, id: string): Promise<void> {
+  await db.runAsync('DELETE FROM Vocab WHERE id = ?', [id]);
 }

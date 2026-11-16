@@ -233,7 +233,7 @@ CREATE TABLE IF NOT EXISTS SleepLog (
 );
 `;
 
-/** v12: rutine simge, renk ve günler (isteğe bağlı) + günlük ruh hali kaydı. */
+/** v12: rutine simge, renk ve günler (isteğe bağlı) + günlük ruh hali kaydı + kelime defteri. */
 const CREATE_TABLES_V12 = `
 CREATE TABLE IF NOT EXISTS MoodLog (
   day       TEXT PRIMARY KEY NOT NULL,
@@ -241,6 +241,20 @@ CREATE TABLE IF NOT EXISTS MoodLog (
   note      TEXT,
   updatedAt TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS Vocab (
+  id        TEXT PRIMARY KEY NOT NULL,
+  word      TEXT NOT NULL,
+  meaning   TEXT NOT NULL,
+  note      TEXT,
+  box       INTEGER NOT NULL DEFAULT 0 CHECK (box BETWEEN 0 AND 5),
+  dueDay    TEXT NOT NULL,
+  lastDay   TEXT,
+  seen      INTEGER NOT NULL DEFAULT 0,
+  known     INTEGER NOT NULL DEFAULT 0,
+  createdAt TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_vocab_due ON Vocab(dueDay);
 `;
 const ADD_ROUTINE_ICON = `ALTER TABLE Routine ADD COLUMN icon TEXT;`;
 const ADD_ROUTINE_COLOR = `ALTER TABLE Routine ADD COLUMN color TEXT;`;

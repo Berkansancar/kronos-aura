@@ -164,6 +164,12 @@ export default function LanguageScreen() {
               )}
             </View>
 
+            <Pressable onPress={() => router.push('/vocab')} style={styles.card}>
+              <Text style={styles.cardLabel}>Kelime defteri</Text>
+              <Text style={styles.body}>📒 Yolda gördüğün kelimeleri yaz, tekrar kartlarıyla pekiştir.</Text>
+              <Text style={styles.link}>Defteri aç ›</Text>
+            </Pressable>
+
             <Text style={styles.section}>Çalışma ekle</Text>
             <View style={styles.card}>
               <View style={styles.chipRow}>

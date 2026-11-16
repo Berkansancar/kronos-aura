@@ -31,7 +31,9 @@
     "test:weekplan": "tsx scripts/test-weekplan.ts",
     "test:guide": "tsx scripts/test-guide.ts",
     "test:habits": "tsx scripts/test-habits.ts",
-    "test:days": "tsx scripts/test-days.ts"
+    "test:days": "tsx scripts/test-days.ts",
+    "test:backfill": "tsx scripts/test-backfill.ts",
+    "test:vocab": "tsx scripts/test-vocab.ts"
   },
   "dependencies": {
     "expo": "~58.0.0"

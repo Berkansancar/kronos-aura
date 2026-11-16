@@ -35,6 +35,7 @@ export const BACKUP_TABLES = [
   'SleepLog',
   'StudyLog',
   'MoodLog',
+  'Vocab',
 ] as const;
 export type BackupTable = (typeof BACKUP_TABLES)[number];
 
@@ -62,6 +63,7 @@ const TABLE_LABELS: Partial<Record<BackupTable, string>> = {
   SleepLog: 'Uyku kaydı',
   StudyLog: 'Dil çalışması',
   MoodLog: 'Ruh hali kaydı',
+  Vocab: 'Kelime',
   DayReview: 'Gün sonu değerlendirmesi',
 };
 
