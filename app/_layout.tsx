@@ -119,6 +119,9 @@ export default function RootLayout() {
           <Stack.Screen name="vocab" />
           <Stack.Screen name="routine-run" />
           <Stack.Screen name="monthly" />
+          <Stack.Screen name="exercise" />
+          <Stack.Screen name="exercise-move" />
+          <Stack.Screen name="exercise-run" />
         </Stack>
       </SQLiteProvider>
     </Suspense>

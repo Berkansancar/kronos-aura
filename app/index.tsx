@@ -88,6 +88,8 @@ import { materializePlannedRoutines, reviewAvailable, reviewDayOf } from '../ser
 import { loadBackupNudge, snoozeBackupNudge } from '../services/backupNudge';
 import { loadTypicalCommute } from '../services/commute';
 import { loadGame, takeLevelUp } from '../services/game';
+import { loadExercise } from '../services/exercise';
+import { tileLine as exerciseTileLine } from '../services/exerciseLogic';
 import { DATA_CHANGED_EVENT } from '../services/notificationActionQueue';
 import { countParked } from '../services/weekPlan';
 import { loadGuide, type GuideData } from '../services/dayGuide';
@@ -142,6 +144,7 @@ export default function HomeScreen() {
   const [hardDay, setHardDayOn] = useState(false);
   const [nutrition, setNutrition] = useState<DayNutrition | null>(null);
   const [goalLine, setGoalLine] = useState<string | null>(null);
+  const [exerciseLine, setExerciseLine] = useState<string | null>(null);
   const [workEnabled, setWorkEnabled] = useState(false);
   const [workSched, setWorkSched] = useState<WorkSchedule | null>(null);
   const [outcomeNotes, setOutcomeNotes] = useState<Map<string, string>>(new Map());
@@ -224,6 +227,12 @@ export default function HomeScreen() {
       if (msg) setLevelMsg(msg);
     } catch {
       setGame(null);
+    }
+    // Egzersiz: bu haftaki seans sayısı (hata verirse varsayılan satır gösterilir)
+    try {
+      setExerciseLine(exerciseTileLine(await loadExercise(db), current));
+    } catch {
+      setExerciseLine(null);
     }
     // Hedefler özeti (hata verirse kart yine de açılır)
     try {
@@ -869,6 +878,11 @@ export default function HomeScreen() {
               title="Dil öğrenme"
               subtitle={lang ? (languageLine(lang.summary.total, lang.settings.goalMin) ?? 'Duolingo otomatik, kalem-kağıt elle') : 'Duolingo otomatik, kalem-kağıt elle'}
               onPress={() => router.push('/language')}
+            />
+            <HomeTile
+              title="Egzersiz"
+              subtitle={exerciseLine ?? 'Ekipmansız güç programı: çizimli hareketler ve seans takibi'}
+              onPress={() => router.push('/exercise')}
             />
             <HomeTile title="Alışkanlık takvimi" subtitle="Ay görünümü, seriler ve ruh hali" onPress={() => router.push('/habits')} />
             <HomeTile title="Aylık karne" subtitle="Ayın tek sayfalık özeti ve önceki ayla kıyas" onPress={() => router.push('/monthly')} />

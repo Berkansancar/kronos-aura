@@ -31,12 +31,14 @@ Bir yerde hata çıkarsa pencerede görünen kırmızı yazıyı kopyalayıp Cla
 app/            index.tsx (ana ekran) · chat.tsx (koç sohbeti) · settings.tsx · profile.tsx
                 activity.tsx (gün analizi, uyku) · routines.tsx (rutinlerim) · review.tsx (gün sonu)
                 nutrition.tsx (su ve yemek) · goals.tsx (hedefler, zaman dengesi)
-components/     CoachConsole, CoachCard, TaskItem, TaskComposer, EnergyCheckModal
+                exercise.tsx (egzersiz programı) · exercise-move.tsx (çizimli hareket anlatımı) · exercise-run.tsx (seans)
+components/     CoachConsole, CoachCard, TaskItem, TaskComposer, EnergyCheckModal, ExerciseFigure (çubuk adam çizimi)
                 RoutineCard, SnoozeModal, RoutineEditor
 services/       scheduler.ts (zamanlama motoru) · coachEngine.ts (kural tabanlı koç)
                 planner.ts · taskFlow.ts · coachContext.ts
                 routineLogic.ts · routineFlow.ts · routineTemplates.ts · routineReminders.ts
                 sleepLogic.ts · activity.ts
+                exerciseData.ts (hareketler, anlatımlar, pozlar) · exerciseFigure.ts (çizim geometrisi) · exerciseLogic.ts · exercise.ts
                 dayReviewLogic.ts · dayReview.ts · reminderSync.ts · ai/reviewAI.ts
 services/ai/    claudeClient.ts · personas.ts · coachAI.ts · settings.ts
 hooks/          useAICoachMessages.ts
@@ -76,6 +78,7 @@ npm run test:quests       haftalık görevler: seçim, ilerleme, bonus XP, geçm
 npm run test:notifyactions  bildirimden Yaptım / Yapacağım / Bugün değil: ayrıştırma, karar, kuyruk, kayıt, 47 kontrol
 npm run test:weekplan     hafta planı (güne ayırma, kapasite, otomatik dağıtım, veritabanı v11), 41 kontrol
 npm run test:game         oyunlaştırma (XP, seviye, altın, seri, rozet, ödül, veritabanından türetme, yedek), 62 kontrol
+npm run test:exercise     egzersiz: çizim geometrisi, içerik bütünlüğü, basamak atlama, seans kaydı, hafta sayısı, yedek, 271 kontrol
 npm run test:language     dil öğrenme (uygulama süresi, kalem-kağıt, hedef, geçmiş, gün analizi, yedek, veritabanı v10), 52 kontrol
 ```
 

@@ -37,7 +37,8 @@
     "test:runmode": "tsx scripts/test-runmode.ts",
     "test:monthly": "tsx scripts/test-monthly.ts",
     "test:quests": "tsx scripts/test-quests.ts",
-    "test:notifyactions": "tsx scripts/test-notifyactions.ts"
+    "test:notifyactions": "tsx scripts/test-notifyactions.ts",
+    "test:exercise": "tsx scripts/test-exercise.ts"
   },
   "dependencies": {
     "expo": "~58.0.0"
