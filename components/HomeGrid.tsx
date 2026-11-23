@@ -71,7 +71,7 @@ export function HomeGrid(p: Props) {
           </Pressable>
         </View>
 
-        <Text style={styles.hint}>Basılı tut: detay · Su kutusuna dokun: +200 ml · Yana kaydır: tüm akış ›</Text>
+        <Text style={styles.hint}>Basılı tut: detay · Yana kaydır: tüm akış ›</Text>
 
         {p.nowText && (
           <Pressable onPress={p.onNow} style={styles.nowCard}>
@@ -143,7 +143,7 @@ export function HomeGrid(p: Props) {
 }
 
 function TileIcon({ tile, waterRatio }: { tile: HomeTileDef; waterRatio: number }) {
-  if (tile.icon === ICON_DAMACANA) return <Damacana ratio={waterRatio} size={42} />;
+  if (tile.icon === ICON_DAMACANA) return <Damacana ratio={waterRatio} size={40} />;
   if (tile.icon === ICON_KRONOS || tile.icon === ICON_AURA) {
     const kronos = tile.icon === ICON_KRONOS;
     return (
@@ -174,12 +174,12 @@ const styles = StyleSheet.create({
   nowLabel: { color: colors.aura, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 },
   nowText: { color: colors.text, fontSize: 17, fontWeight: '700' },
   nowNote: { color: colors.textMuted, fontSize: 13, lineHeight: 18 },
-  grid: { gap: spacing.lg },
+  grid: { gap: 10 },
   row: { flexDirection: 'row', gap: spacing.sm },
-  tile: { flex: 1, alignItems: 'center', gap: 6, minHeight: 88 },
-  iconBox: { width: 60, height: 60, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  emoji: { fontSize: 28 },
-  coachDot: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  tile: { flex: 1, alignItems: 'center', gap: 6, minHeight: 78 },
+  iconBox: { width: 54, height: 54, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  emoji: { fontSize: 26 },
+  coachDot: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   coachLetter: { color: colors.bg, fontSize: 18, fontWeight: '800' },
   label: { color: colors.text, fontSize: 12, fontWeight: '600', textAlign: 'center' },
   tasks: {

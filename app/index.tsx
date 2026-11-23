@@ -11,7 +11,7 @@ import {
   View,
   type ScrollViewInstance,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { CoachConsole } from '../components/CoachConsole';
@@ -168,6 +168,7 @@ export default function HomeScreen() {
   const [moreOpen, setMoreOpen] = useState(false);
   // Ana ekran iki sayfa: 0 = simgeli ızgara, 1 = tam akış (eski ana ekran)
   const { width: pageW } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const pager = useRef<ScrollViewInstance>(null);
   const [page, setPage] = useState(0);
   const [editing, setEditing] = useState<Task | null>(null);
@@ -1015,7 +1016,7 @@ export default function HomeScreen() {
         </View>
       </ScrollView>
 
-      <View style={styles.dots} pointerEvents="box-none">
+      <View style={[styles.dots, { top: insets.top + 4 }]} pointerEvents="box-none">
         {Array.from({ length: HOME_PAGES }).map((_, i) => (
           <Pressable key={i} onPress={() => goToPage(i)} hitSlop={10} accessibilityLabel={i === 0 ? 'Simgeli ekran' : 'Tüm akış'}>
             <View style={[styles.dot, page === i && styles.dotOn]} />
@@ -1068,7 +1069,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   pager: { flex: 1 },
-  dots: { position: 'absolute', left: 0, right: 0, bottom: 26, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 },
+  dots: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.border },
   dotOn: { width: 22, backgroundColor: colors.aura },
   center: { alignItems: 'center', justifyContent: 'center' },

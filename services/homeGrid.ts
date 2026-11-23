@@ -39,7 +39,7 @@ export const HOME_TILES: HomeTileDef[] = [
   { id: 'rehber', label: 'Rehber', icon: '🧭', group: 'plan', route: '/guide' },
   { id: 'gun-akisi', label: 'Gün akışı', icon: '🕐', group: 'plan', route: '/day' },
   { id: 'isaretle', label: 'İşaretle', icon: '✅', group: 'plan', route: '/mark' },
-  { id: 'hafta', label: 'Hafta', icon: '🗓️', group: 'plan', route: '/week' },
+  { id: 'hafta', label: 'Hafta', icon: '📋', group: 'plan', route: '/week' },
   { id: 'takvim', label: 'Takvim', icon: '📅', group: 'plan', route: '/habits' },
   { id: 'gecmis', label: 'Geçmiş', icon: '📈', group: 'plan', route: '/history' },
   { id: 'hedef', label: 'Hedefler', icon: '🎯', group: 'plan', route: '/goals' },

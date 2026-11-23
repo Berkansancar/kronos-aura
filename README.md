@@ -289,7 +289,7 @@ Veritabanı sürümü 11 (`TaskOutcome`, `Setting`, `DayEvent`, `SmokeLog`, `Stu
 
 ## Ana ekran: iki sayfa (simgeli ızgara + tüm akış)
 
-Ana ekran **yatay iki sayfadır**; alttaki iki nokta hangi sayfada olduğunu gösterir (noktaya dokunarak da geçilir).
+Ana ekran **yatay iki sayfadır**; üstteki iki nokta hangi sayfada olduğunu gösterir (noktaya dokunarak da geçilir).
 
 - **1. sayfa (açılış): simgeli ızgara.** Üstte tarih ve ayar düğmesi, "ŞİMDİ" kartı (gün rehberinden), sonra üç sütunlu **15 simgeli kutu**
   ve altta açık görevlerin kısa özeti (dokununca 2. sayfaya geçer). Kutular renkle gruplanır: yeşil sağlık ve rutin (Rutinler,
