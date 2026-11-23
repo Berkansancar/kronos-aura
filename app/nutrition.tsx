@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, Text
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
+import { Damacana } from '../components/Damacana';
 import { WaterIcon } from '../components/WaterIcon';
 import { colors, radius, spacing } from '../constants/theme';
 import type { MealKind, MealLog, WaterLog } from '../database/types';
@@ -20,6 +21,7 @@ import {
   suggestMealKind,
   type DayNutrition,
 } from '../services/nutritionLogic';
+import { damacanaPercent } from '../services/damacana';
 import { drinkIcon, groupIcon, mealIcon } from '../services/nutritionIcons';
 import { getNutritionOptions } from '../services/nutritionSettings';
 import { refreshReminders } from '../services/reminderSync';
@@ -186,12 +188,16 @@ export default function NutritionScreen() {
             {/* ───── Su ───── */}
             <Text style={styles.section}>Su</Text>
             <View style={styles.card}>
-              <View style={styles.rowBetween}>
-                <Text style={styles.big}>{formatWater(n.waterMl)}</Text>
-                <Text style={styles.muted}>hedef {formatWater(n.waterGoalMl)}</Text>
-              </View>
-              <View style={styles.track}>
-                <View style={[styles.fill, { width: `${Math.round(n.waterRatio * 100)}%` }]} />
+              <View style={styles.jugRow}>
+                <Damacana ratio={n.waterRatio} size={120} />
+                <View style={styles.jugInfo}>
+                  <Text style={styles.big}>{formatWater(n.waterMl)}</Text>
+                  <Text style={styles.muted}>hedef {formatWater(n.waterGoalMl)}</Text>
+                  <Text style={styles.jugPercent}>%{damacanaPercent(n.waterRatio)}</Text>
+                  <Text style={styles.muted}>
+                    {n.waterLeftMl <= 0 ? 'Hedef tamam 🎉' : `Hedefe ${formatWater(n.waterLeftMl)} kaldı`}
+                  </Text>
+                </View>
               </View>
               <View style={styles.waterRow}>
                 {WATER_PRESETS.map((p) => (
@@ -458,6 +464,9 @@ const styles = StyleSheet.create({
   muted: { color: colors.textMuted, fontSize: 13 },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: spacing.md },
   rowEnd: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: spacing.lg },
+  jugRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
+  jugInfo: { flex: 1, gap: 4 },
+  jugPercent: { color: colors.aura, fontSize: 22, fontWeight: '800' },
   track: { height: 8, borderRadius: 4, backgroundColor: colors.surfaceAlt, overflow: 'hidden' },
   fill: { height: 8, borderRadius: 4, backgroundColor: colors.aura },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },

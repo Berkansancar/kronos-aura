@@ -6,7 +6,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { CoachConsole } from '../components/CoachConsole';
 import { EnergyCheckModal } from '../components/EnergyCheckModal';
 import { HomeTile } from '../components/HomeTile';
-import { WaterIcon } from '../components/WaterIcon';
+import { Damacana } from '../components/Damacana';
 import { MoodCard } from '../components/MoodCard';
 import { ReasonModal } from '../components/ReasonModal';
 import { RoutineCard } from '../components/RoutineCard';
@@ -800,7 +800,7 @@ export default function HomeScreen() {
             style={styles.quickBtn}
           >
             <View style={styles.quickWater}>
-              <WaterIcon kind="glass" size={20} />
+              <Damacana ratio={nutrition ? nutrition.waterRatio : 0} size={30} />
               <Text style={styles.quickMain}>+200 ml</Text>
             </View>
             <Text style={styles.quickSub} numberOfLines={1}>

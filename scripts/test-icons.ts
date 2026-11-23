@@ -4,9 +4,19 @@
  */
 import { createRoutine, getRoutine, getSetting, listRoutines, setRoutineStatus } from '../database/repository';
 import { migrateDbIfNeeded } from '../database/schema';
+import {
+  DAMACANA_BOX,
+  DAMACANA_COLORS,
+  DAMACANA_PARTS,
+  clampRatio,
+  damacanaInner,
+  damacanaPercent,
+  damacanaWaterColor,
+  damacanaWaterRect,
+} from '../services/damacana';
 import { EXERCISES } from '../services/exerciseData';
 import { FOOD_GROUPS } from '../services/foodTable';
-import { DRINK_PRESETS, MEAL_KINDS, WATER_PRESETS } from '../services/nutritionLogic';
+import { DRINK_PRESETS, MEAL_KINDS, WATER_PRESETS, analyzeNutrition } from '../services/nutritionLogic';
 import { DRINK_ICON, FOOD_GROUP_ICON, MEAL_ICON, drinkIcon, groupIcon, mealIcon } from '../services/nutritionIcons';
 import { ICON_UPGRADE_KEY, upgradeRoutineIcons } from '../services/routineIconUpgrade';
 import {
@@ -195,6 +205,47 @@ async function main(): Promise<void> {
   const later = await mk('Su iç akşam', '💧');
   check('ikinci çalıştırma hiçbir şey yapmaz (kullanıcı sonradan geri aldığı simge bozulmaz)', (await upgradeRoutineIcons(db)) === 0 && (await getRoutine(db, later.id))?.icon === '💧');
   check('şablondan eklenen su rutini bardak simgesiyle gelir', ROUTINE_TEMPLATES.find((t) => t.id === 'su-ic')?.icon === 'ico:glass');
+
+  console.log('Damacana (içtikçe dolar)');
+  const inBox = (b: { x: number; y: number; w: number; h: number }) => b.x >= 0 && b.y >= 0 && b.x + b.w <= DAMACANA_BOX.w && b.y + b.h <= DAMACANA_BOX.h;
+  const P = DAMACANA_PARTS;
+  check('tüm parçalar çizim kutusunun içinde', [P.cap, P.neck, P.body, P.glint, ...P.ridges].every(inBox) && inBox({ x: 0, y: P.label.y, w: DAMACANA_BOX.w, h: P.label.h }));
+  check('kapak üstte, boyun kapağın altında, gövde boyundan sonra başlar', P.cap.y < P.neck.y && P.neck.y < P.body.y && P.body.y > P.neck.y + P.neck.h - 3);
+  check('boyun ve kapak gövdenin ortasında', Math.abs(P.neck.x + P.neck.w / 2 - DAMACANA_BOX.w / 2) < 0.01 && Math.abs(P.cap.x + P.cap.w / 2 - DAMACANA_BOX.w / 2) < 0.01);
+  check('damacana gibi uzun (boy/genişlik > 1,4)', DAMACANA_BOX.h / DAMACANA_BOX.w > 1.4);
+  const inner = damacanaInner();
+  check('iç alan gövdenin çerçeve kalınlığı kadar içinde', inner.x === P.body.x + P.body.bw && inner.y === P.body.y + P.body.bw && inner.w === P.body.w - 2 * P.body.bw && inner.h === P.body.h - 2 * P.body.bw);
+  check('iç köşe yarıçapları dıştakinden çerçeve kalınlığı kadar küçük', inner.r.every((v, i) => Math.abs(v - (P.body.r[i] - P.body.bw)) < 1e-9 && v >= 0));
+  check('etiket bandı ve çizgiler iç alanda', P.label.y >= inner.y && P.label.y + P.label.h <= inner.y + inner.h && P.ridges.every((r) => r.x >= inner.x && r.x + r.w <= inner.x + inner.w && r.y >= inner.y));
+
+  check('oran sıkıştırma: negatif, NaN, sonsuz, taşan', clampRatio(-1) === 0 && clampRatio(NaN) === 0 && clampRatio(Infinity) === 0 && clampRatio(7) === 1 && clampRatio(0.4) === 0.4);
+  check('boş damacana: su yok', damacanaWaterRect(0).h === 0 && damacanaPercent(0) === 0);
+  const full = damacanaWaterRect(1);
+  check('dolu damacana: suyun tamamı iç alan', full.x === inner.x && full.y === inner.y && full.w === inner.w && full.h === inner.h && damacanaPercent(1) === 100);
+  check('oran 1\'i aşsa da taşmaz', damacanaWaterRect(3).h === inner.h && damacanaWaterRect(3).y === inner.y);
+  let prev = -1;
+  let monotone = true;
+  let inside = true;
+  let bottomFixed = true;
+  for (let i = 0; i <= 100; i += 1) {
+    const r = damacanaWaterRect(i / 100);
+    if (r.h < prev) monotone = false;
+    prev = r.h;
+    if (r.x < inner.x || r.x + r.w > inner.x + inner.w || r.y < inner.y - 1e-9 || r.y + r.h > inner.y + inner.h + 1e-9) inside = false;
+    if (Math.abs(r.y + r.h - (inner.y + inner.h)) > 1e-9) bottomFixed = false;
+  }
+  check('su yüksekliği oranla artar (her yüzde için)', monotone);
+  check('su her seviyede iç alanın içinde kalır', inside);
+  check('su hep gövdenin dibine yaslıdır (yukarı yükselir)', bottomFixed);
+  check('yarı dolu: yükseklik tam yarısı', Math.abs(damacanaWaterRect(0.5).h - inner.h / 2) < 1e-9);
+  check('su boyuna (boyun bölgesine) çıkmaz', damacanaWaterRect(1).y >= P.body.y && damacanaWaterRect(1).y >= P.neck.y + P.neck.h - P.neck.bw);
+  check('yüzde yuvarlanır', damacanaPercent(0.614) === 61 && damacanaPercent(0.615) === 62 && damacanaPercent(0.999) === 100);
+  check('hedefe varınca nane yeşili, değilse mavi', damacanaWaterColor(1) === DAMACANA_COLORS.done && damacanaWaterColor(0.99) === DAMACANA_COLORS.water && damacanaWaterColor(0) === DAMACANA_COLORS.water);
+  check('mavi ve yeşil birbirinden farklı', DAMACANA_COLORS.done !== DAMACANA_COLORS.water);
+  const dn = (ml: number) => analyzeNutrition({ day: '2026-11-16', now: new Date(2026, 10, 16, 14, 0), waterGoalMl: 2000, kcalTarget: null, water: ml > 0 ? [{ ml, minute: 600 }] : [], meals: [], peakStartHour: 10, peakEndHour: 14 });
+  check('beslenme çözümlemesinin oranı damacanaya bağlanır: 0 → boş', damacanaWaterRect(dn(0).waterRatio).h === 0);
+  check('1200 ml / 2000 ml → %60', damacanaPercent(dn(1200).waterRatio) === 60 && Math.abs(damacanaWaterRect(dn(1200).waterRatio).h - inner.h * 0.6) < 1e-9);
+  check('hedefin üstü → dolu ve yeşil', damacanaWaterRect(dn(3000).waterRatio).h === inner.h && damacanaWaterColor(dn(3000).waterRatio) === DAMACANA_COLORS.done);
 
   console.log('Beslenme simgeleri');
   check('her öğün türünün simgesi var', MEAL_KINDS.every((m) => mealIcon(m.id).length > 0) && mealIcon('ICECEK').length > 0);
