@@ -1,5 +1,5 @@
 /**
- * Açılış sözü testi: söz listesi, tekrarsız seçim (torba), saklama, selamlama, süre, ayar ve açılış penceresi yapılandırması.
+ * Açılış sözü testi: söz listesi, tekrarsız seçim (torba), saklama, selamlama, ayar ve açılış penceresi yapılandırması.
  * Çalıştırmak için:  npm run test:quotes
  */
 import { readFileSync } from 'node:fs';
@@ -12,7 +12,6 @@ import {
   QUOTES,
   QUOTE_BAG_KEY,
   RESUME_AWAY_MS,
-  displayMs,
   greetingFor,
   isOpeningEnabled,
   nextQuoteIndex,
@@ -125,11 +124,9 @@ async function main(): Promise<void> {
   await setOpeningEnabled(db, true);
   check('açılınca ayar açık', (await getOpeningEnabled(db)) === true);
 
-  console.log('Selamlama ve süre');
+  console.log('Selamlama ve açılış penceresi');
   check('selamlama: sabah, gün, akşam, gece', greetingFor(5) === 'Günaydın' && greetingFor(11) === 'Günaydın' && greetingFor(12) === 'İyi günler' && greetingFor(17) === 'İyi günler' && greetingFor(18) === 'İyi akşamlar' && greetingFor(21) === 'İyi akşamlar' && greetingFor(22) === 'İyi geceler' && greetingFor(2) === 'İyi geceler' && greetingFor(4) === 'İyi geceler');
   check('her saat için selamlama var', Array.from({ length: 24 }, (_, h) => greetingFor(h)).every((g) => g.length > 0));
-  check('süre en az 3,2 en çok 5,5 saniye', QUOTES.every((q) => displayMs(q.text) >= 3200 && displayMs(q.text) <= 5500) && displayMs('') === 3200 && displayMs('x'.repeat(500)) === 5500);
-  check('uzun söz daha uzun kalır', displayMs('x'.repeat(80)) > displayMs('x'.repeat(30)));
   check('arka plandan dönüşte: 20 dakikadan az gösterme, çok ise göster', !shouldShowOnResume(5 * 60_000) && !shouldShowOnResume(RESUME_AWAY_MS - 1) && shouldShowOnResume(RESUME_AWAY_MS) && shouldShowOnResume(3 * 3600_000) && !shouldShowOnResume(NaN));
   check('ayar: yalnızca "0" kapatır', isOpeningEnabled(null) && isOpeningEnabled('1') && isOpeningEnabled('') && !isOpeningEnabled('0'));
 
@@ -146,6 +143,8 @@ async function main(): Promise<void> {
   const comp = read('components/OpeningQuote.tsx');
   check('bileşen: dokununca geçer, geri tuşu geçer, arka plandan dönüşü dinler', comp.includes('onPress={finish}') && comp.includes('hardwareBackPress') && comp.includes('shouldShowOnResume'));
   check('bileşen: ayar kapalıysa gösterilmez', comp.includes('getOpeningEnabled'));
+  check('söz kendiliğinden kapanmaz: zamanlayıcı ve ilerleme çizgisi yok, yalnızca dokunuş ya da geri tuşu geçer', !comp.includes('setTimeout') && !comp.includes('displayMs') && !comp.includes('fillBar') && comp.includes('Devam etmek için ekrana dokun'));
+  check('söz süre fonksiyonu kalmadı', !read('services/quotes.ts').includes('displayMs'));
   check('ayarlar ekranında açma kapama anahtarı var', read('app/settings.tsx').includes('Açılış sözü') && read('app/settings.tsx').includes('setOpeningEnabled'));
 
   console.log(`\nTüm kontroller geçti: ${passed}`);

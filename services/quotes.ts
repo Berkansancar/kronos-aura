@@ -208,11 +208,6 @@ export function greetingFor(hour: number): string {
   return 'İyi geceler';
 }
 
-/** Sözün ekranda kalma süresi (ms): uzun söz daha uzun kalır; dokununca zaten geçilir. */
-export function displayMs(text: string): number {
-  return Math.min(5500, Math.max(3200, 2600 + text.length * 35));
-}
-
 /** Uygulama arka plandan dönünce ne kadar uzaklıktan sonra yeni söz gösterilsin (ms) */
 export const RESUME_AWAY_MS = 20 * 60 * 1000;
 export const shouldShowOnResume = (awayMs: number): boolean => Number.isFinite(awayMs) && awayMs >= RESUME_AWAY_MS;

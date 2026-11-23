@@ -78,7 +78,7 @@ npm run test:quests       haftalık görevler: seçim, ilerleme, bonus XP, geçm
 npm run test:notifyactions  bildirimden Yaptım / Yapacağım / Bugün değil: ayrıştırma, karar, kuyruk, kayıt, 47 kontrol
 npm run test:weekplan     hafta planı (güne ayırma, kapasite, otomatik dağıtım, veritabanı v11), 41 kontrol
 npm run test:game         oyunlaştırma (XP, seviye, altın, seri, rozet, ödül, veritabanından türetme, yedek), 62 kontrol
-npm run test:quotes       açılış sözleri: liste (100 söz), tekrarsız seçim, saklama, selamlama, süre, açılış penceresi ayarı, 49 kontrol
+npm run test:quotes       açılış sözleri: liste (100 söz), tekrarsız seçim, saklama, selamlama, açılış penceresi ayarı, dokunana kadar ekranda kalma
 npm run test:homegrid     ana ekran ızgarası: kutular, rotalar, sayfa hesabı, ipuçları, eski ekranın korunması, 36 kontrol
 npm run test:effects      etki ekranı: içerik ve rakam doğruluğu, seri, aşamalar, tekrar ve kalori toplamı, ekran satırları
 npm run test:icons        simgeler: çizilen bardak ve şişeler, ada göre rutin simgesi, eski rutinleri yenileme, beslenme simgeleri, eski telefon uyumu, 111 kontrol
@@ -295,8 +295,8 @@ Veritabanı sürümü 11 (`TaskOutcome`, `Setting`, `DayEvent`, `SmokeLog`, `Stu
   (`expo-splash-screen`, ayar `app.json`'da). Açılış penceresi, söz ekranı çizilene kadar açık tutulur; arada beyaz ya da boş
   bir an görünmez.
 - **Açılış sözü.** Uygulama her açıldığında koyu bir ekranda selamlama (Günaydın, İyi günler, İyi akşamlar, İyi geceler), tarih ve
-  **her seferinde farklı bir söz** görünür. Dokununca, geri tuşuna basınca ya da yaklaşık 3-5 saniye sonra (söz uzunsa biraz daha)
-  ana ekrana geçilir; altta kalan süreyi gösteren ince çizgi vardır. Uygulama 20 dakikadan uzun süre arka plandaysa, geri
+  **her seferinde farklı bir söz** görünür. Söz, sen ekrana dokunana ya da geri tuşuna basana kadar ekranda **kalır**;
+  kendiliğinden kapanmaz (altta "Devam etmek için ekrana dokun" yazar). Uygulama 20 dakikadan uzun süre arka plandaysa, geri
   dönünce de yeni bir söz gelir.
 - **Tekrarsız seçim.** Sözler karıştırılıp sırayla gösterilir: tüm sözler birer kez görünmeden hiçbiri tekrar etmez; yeni turun ilk
   sözü bir önceki turun sonuncusu olmaz. Durum telefonda saklanır, yedeğe girer.
