@@ -13,7 +13,7 @@ import { enqueueAction } from '../services/notificationActionQueue';
 import { actionKey, isStale, parseRoutineAction } from '../services/routineActionLogic';
 
 /** Bildirime dokunulunca bildirimin belirttiği ekranı (sabah brifingi, gün sonu) açar. */
-const ALLOWED_ROUTES = new Set(['/morning', '/review', '/nutrition', '/goals', '/mark', '/day']);
+const ALLOWED_ROUTES = new Set(['/morning', '/review', '/nutrition', '/goals', '/mark', '/day', '/exercise-run']);
 
 function openFromNotification(response: Notifications.NotificationResponse | null | undefined): void {
   const route = response?.notification.request.content.data?.route;
@@ -21,7 +21,7 @@ function openFromNotification(response: Notifications.NotificationResponse | nul
   // Uygulama yeni açılıyorsa gezinme hazır olana kadar kısa bekle
   setTimeout(() => {
     try {
-      router.push(route as '/morning' | '/review' | '/nutrition' | '/goals' | '/mark' | '/day');
+      router.push(route as '/morning' | '/review' | '/nutrition' | '/goals' | '/mark' | '/day' | '/exercise-run');
     } catch {
       // Gezinme hazır değilse ana ekran açık kalır; kullanıcı kartlardan girebilir.
     }

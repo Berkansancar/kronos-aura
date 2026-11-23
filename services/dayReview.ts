@@ -42,6 +42,8 @@ import { loadDayNutrition, type NutritionOptions } from './nutrition';
 import { nutritionDay } from './nutritionLogic';
 import { analyzeSmoking } from './smokeLogic';
 import { latestOutcomes } from './taskOutcomeLogic';
+import { loadExercise } from './exercise';
+import { exerciseDayFacts } from './exerciseLogic';
 import { languageForDay } from './language';
 import { analyzeTimeUse, type OpenTaskInfo } from './timeUseLogic';
 import { getWork } from './workSettings';
@@ -196,6 +198,10 @@ export async function gatherDayFacts(
   );
 
   const moodLog = await getMoodLog(db, key).catch(() => null);
+  // Sabah egzersizi: program ve o günkü seans (hata verirse değerlendirme egzersizsiz devam eder)
+  const exercise = await loadExercise(db)
+    .then((s) => exerciseDayFacts(s, day))
+    .catch(() => null);
 
   return {
     day: key,
@@ -221,6 +227,7 @@ export async function gatherDayFacts(
     timeUse,
     smoke,
     mood: moodLog ? { value: moodLog.mood, label: moodInfo(moodLog.mood).label } : null,
+    exercise,
   };
 }
 

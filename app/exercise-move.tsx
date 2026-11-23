@@ -6,7 +6,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { ExerciseFigures } from '../components/ExerciseFigure';
 import { colors, radius, spacing } from '../constants/theme';
 import { chooseExerciseLevel, loadExercise } from '../services/exercise';
-import { EXERCISE_BY_ID, LEVEL_NAMES, REST_SECONDS, type Level, type MoveId } from '../services/exerciseData';
+import { ALT_REST_SECONDS, EXERCISE_BY_ID, LEVEL_NAMES, type Level, type MoveId } from '../services/exerciseData';
 import { defaultState, lastResult, setsLine, targetLine, type ExerciseState } from '../services/exerciseLogic';
 
 const LEVELS: Level[] = [1, 2, 3];
@@ -84,8 +84,8 @@ export default function ExerciseMoveScreen() {
           <Text style={styles.label}>HEDEF</Text>
           <Text style={styles.target}>{targetLine(v)}</Text>
           <Text style={styles.muted}>
-            Setler arası {Math.round(REST_SECONDS / 60)} dakika dinlen. Tüm setlerde {v.max} {v.unit === 'sec' ? 'saniyeye' : 'tekrara'} ulaşınca bir üst basamağa
-            geçersin.
+            Setler arası {ALT_REST_SECONDS} saniye dinlen; hareketleri dönüşümlü yaptığın için aynı hareketin iki seti arası yaklaşık 3 dakika olur. Tüm
+            setlerde {v.max} {v.unit === 'sec' ? 'saniyeye' : 'tekrara'} ulaşınca bir üst basamağa geçersin.
           </Text>
           {last && last.item.level === level && <Text style={styles.muted}>Son seferin: {setsLine(v, last.item.sets)}</Text>}
         </View>

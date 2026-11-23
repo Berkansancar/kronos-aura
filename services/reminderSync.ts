@@ -12,8 +12,10 @@ import { loadDayNutrition } from './nutrition';
 import { nutritionDay } from './nutritionLogic';
 import { getNutritionOptions } from './nutritionSettings';
 import { loadRoutineBriefs } from './routineBriefs';
+import { loadExercise } from './exercise';
+import { doneToday } from './exerciseLogic';
 import { syncRoutineReminders, type ReminderStatus } from './routineReminders';
-import type { GoalReminders } from './routineRemindersLogic';
+import type { GoalReminders, ReminderExtras } from './routineRemindersLogic';
 
 /** Hedef hatırlatmaları kapalıysa null; açıksa bugünün su durumu ve yatış saati. */
 async function goalReminders(db: SQLiteDatabase, now: Date): Promise<GoalReminders | null> {
@@ -42,6 +44,17 @@ async function goalReminders(db: SQLiteDatabase, now: Date): Promise<GoalReminde
   }
 }
 
+/** Sabah egzersizi hatırlatması açıksa günler, güne başlama saati ve bugünün durumu; kapalıysa null. */
+async function exerciseReminder(db: SQLiteDatabase, now: Date): Promise<ReminderExtras['exercise']> {
+  try {
+    const ex = await loadExercise(db);
+    if (!ex.plan.remind) return null;
+    return { days: ex.plan.days, startMin: ex.plan.startMin, doneToday: doneToday(ex, now) };
+  } catch {
+    return null;
+  }
+}
+
 export async function refreshReminders(
   db: SQLiteDatabase,
   now: Date = new Date(),
@@ -49,5 +62,5 @@ export async function refreshReminders(
 ): Promise<ReminderStatus> {
   const b = briefs ?? (await loadRoutineBriefs(db, now));
   const extras = await reminderExtras(db, now);
-  return syncRoutineReminders(b, now, { ...extras, goals: await goalReminders(db, now) });
+  return syncRoutineReminders(b, now, { ...extras, goals: await goalReminders(db, now), exercise: await exerciseReminder(db, now) });
 }

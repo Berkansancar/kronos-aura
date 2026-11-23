@@ -16,6 +16,9 @@
     android:name="android.permission.PACKAGE_USAGE_STATS"
     tools:ignore="ProtectedPermissions" />
 
+  <!-- Sabah egzersizi icin Saat uygulamasina alarm kurmak (normal izin, kullanicidan sorulmaz) -->
+  <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+
   <!-- Android 11+: uygulama adlarini okuyabilmek icin -->
   <queries>
     <intent>

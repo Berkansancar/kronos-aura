@@ -78,7 +78,7 @@ npm run test:quests       haftalık görevler: seçim, ilerleme, bonus XP, geçm
 npm run test:notifyactions  bildirimden Yaptım / Yapacağım / Bugün değil: ayrıştırma, karar, kuyruk, kayıt, 47 kontrol
 npm run test:weekplan     hafta planı (güne ayırma, kapasite, otomatik dağıtım, veritabanı v11), 41 kontrol
 npm run test:game         oyunlaştırma (XP, seviye, altın, seri, rozet, ödül, veritabanından türetme, yedek), 62 kontrol
-npm run test:exercise     egzersiz: çizim geometrisi, içerik bütünlüğü, basamak atlama, seans kaydı, hafta sayısı, yedek, 271 kontrol
+npm run test:exercise     egzersiz: çizim geometrisi, içerik bütünlüğü, basamak atlama, seans kaydı, program (gün, güne başlama saati), sabah kartı, alarm, bildirim planı, yedek, 334 kontrol
 npm run test:language     dil öğrenme (uygulama süresi, kalem-kağıt, hedef, geçmiş, gün analizi, yedek, veritabanı v10), 52 kontrol
 ```
 
@@ -450,6 +450,19 @@ Rutin hatırlatma bildiriminde üç düğme çıkar: **Yaptım ✓**, **Yapacağ
 - Güvenli: zaten yapılmış rutin sonradan "Bugün değil" ile bozulmaz; aynı cevap iki kez yazılmaz; planlı olmayan günde (ör. Pazar rutini Pazartesi) bir şey değişmez; 36 saatten eski bildirim cevabı işlenmez.
 - Düğme uygulamayı bilerek açar: uygulama kapalıyken arka planda çalışmaya güvenilmediği için cevabın kaybolmaması tercih edildi.
 - Eski bildirimler uygulama ilk açıldığında düğmeli olarak yeniden kurulur.
+
+## Sabah egzersizi (ana ekranda sabah kartı, Ayarlar > Sabah egzersizi)
+
+Ekipmansız güç programı artık "Daha fazla" menüsünde değil; **sabah saatinde** yapılır. Program ekranına ana ekrandaki sabah kartından ya da Ayarlar > Sabah egzersizi'nden girilir.
+
+- **Güne başlama saati**: varsayılan 06:00 (05:00-07:00 arası seçenekler). Egzersiz bu saatte başlar ve 30 dakika sürer (06:00-06:30). Saat değişince pencere, bildirim ve alarm saati birlikte değişir.
+- **Egzersiz günleri**: varsayılan Pzt-Çar-Cum; günler program ekranından seçilir, en az bir gün kalır.
+- **Ana ekran kartı**: yalnızca egzersiz gününde 05:00-12:00 arası görünür (yapıldıysa "tamam" kartı); zor gün modunda yapılmamış kart gizlenir. Dokununca seans açılır.
+- **Hatırlatma bildirimi**: egzersiz günlerinde güne başlama saatinde, sesli ve titreşimli ayrı kanalda ("Sabah egzersizi"). Bugün yapıldıysa ya da zor gün modundaysa bugünün bildirimi gelmez. Ayarlardan kapatılabilir.
+- **Alarm**: program ekranındaki "Alarmı Saat uygulamasına kur" düğmesi telefonun Saat uygulamasını güne başlama saati ve "Sabah egzersizi" adıyla hazır dolu açar. Onay işaretine dokunup tekrar günlerini seçmek kullanıcıya kalır (Android, uygulamanın izinsiz ve sessizce alarm kurmasına izin vermez; böylece çift alarm da oluşmaz). Yeni paket gerekmez; yalnızca normal (kullanıcıya sorulmayan) `SET_ALARM` izni eklendi.
+- **30 dakikalık seans**: her hareket 3 set. 2 dk ısınma + 3 blok: Bacak ↔ Çekme, İtme ↔ Arka zincir, Karın. Bloktaki iki hareket dönüşümlü yapılır, setler arası 60 sn dinlenme (90 sn ya da 3 dk da seçilebilir). Aynı hareketin iki seti arası yaklaşık 3 dakika olur, güç için yeterli. Tahmini süre ekranda görünür; dinlenme uzarsa son blok (karın) atlanabilir.
+- **Günü değerlendirme**: sabah egzersizi yapıldıysa özetteki çipe ("sabah egzersizi yapıldı"), kural tabanlı değerlendirme metnine ve yapay zekâ komutuna (hangi hareket, kaç set) girer. Planlı ama yapılmadıysa yargılamadan yalnızca veri olarak anılır. Programın olduğu günlerde yeni "egzersiz" rutini önerilmez; önerilen rutin saatleri iş saatlerine ve sabah egzersiz penceresine denk gelmez (gerekirse iş çıkışına kaydırılır).
+- Veriler Setting tablosundadır (`exercise_v1`), yedeğe kendiliğinden dahildir; eski kayıtlar varsayılan programla açılır.
 
 ## Logo ve ikon
 

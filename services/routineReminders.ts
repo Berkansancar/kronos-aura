@@ -17,6 +17,8 @@ import {
 } from './routineRemindersLogic';
 
 const CHANNEL_ID = 'rutinler';
+/** Sabah egzersizi: yüksek öncelikli, sesli ve titreşimli ayrı kanal */
+const URGENT_CHANNEL_ID = 'egzersiz';
 
 const K_REVIEW_REMINDER = 'review_reminder';
 
@@ -88,6 +90,14 @@ async function ensureChannel(): Promise<void> {
     name: 'Rutin hatırlatmaları',
     importance: Notifications.AndroidImportance.DEFAULT,
     description: 'Günlük rutinlerin için "bugün yapacak mısın?" hatırlatmaları',
+  });
+  await Notifications.setNotificationChannelAsync(URGENT_CHANNEL_ID, {
+    name: 'Sabah egzersizi',
+    importance: Notifications.AndroidImportance.HIGH,
+    description: 'Egzersiz günlerinde güne başlama saatinde gelen hatırlatma',
+    sound: 'default',
+    vibrationPattern: [0, 500, 250, 500, 250, 500],
+    enableVibrate: true,
   });
   channelReady = true;
 }
@@ -173,7 +183,7 @@ export async function syncRoutineReminders(
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
           date: p.at,
-          channelId: CHANNEL_ID,
+          channelId: p.urgent ? URGENT_CHANNEL_ID : CHANNEL_ID,
         },
       });
     }

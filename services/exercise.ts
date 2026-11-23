@@ -37,3 +37,10 @@ export async function chooseExerciseLevel(db: SQLiteDatabase, move: MoveId, leve
   await setSetting(db, EXERCISE_KEY, serializeState(next));
   return next;
 }
+
+/** Durumu okuyup verilen işlevle değiştirir ve kaydeder (gün, güne başlama saati, hatırlatma ayarları için). */
+export async function updateExercise(db: SQLiteDatabase, change: (s: ExerciseState) => ExerciseState): Promise<ExerciseState> {
+  const next = change(await loadExercise(db));
+  await setSetting(db, EXERCISE_KEY, serializeState(next));
+  return next;
+}

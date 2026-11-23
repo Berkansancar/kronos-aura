@@ -512,6 +512,15 @@ export default function SettingsScreen() {
         </Pressable>
 
         <View style={styles.sectionDivider} />
+        <Text style={styles.heading2}>Sabah egzersizi</Text>
+        <Text style={styles.sub}>
+          Egzersiz günlerini, güne başlama saatini (varsayılan 06:00, 30 dakika), hatırlatmayı ve telefonun Saat uygulamasına alarm kurmayı buradan ayarlarsın.
+        </Text>
+        <Pressable onPress={() => router.push('/exercise')} style={styles.secondary}>
+          <Text style={styles.secondaryText}>Egzersiz programını aç</Text>
+        </Pressable>
+
+        <View style={styles.sectionDivider} />
         <Text style={styles.heading2}>Verilerim ve yedek</Text>
         <Text style={styles.sub}>
           Kayıtların yalnızca bu telefonda durur. Telefon değişir ya da uygulama silinirse gider; bu yüzden ara sıra

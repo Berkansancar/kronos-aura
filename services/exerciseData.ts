@@ -292,10 +292,10 @@ export const EXERCISES: ExerciseMove[] = [
           'Tekrarları bitirince ayak değiştir.',
         ],
         mistakes: ['Ön dizin içeri çökmesin; diz ayağın yönüne baksın.', 'Gövde öne eğilmesin.', 'Zıplayarak ya da hızla düşerek inme.'],
-        tips: ['Dengen zayıfsa bir duvara ya da sandalyeye parmak ucuyla dokun.', 'Kolaylaşınca (5 tekrar x 4 set) bir üst basamağa geç.'],
+        tips: ['Dengen zayıfsa bir duvara ya da sandalyeye parmak ucuyla dokun.', 'Kolaylaşınca (5 tekrar x 3 set) bir üst basamağa geç.'],
         unit: 'rep',
         perSide: true,
-        sets: 4,
+        sets: 3,
         min: 3,
         max: 5,
         poses: [splitTop, splitBottom],
@@ -316,7 +316,7 @@ export const EXERCISES: ExerciseMove[] = [
         tips: ['Sandalye kaymasın: duvara dayalı ya da halıya basmayan bir sandalye seç.', 'Dengen sallanırsa elini duvara hafifçe değdir.'],
         unit: 'rep',
         perSide: true,
-        sets: 4,
+        sets: 3,
         min: 3,
         max: 5,
         poses: [bulgarTop, bulgarBottom],
@@ -340,7 +340,7 @@ export const EXERCISES: ExerciseMove[] = [
         ],
         unit: 'rep',
         perSide: true,
-        sets: 4,
+        sets: 3,
         min: 3,
         max: 5,
         poses: [boxSquatTop, boxSquatBottom],
@@ -369,7 +369,7 @@ export const EXERCISES: ExerciseMove[] = [
         tips: ['Çok zorsa dizlerini yere koyarak başla.', 'Her sette bir tekrar daha yapabilecekken bırak.'],
         unit: 'rep',
         perSide: false,
-        sets: 4,
+        sets: 3,
         min: 3,
         max: 5,
         poses: [pushTop, pushBottom],
@@ -389,7 +389,7 @@ export const EXERCISES: ExerciseMove[] = [
         tips: ['Ayaklar ne kadar yüksekteyse hareket o kadar zor olur; sandalyeyi gerekirse kitaplarla yükselt.'],
         unit: 'rep',
         perSide: false,
-        sets: 4,
+        sets: 3,
         min: 3,
         max: 5,
         poses: [feetUpTop, feetUpBottom],
@@ -409,7 +409,7 @@ export const EXERCISES: ExerciseMove[] = [
         tips: ['Boyun ve omuzda keskin ağrı hissedersen dur.', 'Kolaylaşınca ayakları yükselttikçe baş aşağı şınava yaklaşırsın.'],
         unit: 'rep',
         perSide: false,
-        sets: 4,
+        sets: 3,
         min: 3,
         max: 5,
         poses: [pikeTop, pikeBottom],
@@ -443,7 +443,7 @@ export const EXERCISES: ExerciseMove[] = [
         ],
         unit: 'rep',
         perSide: false,
-        sets: 4,
+        sets: 3,
         min: 3,
         max: 5,
         poses: [rowKneesStart, rowKneesEnd],
@@ -463,7 +463,7 @@ export const EXERCISES: ExerciseMove[] = [
         tips: ['Masanın sağlam olduğundan emin ol.', 'Kolaylaşınca ayakları yükseltmeye geç.'],
         unit: 'rep',
         perSide: false,
-        sets: 4,
+        sets: 3,
         min: 3,
         max: 5,
         poses: [rowStraightStart, rowStraightEnd],
@@ -483,7 +483,7 @@ export const EXERCISES: ExerciseMove[] = [
         tips: ['Sandalye ve masa kesinlikle sağlam olmalı; ilk denemede birini yanına al.', 'Zorsa dizlerini hafif bük.'],
         unit: 'rep',
         perSide: false,
-        sets: 4,
+        sets: 3,
         min: 3,
         max: 5,
         poses: [rowChairStart, rowChairEnd],
@@ -509,10 +509,10 @@ export const EXERCISES: ExerciseMove[] = [
           '3 saniyede yavaşça in.',
         ],
         mistakes: ['Belini fazla kavislendirme; kalçayla it, bel zorlanmasın.', 'Ayaklarını kalçaya çok uzak ya da çok yakın koyma.'],
-        tips: ['Kolaylaşınca (5 tekrar x 4 set) tek bacağa geç.'],
+        tips: ['Kolaylaşınca (5 tekrar x 3 set) tek bacağa geç.'],
         unit: 'rep',
         perSide: false,
-        sets: 4,
+        sets: 3,
         min: 3,
         max: 5,
         poses: [bridgeDown, bridgeUp],
@@ -533,7 +533,7 @@ export const EXERCISES: ExerciseMove[] = [
         tips: ['Kramp girerse bir dakika dinlen, esne.'],
         unit: 'rep',
         perSide: true,
-        sets: 4,
+        sets: 3,
         min: 3,
         max: 5,
         poses: [singleBridgeDown, singleBridgeUp],
@@ -649,11 +649,31 @@ export const LEVEL_NAMES: Record<Level, string> = { 1: 'Kolay', 2: 'Orta', 3: 'Z
 /** Programın temel kuralları (egzersiz ekranında gösterilir). */
 export const PRINCIPLES: { title: string; text: string }[] = [
   { title: 'Az tekrar, zor hareket', text: 'Her sette 3-5 tekrar. 6-8 tekrar kolay geliyorsa bir üst basamağa geç; tekrar artırma.' },
-  { title: 'Uzun dinlen', text: 'Setler arası 3 dakika. Kısa dinlenme kas büyütür; uzun dinlenme gücü artırır.' },
+  { title: 'Sırayla çalış', text: 'İki hareketi dönüşümlü yap; setler arası 60 saniye dinlen. Aynı hareketin iki seti arası yaklaşık 3 dakika olur, güç için yeterli ve süre kısalır.' },
   { title: 'Tükenme', text: 'Bitmeden 1-3 tekrar önce bırak. Hata yapana kadar zorlama.' },
   { title: 'Yavaş in, güçlü kalk', text: 'İnişi 3 saniyede kontrollü yap, kalkışı hızlı ve güçlü.' },
-  { title: 'Haftada 3 gün', text: 'Araya en az bir gün dinlenme koy: Salı, Perşembe, Pazar gibi.' },
+  { title: 'Araya gün koy', text: 'Egzersiz günleri arasında en az bir gün dinlenme olsun; günleri aşağıdan seçebilirsin.' },
+];
+
+/** Sabah seansı 30 dakikaya sığar: 2 dakika ısınma + 3 blok. */
+export const SESSION_MINUTES = 30;
+export const WARMUP_MINUTES = 2;
+/** Dönüşümlü çalışırken setler arası dinlenme; tek başına çalışırken uzun dinlenme. */
+export const ALT_REST_SECONDS = 60;
+export const REST_SECONDS = 180;
+export const REST_CHOICES: readonly number[] = [60, 90, 180];
+
+/**
+ * Seans blokları: her blokta iki hareket dönüşümlü yapılır (bacak, sonra çekme, sonra yine bacak...).
+ * Karşıt bölgeler seçildi; biri çalışırken diğeri dinlenir.
+ */
+export const SESSION_BLOCKS: readonly (readonly MoveId[])[] = [['legs', 'pull'], ['push', 'hinge'], ['core']];
+
+export const WARMUP_STEPS: readonly string[] = [
+  'Kollarını ve omuzlarını 10 kez büyük daireler çizerek çevir.',
+  'Kalçanı ve dizlerini 10 kez çevir.',
+  '10 hafif squat yap (hızlı değil, kontrollü).',
+  '5 yavaş diz üstü şınav ya da duvara şınav yap.',
 ];
 
 export const SESSIONS_PER_WEEK = 3;
-export const REST_SECONDS = 180;

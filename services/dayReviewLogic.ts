@@ -17,6 +17,7 @@ import type {
 import { extractJsonObject } from './ai/claudeClient';
 import { nutritionPromptLines, type DayNutrition } from './nutritionLogic';
 import { formatDuration } from './format';
+import type { ExerciseDayFacts } from './exerciseLogic';
 import { moodInfo } from './moodLogic';
 import { ROUTINE_TEMPLATES } from './routineTemplates';
 import { smokePromptLine, type SmokeStats } from './smokeLogic';
@@ -60,6 +61,8 @@ export interface DayFacts {
   smoke?: SmokeStats | null;
   /** Kullanıcının seçtiği günlük ruh hali (not hiçbir yere gitmez; yalnızca seçim) */
   mood?: { value: number; label: string } | null;
+  /** Sabah egzersiz programı ve o günkü seans (program yoksa ya da okunamazsa yok) */
+  exercise?: ExerciseDayFacts | null;
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -70,6 +73,7 @@ export function factChips(f: DayFacts): string[] {
   chips.push(`${f.tasksDone.length} görev bitti`);
   const total = f.routinesDone.length + f.routinesSkipped.length + f.routinesOpen.length;
   if (total > 0) chips.push(`${f.routinesDone.length}/${total} rutin`);
+  if (f.exercise?.done) chips.push('sabah egzersizi yapıldı');
   if (f.steps !== null) chips.push(`${f.steps.toLocaleString('tr-TR')} adım${f.stepsReliable ? '' : ' (eksik olabilir)'}`);
   if (f.screenMinutes !== null) chips.push(`${formatDuration(f.screenMinutes)} ekran`);
   if (f.sleepMinutes !== null) chips.push(`uyku ~${formatDuration(f.sleepMinutes)}`);
@@ -84,7 +88,7 @@ export function factChips(f: DayFacts): string[] {
 
 /** Gün hiç kayıt bırakmadıysa true. */
 export function isQuietDay(f: DayFacts): boolean {
-  return f.tasksDone.length === 0 && f.routinesDone.length === 0;
+  return f.tasksDone.length === 0 && f.routinesDone.length === 0 && !f.exercise?.done;
 }
 
 // ───────────────────────── Yargı filtresi ─────────────────────────
@@ -126,7 +130,10 @@ export function ruleBasedIdeas(
   if ((f.sleepMinutes !== null && f.sleepMinutes < 360) || lateBed) order.push('uyku-hazirligi');
   if (f.energy.EXHAUSTED > 0 || f.energy.DISTRACTED > 0) order.push('nefes-meditasyon');
   if (f.routinesDone.length === 0) order.push('su-ic', 'nefes-meditasyon');
-  order.push('gunu-planla', 'yarini-hazirla', 'gunluk-notu', 'kitap-oku', 'egzersiz', 'derin-calisma', 'dil-calis');
+  // Sabah egzersiz programı varsa ayrı bir egzersiz rutini önerilmez
+  order.push('gunu-planla', 'yarini-hazirla', 'gunluk-notu', 'kitap-oku');
+  if (!f.exercise) order.push('egzersiz');
+  order.push('derin-calisma', 'dil-calis');
 
   const taken = new Set(existingTitles.map(norm));
   const active = new Set(activeTemplateIds);
@@ -154,10 +161,17 @@ export function buildRulesReview(
     const bits: string[] = [];
     if (f.tasksDone.length > 0) bits.push(`${f.tasksDone.length} görev`);
     if (f.routinesDone.length > 0) bits.push(`${f.routinesDone.length} rutin`);
-    parts.push(`Bugün ${bits.join(' ve ')} tamamlandı.`);
+    if (f.exercise?.done) bits.push('sabah egzersizi');
+    const joined = bits.length > 2 ? `${bits.slice(0, -1).join(', ')} ve ${bits[bits.length - 1]}` : bits.join(' ve ');
+    parts.push(`Bugün ${joined} tamamlandı.`);
     if (f.energy.EXHAUSTED > 0) parts.push('Bazı işleri yorgun bitirdin; bu bir sinyal, akşam dinlenmek hak.');
     else if (f.energy.DISTRACTED > 0) parts.push('Zihin zaman zaman dolaştı; bu olağan, yarın küçük adımlarla toparlarız.');
     else parts.push('Bu ritim kayda geçti.');
+  }
+  if (f.exercise?.done) {
+    parts.push('Sabah egzersizini yapman güne güçle başlamak demek; bu alışkanlık birikerek güçlendirir.');
+  } else if (f.exercise?.planned) {
+    parts.push('Bugün egzersiz günüydü ama seans kaydı yok; sorun değil, sıradaki egzersiz gününde kaldığın yerden devam edersin.');
   }
   if (f.mood && f.mood.value <= 2) {
     parts.push('Bugünü ağır olarak işaretlemiştin; böyle günlerde küçük adımlar bile yeter, kendine nazik ol.');
@@ -191,7 +205,7 @@ export function buildRulesReview(
   const payload: DayReviewPayload = {
     reflection,
     tomorrow,
-    ideas: ruleBasedIdeas(f, existingTitles, activeTemplateIds),
+    ideas: avoidBusyHours(ruleBasedIdeas(f, existingTitles, activeTemplateIds), f),
     source: 'RULES',
   };
   return { ...payload, ...ruleTimeUse(f) };
@@ -243,6 +257,7 @@ export function buildReviewPrompt(
     lines.push(`- Görev sonu hisleri: ${e.HIGH} enerjik, ${e.EXHAUSTED} yorgun, ${e.DISTRACTED} dağınık`);
   }
   if (f.driftMinutes > 0) lines.push(`- Not edilen akıp giden zaman: ${formatDuration(f.driftMinutes)} (yargılama, yalnızca veri)`);
+  lines.push(...exercisePromptLines(f));
   if (f.mood) lines.push(`- Ruh hali (kullanıcı seçti, 1 çok zor – 5 harika): ${f.mood.label} (${f.mood.value}/5)`);
   if (shareActivity) {
     if (f.steps !== null) lines.push(`- Adım: ${f.steps}${f.stepsReliable ? '' : ' (eksik olabilir)'}`);
@@ -306,6 +321,9 @@ export function buildReviewPrompt(
     '- "reflection": Aura sesiyle (sıcak, yargısız) en fazla 3 kısa cümle. Verilmeyen sayı ya da olay uydurma.',
     '- "tomorrow": Kronos sesiyle (net, stratejik) en fazla 2 kısa cümle; yarının enerji saatlerine göre tek bir somut yaklaşım.',
     '- "ideas": 3 fikir; kullanıcının mevcut hâline uygun, küçük ve uygulanabilir olsun (5-60 dakika). Birbirine benzemesin.',
+    ...(f.workWindow || f.exercise
+      ? [`  Önerdiğin saatler ("hour") ${busyHoursText(f)} denk gelmesin; bunların dışındaki boş saatlere koy.`]
+      : []),
     '  Her fikir: {"title": en fazla 40 karakter, "category": "SAGLIK" | "ZIHIN" | "ODAK" | "DUZEN", "minutes": 5-60, "hour": 6-21 (sorulacak saat), "minute": 0-59, "why": tek kısa cümle}',
     '- "timeUse": Aura sesiyle en fazla 3 kısa cümle: zamanın nereye gittiğini yargılamadan özetle (kayıt dışı kalan zaman, akıp giden zaman). Yalnızca yukarıda verilen sayıları kullan; "boşa" gibi değer yargısı taşıyan sözcükler yerine "kayıt dışı kalan zaman" de. Zaman dökümü verilmediyse boş metin ("") ver.',
     ...(shareActivity
@@ -329,7 +347,7 @@ export function buildReviewPrompt(
 export function withTimeUse(gen: DayReviewPayload, rules: DayReviewPayload, f: DayFacts): DayReviewPayload {
   const open = new Set((f.openTasks ?? []).map((t) => norm(t.title)));
   const aiAlts = (gen.screenAlternatives ?? []).map((a) => (open.has(norm(a.title)) ? { ...a, kind: 'TASK' as const } : a));
-  const out: DayReviewPayload = { ...gen };
+  const out: DayReviewPayload = { ...gen, ideas: avoidBusyHours(gen.ideas, f) };
   const timeUse = gen.timeUse ?? rules.timeUse;
   if (timeUse) out.timeUse = timeUse;
   else delete out.timeUse;
@@ -342,6 +360,56 @@ export function withTimeUse(gen: DayReviewPayload, rules: DayReviewPayload, f: D
     delete out.screenAlternatives;
   }
   return out;
+}
+
+const hm2 = (m: number) => `${pad(Math.floor(m / 60) % 24)}:${pad(m % 60)}`;
+
+/** Prompt için meşgul saatler: iş saatleri ve sabah egzersiz penceresi. */
+function busyHoursText(f: DayFacts): string {
+  const parts: string[] = [];
+  if (f.workWindow) parts.push(`iş saatlerine (${hm2(f.workWindow.startMin)}–${hm2(f.workWindow.endMin)})`);
+  if (f.exercise) parts.push(`sabah egzersiz saatine (${f.exercise.window})`);
+  return parts.join(' ve ');
+}
+
+/** Egzersiz bilgisi prompta eklenen satırlar: yapıldıysa ne yapıldığı, planlıydı ama yapılmadıysa yargısız veri. */
+function exercisePromptLines(f: DayFacts): string[] {
+  const ex = f.exercise;
+  if (!ex) return [];
+  const out: string[] = [];
+  if (ex.done) {
+    out.push(
+      `- Sabah egzersizi yapıldı (${ex.window}): ${ex.items.map((i) => `${i.name} ${i.sets.join('-')}`).join(', ')}`
+    );
+  } else if (ex.planned) {
+    out.push('- Bugün sabah egzersiz günüydü, seans kaydı yok (yargılama, yalnızca veri).');
+  }
+  out.push(
+    `- Kullanıcının zaten bir sabah egzersiz programı var (${ex.window}): yeni bir egzersiz rutini önerme ve bu saate bir şey koyma.`
+  );
+  return out;
+}
+
+/**
+ * Önerilen rutin saatlerini meşgul zamanlardan uzaklaştırır: iş saatlerine ve sabah egzersiz penceresine
+ * denk gelen saat, pencerenin bitişinden sonraki ilk yarım saate kaydırılır. Kaydırma 21:30'u aşacaksa
+ * öneri olduğu gibi kalır (saati kullanıcı kabul ederken zaten ayarlayabilir).
+ */
+export function avoidBusyHours(ideas: RoutineIdea[], f: DayFacts): RoutineIdea[] {
+  const windows: { start: number; end: number }[] = [];
+  if (f.workWindow) windows.push({ start: f.workWindow.startMin, end: f.workWindow.endMin });
+  if (f.exercise) windows.push({ start: f.exercise.startMin, end: f.exercise.startMin + 30 });
+  if (windows.length === 0) return ideas;
+  return ideas.map((idea) => {
+    let start = idea.hour * 60 + idea.minute;
+    for (let guard = 0; guard < 4; guard += 1) {
+      const hit = windows.find((w) => start < w.end && start + idea.minutes > w.start);
+      if (!hit) break;
+      start = Math.ceil(hit.end / 30) * 30;
+    }
+    if (start === idea.hour * 60 + idea.minute || start > 21 * 60 + 30) return idea;
+    return { ...idea, hour: Math.floor(start / 60), minute: start % 60 };
+  });
 }
 
 function clampInt(v: unknown, min: number, max: number, fallback: number): number {
@@ -434,7 +502,7 @@ export function buildManualPrompt(f: DayFacts, existingTitles: string[]): string
     MANUAL_PREAMBLE,
     buildReviewPrompt(f, existingTitles, true),
     '',
-    'Cevabını tek bir kod bloğu (```json) içinde ver; böylece kopyalaması kolay olur. Kod bloğunun dışına açıklama yazma.',
+    'JSON cevabını tek bir kod bloğu (```json) içine koy; böylece kopyalaması kolay olur. Kod bloğunun dışına açıklama yazma.',
   ].join('\n');
 }
 

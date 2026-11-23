@@ -89,7 +89,7 @@ import { loadBackupNudge, snoozeBackupNudge } from '../services/backupNudge';
 import { loadTypicalCommute } from '../services/commute';
 import { loadGame, takeLevelUp } from '../services/game';
 import { loadExercise } from '../services/exercise';
-import { tileLine as exerciseTileLine } from '../services/exerciseLogic';
+import { defaultState as defaultExerciseState, morningCard, type ExerciseState } from '../services/exerciseLogic';
 import { DATA_CHANGED_EVENT } from '../services/notificationActionQueue';
 import { countParked } from '../services/weekPlan';
 import { loadGuide, type GuideData } from '../services/dayGuide';
@@ -144,7 +144,7 @@ export default function HomeScreen() {
   const [hardDay, setHardDayOn] = useState(false);
   const [nutrition, setNutrition] = useState<DayNutrition | null>(null);
   const [goalLine, setGoalLine] = useState<string | null>(null);
-  const [exerciseLine, setExerciseLine] = useState<string | null>(null);
+  const [exerciseState, setExerciseState] = useState<ExerciseState>(defaultExerciseState());
   const [workEnabled, setWorkEnabled] = useState(false);
   const [workSched, setWorkSched] = useState<WorkSchedule | null>(null);
   const [outcomeNotes, setOutcomeNotes] = useState<Map<string, string>>(new Map());
@@ -228,11 +228,11 @@ export default function HomeScreen() {
     } catch {
       setGame(null);
     }
-    // Egzersiz: bu haftaki seans sayısı (hata verirse varsayılan satır gösterilir)
+    // Sabah egzersizi kartı için program ve son seanslar (hata verirse kart gösterilmez)
     try {
-      setExerciseLine(exerciseTileLine(await loadExercise(db), current));
+      setExerciseState(await loadExercise(db));
     } catch {
-      setExerciseLine(null);
+      setExerciseState(defaultExerciseState());
     }
     // Hedefler özeti (hata verirse kart yine de açılır)
     try {
@@ -534,6 +534,8 @@ export default function HomeScreen() {
   const freeDay = workSched ? isFreeDay(logicalDay, workSched) : false;
   const freePlan = freeDay ? freeDayPlan(tasks) : null;
   // Günün saatine göre öne çıkan tek kart; geri kalanı "Daha fazla" altında durur
+  // Sabah egzersizi kartı: yalnızca egzersiz gününde 05:00-12:00 arası; zor gün modunda gizlenir
+  const exerciseCard = morningCard(exerciseState, now, hardDay);
   const focus: 'MORNING' | 'MARK' | 'REVIEW' | null = reviewAvailable(now)
     ? 'REVIEW'
     : morningWindow
@@ -726,6 +728,19 @@ export default function HomeScreen() {
           </View>
         )}
 
+        {exerciseCard && (
+          <Pressable
+            onPress={() => router.push(exerciseCard.kind === 'TODO' ? '/exercise-run' : '/exercise')}
+            style={styles.activityCard}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={styles.activityTitle}>{exerciseCard.title}</Text>
+              <Text style={styles.activitySub}>{exerciseCard.sub}</Text>
+            </View>
+            <Text style={styles.activityArrow}>›</Text>
+          </Pressable>
+        )}
+
         {focus === 'MORNING' && (
           <Pressable onPress={() => router.push('/morning')} style={styles.activityCard}>
             <View style={{ flex: 1 }}>
@@ -878,11 +893,6 @@ export default function HomeScreen() {
               title="Dil öğrenme"
               subtitle={lang ? (languageLine(lang.summary.total, lang.settings.goalMin) ?? 'Duolingo otomatik, kalem-kağıt elle') : 'Duolingo otomatik, kalem-kağıt elle'}
               onPress={() => router.push('/language')}
-            />
-            <HomeTile
-              title="Egzersiz"
-              subtitle={exerciseLine ?? 'Ekipmansız güç programı: çizimli hareketler ve seans takibi'}
-              onPress={() => router.push('/exercise')}
             />
             <HomeTile title="Alışkanlık takvimi" subtitle="Ay görünümü, seriler ve ruh hali" onPress={() => router.push('/habits')} />
             <HomeTile title="Aylık karne" subtitle="Ayın tek sayfalık özeti ve önceki ayla kıyas" onPress={() => router.push('/monthly')} />

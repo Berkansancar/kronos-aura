@@ -1,20 +1,30 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { colors, radius, spacing } from '../constants/theme';
 import { formatDayTitle } from '../services/format';
-import { loadExercise } from '../services/exercise';
+import { loadExercise, updateExercise } from '../services/exercise';
+import { openAlarmEditor } from '../services/exerciseAlarm';
+import { refreshReminders } from '../services/reminderSync';
 import { parseDayKey } from '../services/activityLogic';
-import { EXERCISES, LEVEL_NAMES, PRINCIPLES, REST_SECONDS, SESSIONS_PER_WEEK } from '../services/exerciseData';
+import { EXERCISES, LEVEL_NAMES, PRINCIPLES, SESSION_MINUTES } from '../services/exerciseData';
 import {
+  DAY_SHORT,
+  START_CHOICES,
+  WEEK_ORDER,
+  clock,
   defaultState,
   sessionSummary,
   sessionsThisWeek,
   targetLine,
+  setRemind,
+  setStart,
   todayAdvice,
+  toggleDay,
   variantFor,
+  windowText,
   type ExerciseState,
 } from '../services/exerciseLogic';
 
@@ -37,7 +47,23 @@ export default function ExerciseScreen() {
     }, [db])
   );
 
+  // Program ayarını kaydeder; bildirimler yeni güne ve saate göre yeniden planlanır
+  const savePlan = async (change: (s: ExerciseState) => ExerciseState) => {
+    try {
+      setState(await updateExercise(db, change));
+      refreshReminders(db).catch(() => undefined);
+    } catch (e) {
+      Alert.alert('Kaydedilemedi', e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const setAlarm = async () => {
+    const res = await openAlarmEditor(state.plan.startMin);
+    if (!res.ok) Alert.alert('Alarm kurulamadı', res.message);
+  };
+
   const today = new Date();
+  const target = state.plan.days.length;
   const week = sessionsThisWeek(state, today);
   const recent = state.sessions.slice(-5).reverse();
 
@@ -59,17 +85,68 @@ export default function ExerciseScreen() {
             <View style={styles.weekCard}>
               <Text style={styles.label}>BU HAFTA</Text>
               <View style={styles.dots}>
-                {Array.from({ length: SESSIONS_PER_WEEK }, (_, i) => (
+                {Array.from({ length: target }, (_, i) => (
                   <View key={i} style={[styles.dot, i < week && styles.dotOn]} />
                 ))}
                 <Text style={styles.weekText}>
-                  {Math.min(week, 99)}/{SESSIONS_PER_WEEK} seans
+                  {Math.min(week, 99)}/{target} seans
                 </Text>
               </View>
               <Text style={styles.muted}>{todayAdvice(state, today)}</Text>
               <Pressable onPress={() => router.push('/exercise-run')} style={styles.primary}>
                 <Text style={styles.primaryText}>Seansı başlat</Text>
               </Pressable>
+            </View>
+
+            <Text style={styles.section}>Sabah programı</Text>
+            <View style={styles.rules}>
+              <Text style={styles.ruleTitle}>Egzersiz günleri</Text>
+              <View style={styles.chips}>
+                {WEEK_ORDER.map((d) => {
+                  const on = state.plan.days.includes(d);
+                  return (
+                    <Pressable key={d} onPress={() => savePlan((s) => toggleDay(s, d))} style={[styles.chip, on && styles.chipOn]}>
+                      <Text style={[styles.chipText, on && styles.chipTextOn]}>{DAY_SHORT[d]}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text style={styles.muted}>Seanslar arasında en az bir gün dinlenme olsun (örneğin Pzt, Çar, Cum).</Text>
+
+              <Text style={[styles.ruleTitle, { marginTop: spacing.sm }]}>Güne başlama saati</Text>
+              <View style={styles.chips}>
+                {START_CHOICES.map((m) => {
+                  const on = state.plan.startMin === m;
+                  return (
+                    <Pressable key={m} onPress={() => savePlan((s) => setStart(s, m))} style={[styles.chip, on && styles.chipOn]}>
+                      <Text style={[styles.chipText, on && styles.chipTextOn]}>{clock(m)}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text style={styles.muted}>
+                Egzersiz {windowText(state.plan)} arasında yapılır ({SESSION_MINUTES} dakika). Alarm ve hatırlatma bu saate göre kurulur.
+              </Text>
+
+              <View style={styles.switchRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.ruleTitle}>Uygulama hatırlatması</Text>
+                  <Text style={styles.muted}>Egzersiz günlerinde {clock(state.plan.startMin)}'da bildirim gelir. Dokununca seans açılır.</Text>
+                </View>
+                <Switch
+                  value={state.plan.remind}
+                  onValueChange={(on) => savePlan((s) => setRemind(s, on))}
+                  trackColor={{ true: colors.aura, false: colors.border }}
+                />
+              </View>
+
+              <Pressable onPress={setAlarm} style={styles.alarmBtn}>
+                <Text style={styles.alarmText}>⏰ Alarmı Saat uygulamasına kur ({clock(state.plan.startMin)})</Text>
+              </Pressable>
+              <Text style={styles.muted}>
+                Saat uygulaması hazır dolu açılır. Onay işaretine dokun ve tekrar günlerini seç. Gerçek alarm Saat uygulamasında çalar;
+                uygulama bildirimi ek hatırlatmadır.
+              </Text>
             </View>
 
             <Text style={styles.section}>Hareketler</Text>
@@ -109,7 +186,6 @@ export default function ExerciseScreen() {
                   <Text style={styles.muted}>{p.text}</Text>
                 </View>
               ))}
-              <Text style={styles.muted}>Setler arası dinlenme: {Math.round(REST_SECONDS / 60)} dakika.</Text>
             </View>
 
             {recent.length > 0 && (
@@ -187,5 +263,27 @@ const styles = StyleSheet.create({
   ruleTitle: { color: colors.text, fontSize: 14, fontWeight: '700' },
   recentRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md },
   recentDay: { color: colors.text, fontSize: 13, fontWeight: '600', flexShrink: 1 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  chip: {
+    paddingVertical: 8,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+  },
+  chipOn: { borderColor: colors.aura, backgroundColor: colors.auraSoft },
+  chipText: { color: colors.textMuted, fontSize: 13, fontWeight: '700' },
+  chipTextOn: { color: colors.aura },
+  switchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm },
+  alarmBtn: {
+    borderWidth: 1,
+    borderColor: colors.kronos,
+    borderRadius: radius.md,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+  alarmText: { color: colors.kronos, fontSize: 14, fontWeight: '800' },
   footnote: { color: colors.textMuted, fontSize: 11, lineHeight: 16 },
 });

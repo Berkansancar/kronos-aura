@@ -29,6 +29,7 @@ import {
 import {
   buildManualPrompt,
   buildReviewPrompt,
+  avoidBusyHours,
   buildRulesReview,
   extractJsonLenient,
   parseManualResponse,
@@ -37,11 +38,14 @@ import {
   isQuietDay,
   parseReviewResponse,
   ruleBasedIdeas,
+  withTimeUse,
   type DayFacts,
 } from '../services/dayReviewLogic';
 import { dayBounds, planningDay } from '../services/planner';
 import { acceptRoutine, addRoutineFromTemplate, markRoutineDone } from '../services/routineFlow';
 import { loadRoutineBriefs } from '../services/routineBriefs';
+import { saveExerciseSession } from '../services/exercise';
+import { exerciseDayFacts, defaultState as exerciseDefault, recordSession as exerciseRecord } from '../services/exerciseLogic';
 import { planReminders } from '../services/routineRemindersLogic';
 import { completeTask } from '../services/taskFlow';
 import { makeTestDb } from './sqliteAdapter';
@@ -184,6 +188,74 @@ check('eksik alan açıklayıcı mesaj verir', !missing.ok && missing.message.in
 const judgy = parseManualResponse('{"reflection":"Tembel bir gündü","tomorrow":"b"}', []);
 check('yargılayıcı cevap reddedilir', !judgy.ok);
 
+console.log('Sabah egzersizi');
+{
+  const exDone = exerciseDayFacts(
+    exerciseRecord(exerciseDefault(), '2026-11-16', [{ move: 'legs', level: 1, sets: [5, 5, 4] }, { move: 'core', level: 1, sets: [20, 20, 15] }]).state,
+    at(21)
+  );
+  const exPlanned = exerciseDayFacts(exerciseDefault(), at(21));
+  const exRest = exerciseDayFacts(exerciseDefault(), at(21, 0, 17));
+
+  check('egzersiz yapıldıysa özet çipi', factChips(facts({ exercise: exDone })).includes('sabah egzersizi yapıldı'));
+  check('yapılmadıysa çip yok', !factChips(facts({ exercise: exPlanned })).some((c) => c.includes('egzersiz')));
+  check('yalnızca egzersiz yapılan gün sessiz sayılmaz', !isQuietDay(facts({ exercise: exDone })) && isQuietDay(facts({ exercise: exPlanned })));
+
+  const exRules = buildRulesReview(facts({ exercise: exDone }), [], []);
+  check('kural değerlendirmesi: tamamlananlara sabah egzersizi girer', exRules.reflection.includes('Bugün sabah egzersizi tamamlandı.'), exRules.reflection);
+  check('kural değerlendirmesi: egzersiz cümlesi', exRules.reflection.includes('Sabah egzersizini yapman'));
+  const exMixed = buildRulesReview(facts({ exercise: exDone, tasksDone: [{ title: 'a', minutes: 10 }], routinesDone: ['b'] }), [], []);
+  check('üç kalem virgül ve "ve" ile birleşir', exMixed.reflection.includes('Bugün 1 görev, 1 rutin ve sabah egzersizi tamamlandı.'), exMixed.reflection);
+  const exMissed = buildRulesReview(facts({ exercise: exPlanned }), [], []);
+  check('planlı ama yapılmadı: yargısız, sorun değil', exMissed.reflection.includes('sorun değil') && !hasBannedWords(exMissed.reflection), exMissed.reflection);
+  const exOff = buildRulesReview(facts({ exercise: exRest }), [], []);
+  check('dinlenme gününde egzersiz cümlesi yok', !exOff.reflection.includes('egzersiz'), exOff.reflection);
+  check('egzersiz programı varken egzersiz rutini önerilmez', !ruleBasedIdeas(facts({ exercise: exPlanned }), [], [], 20).some((i) => i.templateId === 'egzersiz'));
+  check('program yokken egzersiz rutini hâlâ önerilebilir', ruleBasedIdeas(facts(), [], [], 20).some((i) => i.templateId === 'egzersiz'));
+
+  const exPrompt = buildReviewPrompt(facts({ exercise: exDone }), [], false);
+  check('istem: yapılan egzersiz hareketleri ve setler', exPrompt.includes('Sabah egzersizi yapıldı (06:00–06:30)') && exPrompt.includes('5-5-4') && exPrompt.includes('20-20-15'), exPrompt);
+  check('istem: zaten programı var, egzersiz rutini önerme', exPrompt.includes('zaten bir sabah egzersiz programı var') && exPrompt.includes('egzersiz rutini önerme'));
+  const missPrompt = buildReviewPrompt(facts({ exercise: exPlanned }), [], false);
+  check('istem: yapılmadıysa yargılamadan veri olarak', missPrompt.includes('seans kaydı yok (yargılama, yalnızca veri)'));
+  const restPrompt = buildReviewPrompt(facts({ exercise: exRest }), [], false);
+  check('istem: dinlenme gününde ne yapıldı ne yapılmadı satırı', !restPrompt.includes('Sabah egzersizi yapıldı') && !restPrompt.includes('seans kaydı yok') && restPrompt.includes('zaten bir sabah egzersiz programı var'));
+  check('istem: egzersiz yoksa egzersiz satırı yok', !buildReviewPrompt(facts(), [], false).includes('egzersiz programı'));
+  check('istem: fikir saatleri egzersiz saatine denk gelmesin', exPrompt.includes('sabah egzersiz saatine (06:00–06:30) denk gelmesin'));
+  const workPrompt = buildReviewPrompt(facts({ exercise: exDone, workWindow: { startMin: 460, endMin: 1080, source: 'SETTING' } }), [], false);
+  check('istem: iş saatleri ve egzersiz birlikte anılır', workPrompt.includes('iş saatlerine (07:40–18:00) ve sabah egzersiz saatine (06:00–06:30) denk gelmesin'), workPrompt);
+  check('istem: yalnızca iş saati olunca yalnızca iş saati anılır', buildReviewPrompt(facts({ workWindow: { startMin: 460, endMin: 1080, source: 'SETTING' } }), [], false).includes('iş saatlerine (07:40–18:00) denk gelmesin'));
+  check('istem: ne iş ne egzersiz varsa saat kuralı satırı yok', !buildReviewPrompt(facts(), [], false).includes('denk gelmesin'));
+  check('elle komutta tek kod bloğu talimatı, çift "sadece JSON" çelişkisi yok', buildManualPrompt(facts({ exercise: exDone }), []).includes('JSON cevabını tek bir kod bloğu'));
+}
+
+console.log('Önerilen saatler meşgul zamana denk gelmesin');
+{
+  const mk = (hour: number, minute: number, minutes = 20): ReturnType<typeof ruleBasedIdeas>[number] => ({
+    title: 'x', category: 'SAGLIK', minutes, hour, minute, why: 'y', templateId: null,
+  });
+  const work = { startMin: 460, endMin: 1080, source: 'SETTING' as const };
+  const fWork = facts({ workWindow: work });
+  const o1 = avoidBusyHours([mk(9, 0), mk(12, 30), mk(17, 50), mk(19, 0), mk(7, 0)], fWork);
+  check('iş saatindeki öneri iş çıkışından sonraya (18:00) kayar', o1[0].hour === 18 && o1[0].minute === 0 && o1[1].hour === 18 && o1[1].minute === 0 && o1[2].hour === 18, JSON.stringify(o1.map((i) => `${i.hour}:${i.minute}`)));
+  check('iş çıkışından sonraki öneri değişmez', o1[3].hour === 19 && o1[3].minute === 0);
+  check('iş başlamadan biten öneri değişmez (07:00 + 20 dk < 07:40)', o1[4].hour === 7 && o1[4].minute === 0);
+  check('iş başlamadan başlayıp iş saatine taşan öneri kayar', avoidBusyHours([mk(7, 30, 30)], fWork)[0].hour === 18);
+  const fEx = facts({ exercise: exerciseDayFacts(exerciseDefault(), at(21)) });
+  const o2 = avoidBusyHours([mk(6, 0), mk(6, 15), mk(6, 30), mk(5, 50, 20)], fEx);
+  check('egzersiz penceresine (06:00–06:30) denk gelen öneri 06:30\'a kayar', o2[0].hour === 6 && o2[0].minute === 30 && o2[1].hour === 6 && o2[1].minute === 30, JSON.stringify(o2.map((i) => `${i.hour}:${i.minute}`)));
+  check('06:30\'da başlayan öneri değişmez', o2[2].hour === 6 && o2[2].minute === 30);
+  check('05:50 + 20 dk egzersizle çakışır, 06:30\'a kayar', o2[3].hour === 6 && o2[3].minute === 30);
+  const fBoth = facts({ workWindow: work, exercise: exerciseDayFacts(exerciseDefault(), at(21)) });
+  check('iki pencere de varken sırayla çözülür', avoidBusyHours([mk(6, 10), mk(10, 0)], fBoth).map((i) => `${i.hour}:${i.minute}`).join() === '6:30,18:0');
+  check('kayma 21:30\'u aşacaksa öneri olduğu gibi kalır', avoidBusyHours([mk(10, 0)], facts({ workWindow: { startMin: 460, endMin: 1300, source: 'SETTING' } }))[0].hour === 10);
+  check('pencere yoksa öneriler aynen döner', avoidBusyHours([mk(9, 0)], facts())[0].hour === 9);
+  const aiGood = parseReviewResponse({ reflection: 'Sakin bir gün.', tomorrow: 'Tepe saatini kullan.', ideas: [{ title: 'Kısa yürüyüş', category: 'SAGLIK', minutes: 20, hour: 10, minute: 0, why: 'Hareket iyi gelir.' }] }, []);
+  check('model iş saatine öneri koyarsa withTimeUse iş çıkışına kaydırır', aiGood !== null && withTimeUse(aiGood, buildRulesReview(fWork, [], []), fWork).ideas[0].hour === 18);
+  const rulesWork = buildRulesReview(facts({ workWindow: work, routinesDone: [] }), [], []);
+  check('kural tabanlı fikirler de iş saatine denk gelmez', rulesWork.ideas.every((i) => { const st = i.hour * 60 + i.minute; return !(st < 1080 && st + i.minutes > 460); }), JSON.stringify(rulesWork.ideas.map((i) => `${i.hour}:${i.minute}`)));
+}
+
 // ───────────── Veritabanı ─────────────
 async function dbTests(): Promise<void> {
   console.log('Veritabanı');
@@ -220,6 +292,11 @@ async function dbTests(): Promise<void> {
   check('söz verip yapılmayan rutin açık sayılır', f.routinesOpen.includes('Sabah yürüyüşü') && f.routinesOpen.includes('Nefes ve meditasyon'), f.routinesOpen.join());
   check('adım, ekran ve uyku gelir', f.steps === 3200 && f.screenMinutes === 250 && f.sleepMinutes === 330 && f.sleepBed === '00:30' && f.sleepWake === '06:00');
   check('tepe saatleri profilden', f.peakStartHour > 0 && f.peakEndHour > f.peakStartHour);
+  check('egzersiz: Pazartesi planlı, henüz yapılmadı', f.exercise !== null && f.exercise !== undefined && f.exercise.planned && !f.exercise.done && f.exercise.window === '06:00–06:30');
+  await saveExerciseSession(db, [{ move: 'legs', level: 1, sets: [5, 4, 4] }], at(6, 40));
+  const fEx = await gatherDayFacts(db, at(21, 30));
+  check('egzersiz: seans kaydedilince değerlendirme gerçeklerine girer', fEx.exercise?.done === true && fEx.exercise.items.length === 1 && fEx.exercise.items[0].sets.join('-') === '5-4-4');
+  check('egzersiz: çip ve istem gerçek veriyle', factChips(fEx).includes('sabah egzersizi yapıldı') && buildReviewPrompt(fEx, [], false).includes('Sabah egzersizi yapıldı'));
 
   // Yapay zekâ olmadan (kurallar)
   const rules = await loadOrCreateReview(db, at(21, 30), { cfg: null, shareActivity: false });

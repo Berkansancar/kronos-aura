@@ -5,17 +5,32 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { colors, radius, spacing } from '../constants/theme';
 import { loadExercise, saveExerciseSession } from '../services/exercise';
-import { EXERCISES, EXERCISE_BY_ID, LEVEL_NAMES, REST_SECONDS, type Level, type MoveId } from '../services/exerciseData';
+import {
+  ALT_REST_SECONDS,
+  EXERCISES,
+  EXERCISE_BY_ID,
+  LEVEL_NAMES,
+  REST_CHOICES,
+  SESSION_BLOCKS,
+  SESSION_MINUTES,
+  WARMUP_STEPS,
+  type ExerciseMove,
+  type Level,
+  type MoveId,
+} from '../services/exerciseData';
 import {
   defaultState,
+  estimateMinutes,
   lastResult,
   setsLine,
   targetLine,
   variantFor,
+  windowText,
   type ExerciseState,
   type LevelUp,
   type SessionItem,
 } from '../services/exerciseLogic';
+import { refreshReminders } from '../services/reminderSync';
 
 interface SetRow {
   reps: number;
@@ -40,6 +55,8 @@ function buildPlan(state: ExerciseState): Plan {
 }
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+const restLabel = (s: number) => (s >= 120 ? `${Math.round(s / 60)} dk` : `${s} sn`);
+const hasDone = (p: Plan) => Object.values(p).some((rows) => rows.some((r) => r.done));
 
 export default function ExerciseRunScreen() {
   const db = useSQLiteContext();
@@ -51,6 +68,7 @@ export default function ExerciseRunScreen() {
   const [planLevels, setPlanLevels] = useState<Record<MoveId, Level> | null>(null);
   const planRef = useRef<Plan | null>(null);
   planRef.current = plan;
+  const [restSeconds, setRestSeconds] = useState(ALT_REST_SECONDS);
   const [restEnd, setRestEnd] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [saving, setSaving] = useState(false);
@@ -66,7 +84,7 @@ export default function ExerciseRunScreen() {
           setState(s);
           // İşaretlenmiş set yoksa satırları güncel basamaklarla yeniden kur (başka ekranda basamak değişmiş olabilir)
           const cur = planRef.current;
-          if (!cur || !Object.values(cur).some((rows) => rows.some((r) => r.done))) {
+          if (!cur || !hasDone(cur)) {
             setPlan(buildPlan(s));
             setPlanLevels({ ...s.levels });
           }
@@ -96,6 +114,7 @@ export default function ExerciseRunScreen() {
 
   const levels = planLevels ?? state.levels;
   const remaining = restEnd === null ? null : Math.max(0, Math.ceil((restEnd - now) / 1000));
+  const estimate = estimateMinutes(levels, restSeconds);
 
   const update = (move: MoveId, i: number, patch: Partial<SetRow>) => {
     setPlan((p) => (p ? { ...p, [move]: p[move].map((r, j) => (j === i ? { ...r, ...patch } : r)) } : p));
@@ -107,7 +126,7 @@ export default function ExerciseRunScreen() {
     update(move, i, { done: !row.done });
     if (!row.done) {
       setNow(Date.now());
-      setRestEnd(Date.now() + REST_SECONDS * 1000);
+      setRestEnd(Date.now() + restSeconds * 1000);
     }
   };
 
@@ -128,6 +147,8 @@ export default function ExerciseRunScreen() {
       setState(res.state);
       setRestEnd(null);
       setResult({ sets: items.reduce((n, it) => n + it.sets.length, 0), moves: items.length, levelUps: res.levelUps });
+      // Bugün yapıldığı için bugünkü egzersiz bildirimi artık gelmesin
+      refreshReminders(db).catch(() => undefined);
     } catch (e) {
       Alert.alert('Kaydedilemedi', e instanceof Error ? e.message : String(e));
     } finally {
@@ -144,7 +165,7 @@ export default function ExerciseRunScreen() {
             <Text style={styles.doneBig}>
               {result.moves} hareket, {result.sets} set
             </Text>
-            <Text style={styles.muted}>Şimdi dinlen. Bir sonraki seansa kadar en az bir gün ara ver.</Text>
+            <Text style={styles.muted}>Güne iyi başladın. Bir sonraki seansa kadar en az bir gün ara ver.</Text>
           </View>
           {result.levelUps.length > 0 && (
             <View style={styles.levelCard}>
@@ -166,11 +187,67 @@ export default function ExerciseRunScreen() {
 
   const doneCount = plan ? Object.values(plan).reduce((n, rows) => n + rows.filter((r) => r.done).length, 0) : 0;
 
+  const renderMove = (m: ExerciseMove) => {
+    if (!plan) return null;
+    const level = levels[m.id];
+    const v = variantFor(m.id, level);
+    const last = lastResult(state, m.id);
+    const step = v.unit === 'sec' ? 5 : 1;
+    const upper = v.unit === 'sec' ? 120 : 30;
+    return (
+      <View key={m.id} style={styles.card}>
+        <View style={styles.cardHead}>
+          <Text style={styles.cardIcon}>{m.icon}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.cardTitle}>{v.name}</Text>
+            <Text style={styles.muted}>
+              {m.title} · {LEVEL_NAMES[level]} · {targetLine(v)}
+            </Text>
+          </View>
+        </View>
+        <Pressable onPress={() => router.push({ pathname: '/exercise-move', params: { move: m.id, level: String(level) } })} hitSlop={6}>
+          <Text style={styles.link}>Çizimi ve anlatımı gör ›</Text>
+        </Pressable>
+        {last && last.item.level === level && <Text style={styles.muted}>Geçen sefer: {setsLine(v, last.item.sets)}</Text>}
+        {plan[m.id].map((row, i) => (
+          <View key={i} style={[styles.setRow, row.done && styles.setRowDone]}>
+            <Text style={styles.setLabel}>Set {i + 1}</Text>
+            <View style={styles.stepper}>
+              <Pressable
+                onPress={() => update(m.id, i, { reps: Math.max(0, row.reps - step) })}
+                style={styles.stepBtn}
+                hitSlop={6}
+                disabled={row.done}
+              >
+                <Text style={styles.stepBtnText}>−</Text>
+              </Pressable>
+              <Text style={styles.reps}>
+                {row.reps}
+                <Text style={styles.repsUnit}> {v.unit === 'sec' ? 'sn' : v.perSide ? 'tekrar / taraf' : 'tekrar'}</Text>
+              </Text>
+              <Pressable
+                onPress={() => update(m.id, i, { reps: Math.min(upper, row.reps + step) })}
+                style={styles.stepBtn}
+                hitSlop={6}
+                disabled={row.done}
+              >
+                <Text style={styles.stepBtnText}>+</Text>
+              </Pressable>
+            </View>
+            <Pressable onPress={() => toggleDone(m.id, i)} style={[styles.check, row.done && styles.checkOn]} hitSlop={8}>
+              <Text style={[styles.checkText, row.done && { color: colors.bg }]}>✓</Text>
+            </Pressable>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.screen}>
       {remaining !== null && (
         <View style={[styles.restBar, remaining === 0 && styles.restBarDone]}>
-          <Text style={styles.restText}>{remaining === 0 ? 'Dinlenme bitti, sıradaki sete hazırsın' : `Dinlen: ${mmss(remaining)}`}</Text>
+          <Text style={styles.restText}>{remaining === 0 ? 'Dinlenme bitti, sıradaki sete geç' : `Dinlen: ${mmss(remaining)}`}</Text>
           <Pressable onPress={() => setRestEnd(null)} hitSlop={10}>
             <Text style={styles.restSkip}>{remaining === 0 ? 'Kapat' : 'Atla'}</Text>
           </Pressable>
@@ -180,11 +257,34 @@ export default function ExerciseRunScreen() {
         <Pressable onPress={() => router.back()} hitSlop={10}>
           <Text style={styles.back}>‹ Geri</Text>
         </Pressable>
-        <Text style={styles.heading}>Seans</Text>
+        <Text style={styles.heading}>Sabah seansı</Text>
         <Text style={styles.muted}>
-          Her sette bitmeden 1-3 tekrar önce bırak. Seti bitirince dairesine dokun: {Math.round(REST_SECONDS / 60)} dakikalık dinlenme sayacı başlar. Yaptığın
-          tekrar sayısını + ve − ile ayarla.
+          Tahmini süre: yaklaşık {estimate} dk (hedef {SESSION_MINUTES} dk, {windowText(state.plan)}).
+          {estimate > SESSION_MINUTES ? ' Yetişmezse son bloğu (karın) atlayabilirsin.' : ''}
         </Text>
+
+        <View style={styles.restCard}>
+          <Text style={styles.label}>SETLER ARASI DİNLENME</Text>
+          <View style={styles.chips}>
+            {REST_CHOICES.map((s) => (
+              <Pressable key={s} onPress={() => setRestSeconds(s)} style={[styles.chip, s === restSeconds && styles.chipOn]}>
+                <Text style={[styles.chipText, s === restSeconds && styles.chipTextOn]}>{restLabel(s)}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text style={styles.muted}>
+            Hareketleri dönüşümlü yaptığın için 60 sn yeterli: aynı hareketin iki seti arası yaklaşık 3 dakika olur. Seti işaretleyince sayaç başlar.
+          </Text>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Isınma (yaklaşık 2 dk)</Text>
+          {WARMUP_STEPS.map((w, i) => (
+            <Text key={i} style={styles.warm}>
+              • {w}
+            </Text>
+          ))}
+        </View>
 
         {loading || !plan ? (
           <View style={styles.loading}>
@@ -192,60 +292,22 @@ export default function ExerciseRunScreen() {
           </View>
         ) : (
           <>
-            {EXERCISES.map((m) => {
-              const level = levels[m.id];
-              const v = variantFor(m.id, level);
-              const last = lastResult(state, m.id);
-              const step = v.unit === 'sec' ? 5 : 1;
-              const upper = v.unit === 'sec' ? 120 : 30;
+            {SESSION_BLOCKS.map((block, bi) => {
+              const moves = block.map((id) => EXERCISE_BY_ID[id]);
+              const names = moves.map((m) => variantFor(m.id, levels[m.id]).name);
               return (
-                <View key={m.id} style={styles.card}>
-                  <View style={styles.cardHead}>
-                    <Text style={styles.cardIcon}>{m.icon}</Text>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.cardTitle}>{v.name}</Text>
-                      <Text style={styles.muted}>
-                        {m.title} · {LEVEL_NAMES[level]} · {targetLine(v)}
-                      </Text>
-                    </View>
+                <View key={bi} style={{ gap: spacing.md }}>
+                  <View>
+                    <Text style={styles.blockTitle}>
+                      Blok {bi + 1} · {moves.map((m) => m.title).join(' ↔ ')}
+                    </Text>
+                    <Text style={styles.muted}>
+                      {moves.length > 1
+                        ? `Sırayla yap: ${names[0]} seti, dinlen, ${names[1]} seti, dinlen, tekrar. Üç tur.`
+                        : 'Seti yap, dinlen, tekrar. Üç tur.'}
+                    </Text>
                   </View>
-                  <Pressable
-                    onPress={() => router.push({ pathname: '/exercise-move', params: { move: m.id, level: String(level) } })}
-                    hitSlop={6}
-                  >
-                    <Text style={styles.link}>Çizimi ve anlatımı gör ›</Text>
-                  </Pressable>
-                  {last && last.item.level === level && <Text style={styles.muted}>Geçen sefer: {setsLine(v, last.item.sets)}</Text>}
-                  {plan[m.id].map((row, i) => (
-                    <View key={i} style={[styles.setRow, row.done && styles.setRowDone]}>
-                      <Text style={styles.setLabel}>Set {i + 1}</Text>
-                      <View style={styles.stepper}>
-                        <Pressable
-                          onPress={() => update(m.id, i, { reps: Math.max(0, row.reps - step) })}
-                          style={styles.stepBtn}
-                          hitSlop={6}
-                          disabled={row.done}
-                        >
-                          <Text style={styles.stepBtnText}>−</Text>
-                        </Pressable>
-                        <Text style={styles.reps}>
-                          {row.reps}
-                          <Text style={styles.repsUnit}> {v.unit === 'sec' ? 'sn' : v.perSide ? 'tekrar / taraf' : 'tekrar'}</Text>
-                        </Text>
-                        <Pressable
-                          onPress={() => update(m.id, i, { reps: Math.min(upper, row.reps + step) })}
-                          style={styles.stepBtn}
-                          hitSlop={6}
-                          disabled={row.done}
-                        >
-                          <Text style={styles.stepBtnText}>+</Text>
-                        </Pressable>
-                      </View>
-                      <Pressable onPress={() => toggleDone(m.id, i)} style={[styles.check, row.done && styles.checkOn]} hitSlop={8}>
-                        <Text style={[styles.checkText, row.done && { color: colors.bg }]}>✓</Text>
-                      </Pressable>
-                    </View>
-                  ))}
+                  {moves.map(renderMove)}
                 </View>
               );
             })}
@@ -269,6 +331,28 @@ const styles = StyleSheet.create({
   muted: { color: colors.textMuted, fontSize: 12, lineHeight: 18 },
   label: { color: colors.aura, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 },
   link: { color: colors.aura, fontSize: 13, fontWeight: '700' },
+  blockTitle: { color: colors.text, fontSize: 17, fontWeight: '800', marginTop: spacing.sm },
+  warm: { color: colors.text, fontSize: 13, lineHeight: 19 },
+  restCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  chips: { flexDirection: 'row', gap: spacing.sm },
+  chip: {
+    paddingVertical: 8,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+  },
+  chipOn: { borderColor: colors.aura, backgroundColor: colors.auraSoft },
+  chipText: { color: colors.textMuted, fontSize: 13, fontWeight: '700' },
+  chipTextOn: { color: colors.aura },
   restBar: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -6,6 +6,8 @@
  */
 import type { RoutineBrief } from '../database/types';
 import { dayKey } from './activityLogic';
+import { SESSION_MINUTES } from './exerciseData';
+import { clock } from './exerciseLogic';
 import { isRoutineDay } from './routineDaysLogic';
 
 export interface PlannedReminder {
@@ -19,6 +21,8 @@ export interface PlannedReminder {
   route?: string;
   /** Rutin hatırlatmalarında bildirimin ait olduğu gün (yyyy-mm-dd); düğme cevapları bu güne işlenir */
   day?: string;
+  /** Yüksek öncelikli bildirim (sabah egzersizi): ayrı kanalda, sesli ve titreşimli gelir */
+  urgent?: boolean;
 }
 
 export const REMINDER_ID_PREFIX = 'rtn-';
@@ -42,6 +46,8 @@ export interface ReminderExtras {
   hardDayToday?: boolean;
   /** Hedef hatırlatmaları (su ve yatış hazırlığı). Yok ya da null: kapalı (varsayılan). */
   goals?: GoalReminders | null;
+  /** Sabah egzersizi: günler (0 = Pazar), güne başlama saati (gün başından dakika) ve bugün yapıldı mı. Yok ya da null: bildirim yok. */
+  exercise?: { days: number[]; startMin: number; doneToday: boolean } | null;
 }
 
 export interface GoalReminders {
@@ -165,6 +171,28 @@ export function planReminders(
         title: 'Günaydın, planın hazır',
         body: 'Bugünün en önemli işi, rutinlerin ve Kronos\'un notu seni bekliyor.',
         route: '/morning',
+      });
+    }
+  }
+
+  // Sabah egzersizi: egzersiz günlerinde güne başlama saatinde. Dokununca seans açılır.
+  if (extras.exercise) {
+    const ex = extras.exercise;
+    for (let d = 0; d < days; d += 1) {
+      // Bugün yapıldıysa ya da zor gün modundaysa bugünün bildirimi gönderilmez
+      if (d === 0 && (ex.doneToday || extras.hardDayToday)) continue;
+      const base = new Date(now.getFullYear(), now.getMonth(), now.getDate() + d);
+      if (!ex.days.includes(base.getDay())) continue;
+      const at = new Date(base.getFullYear(), base.getMonth(), base.getDate(), 0, ex.startMin);
+      if (at.getTime() <= now.getTime()) continue;
+      out.push({
+        id: `${REMINDER_ID_PREFIX}exercise-${dayKey(base)}`,
+        routineId: '',
+        at,
+        title: 'Sabah egzersizi',
+        body: `${clock(ex.startMin)}–${clock(ex.startMin + SESSION_MINUTES)} arası. Dokununca seans açılır, ısınmayla başla.`,
+        route: '/exercise-run',
+        urgent: true,
       });
     }
   }
