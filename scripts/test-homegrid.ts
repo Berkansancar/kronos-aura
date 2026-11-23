@@ -34,7 +34,7 @@ const homeSource = readFileSync(join(root, 'app', 'index.tsx'), 'utf8');
 const tooNew = (s: string) => [...s].some((ch) => (ch.codePointAt(0) ?? 0) >= 0x1fa70);
 
 console.log('Kutular');
-check('15 kutu, 5 tam satır', HOME_TILES.length === 15 && HOME_TILES.length % TILE_COLUMNS === 0);
+check('18 kutu, 6 tam satır', HOME_TILES.length === 18 && HOME_TILES.length % TILE_COLUMNS === 0);
 check('kimlikler benzersiz', new Set(HOME_TILES.map((t) => t.id)).size === HOME_TILES.length);
 check('adlar benzersiz ve en çok 10 harf', new Set(HOME_TILES.map((t) => t.label)).size === HOME_TILES.length && HOME_TILES.every((t) => t.label.length > 0 && t.label.length <= 10));
 check('her kutunun grubu geçerli', HOME_TILES.every((t) => ['health', 'plan', 'coach'].includes(t.group)));
@@ -51,7 +51,7 @@ check('koç dışındaki kutuların rotaları birbirinden farklı', new Set(HOME
 
 console.log('Satırlar ve sayfalar');
 const rows = chunkTiles(HOME_TILES);
-check('5 satır, her biri 3 kutu', rows.length === 5 && rows.every((r) => r.length === 3));
+check('6 satır, her biri 3 kutu', rows.length === 6 && rows.every((r) => r.length === 3));
 check('kutu sırası bozulmaz', rows.flat().map((t) => t.id).join() === HOME_TILES.map((t) => t.id).join());
 check('eksik son satır korunur', chunkTiles([1, 2, 3, 4, 5], 3).length === 2 && chunkTiles([1, 2, 3, 4, 5], 3)[1].length === 2);
 check('boş liste ve geçersiz sütun sayısı', chunkTiles([], 3).length === 0 && chunkTiles([1, 2], 0).length === 2);

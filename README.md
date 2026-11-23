@@ -80,6 +80,7 @@ npm run test:weekplan     hafta planı (güne ayırma, kapasite, otomatik dağı
 npm run test:game         oyunlaştırma (XP, seviye, altın, seri, rozet, ödül, veritabanından türetme, yedek), 62 kontrol
 npm run test:quotes       açılış sözleri: liste (100 söz), tekrarsız seçim, saklama, selamlama, süre, açılış penceresi ayarı, 49 kontrol
 npm run test:homegrid     ana ekran ızgarası: kutular, rotalar, sayfa hesabı, ipuçları, eski ekranın korunması, 36 kontrol
+npm run test:effects      etki ekranı: içerik ve rakam doğruluğu, seri, aşamalar, tekrar ve kalori toplamı, ekran satırları
 npm run test:icons        simgeler: çizilen bardak ve şişeler, ada göre rutin simgesi, eski rutinleri yenileme, beslenme simgeleri, eski telefon uyumu, 111 kontrol
 npm run test:exercise     egzersiz: çizim geometrisi, içerik bütünlüğü, basamak atlama, seans kaydı, program (gün, güne başlama saati), sabah kartı, alarm, bildirim planı, yedek, 334 kontrol
 npm run test:language     dil öğrenme (uygulama süresi, kalem-kağıt, hedef, geçmiş, gün analizi, yedek, veritabanı v10), 52 kontrol
@@ -310,9 +311,10 @@ Veritabanı sürümü 11 (`TaskOutcome`, `Setting`, `DayEvent`, `SmokeLog`, `Stu
 
 Ana ekran **yatay iki sayfadır**; üstteki iki nokta hangi sayfada olduğunu gösterir (noktaya dokunarak da geçilir).
 
-- **1. sayfa (açılış): simgeli ızgara.** Üstte tarih ve ayar düğmesi, "ŞİMDİ" kartı (gün rehberinden), sonra üç sütunlu **15 simgeli kutu**
+- **1. sayfa (açılış): simgeli ızgara.** Üstte tarih ve ayar düğmesi, "ŞİMDİ" kartı (gün rehberinden), sonra üç sütunlu **18 simgeli kutu**
   ve altta açık görevlerin kısa özeti (dokununca 2. sayfaya geçer). Kutular renkle gruplanır: yeşil sağlık ve rutin (Rutinler,
-  Rutin yap, Egzersiz, Su yemek, Dil), mavi plan ve takip (Rehber, Gün akışı, İşaretle, Hafta, Takvim, Geçmiş, Hedefler, Kahraman),
+  Rutin yap, Egzersiz, Su yemek, Dil, Kelime, Etki), mavi plan ve takip (Rehber, Gün akışı, İşaretle, Hafta, Takvim, Geçmiş, Hedefler, Karne,
+  Kahraman),
   koçlar (Kronos, Aura; sohbeti ilgili koçla açar). Su kutusunda **damacana** durur ve içtikçe dolar.
 - **Basılı tutma (yaklaşık yarım saniye) ilgili ekranı açar.** Su kutusuna **kısa dokunuş +200 ml ekler**; diğer kutulara kısa
   dokunuş yalnızca "Basılı tut: … açılır" ipucunu gösterir (yanlışlıkla açılmasın diye).
@@ -320,6 +322,29 @@ Ana ekran **yatay iki sayfadır**; üstteki iki nokta hangi sayfada olduğunu g�
   "Daha fazla" kutuları ve tam görev listesi burada durur. Izgarada olmayan ekranlara (Aylık karne, Haftalık özet, Sabah
   brifingi, Gün analizi) buradan girilir.
 - Kutu listesi, rotalar ve sayfa hesabı `services/homeGrid.ts`, çizim `components/HomeGrid.tsx`, sayfalama `app/index.tsx`.
+
+## Etki: yaptığın işin gün gün kazancı (Ana ekran > Etki)
+
+Yaptığın işin sana ne kazandırdığını **gün gün, hafta hafta** gösterir ve **serini** izler. Yedi kart vardır: beş egzersiz hareketi
+(İtme/şınav, Bacak, Çekme, Arka zincir, Karın), Su hedefi ve Dil çalışması. Yeni kayıt ya da tablo gerekmez; her şey zaten
+tutulan seans, su ve dil kayıtlarından hesaplanır.
+
+- **Her kartta:** çalışan kaslar (ya da etkilenen alan), "bugün" satırı (hangi hareket, kaç tekrar, yaklaşık kalori), **şu anki aşama**
+  ve altta **zaman çizelgesi**: 1. gün, 2. gün, 1. hafta, 4. hafta, 8. hafta, 12. hafta. Geçtiğin aşamalar dolu, şu an olan halkalı,
+  ilerideki aşamalar soluk görünür ve "N gün kaldı" yazar.
+- **Seri.** Egzersizde iki seans arası en çok 3 gün olursa seri sürer (Pzt-Çar-Cum düzeninde Cuma'dan Pazartesi'ye 3 gün); dinlenme
+  günleri de aşamayı ilerletir. Su ve dilde her gün yapılması gerekir (su için günlük hedefe ulaşmak). Seri bitince en uzun seri
+  saklanır ve suçlayıcı bir söz yazılmaz ("bugün yeniden başlamak için uygun").
+- **Dürüstlük kuralı.** Bir günlük şınavın ölçülebilir kalınlık yaptığı yazılmaz; 1. gün metni "kalınlık bugün değişmez" der.
+  Kalınlık rakamı yalnızca **şınavın 8. haftasında** verilir ve yayımlanmış çalışmadan birebir alınır (göğüs yaklaşık 3,8 mm, arka kol
+  yaklaşık 2,7 mm; haftada 2 gün, genç erkekler, ultrason). Programın amacı güç olduğu için "bu aralığın alt ucunu bekle" denir.
+  Diğer hareketler için sayı uydurulmaz. Kalori değerleri kabadır (tekrar başına katsayı x kilo / 70; kilo yoksa 70 kg).
+- **Aşama metinlerinin dayanağı:** direnç çalışmasından sonra kas protein yapımı 24 saatte yaklaşık 2 kat, 36 saatte normale yakın;
+  ilk haftalarda güç artışı büyük ölçüde sinir uyumu; kas büyümesi yaklaşık 4. haftadan sonra ölçülür; alışkanlık ortalama 66 günde
+  yerleşir. Dil kartında aşamalar uygulamanın kendi tekrar çizelgesine (1, 3, 7, 16, 35. gün) bağlıdır. Kaynaklar ekranın altındaki
+  "Kaynaklar" bölümünde yazılıdır.
+- İçerik `services/effectsData.ts`, hesap `services/effectsLogic.ts`, veri toplama `services/effects.ts`, çizim `app/effects.tsx`.
+- Ana ekran ızgarasına üç kutu eklendi: **Etki**, **Kelime** (kelime defteri) ve **Karne** (aylık karne).
 
 ## Ana ekran ve İlerleme ve geçmiş
 

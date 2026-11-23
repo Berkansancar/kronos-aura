@@ -35,6 +35,8 @@ export const HOME_TILES: HomeTileDef[] = [
   { id: 'egzersiz', label: 'Egzersiz', icon: '💪', group: 'health', route: '/exercise' },
   { id: 'su', label: 'Su, yemek', icon: ICON_DAMACANA, group: 'health', route: '/nutrition' },
   { id: 'dil', label: 'Dil', icon: '🗣️', group: 'health', route: '/language' },
+  { id: 'kelime', label: 'Kelime', icon: '📖', group: 'health', route: '/vocab' },
+  { id: 'etki', label: 'Etki', icon: '🌱', group: 'health', route: '/effects' },
   // Plan ve takip
   { id: 'rehber', label: 'Rehber', icon: '🧭', group: 'plan', route: '/guide' },
   { id: 'gun-akisi', label: 'Gün akışı', icon: '🕐', group: 'plan', route: '/day' },
@@ -43,6 +45,7 @@ export const HOME_TILES: HomeTileDef[] = [
   { id: 'takvim', label: 'Takvim', icon: '📅', group: 'plan', route: '/habits' },
   { id: 'gecmis', label: 'Geçmiş', icon: '📈', group: 'plan', route: '/history' },
   { id: 'hedef', label: 'Hedefler', icon: '🎯', group: 'plan', route: '/goals' },
+  { id: 'karne', label: 'Karne', icon: '📑', group: 'plan', route: '/monthly' },
   { id: 'kahraman', label: 'Kahraman', icon: '🏆', group: 'plan', route: '/hero' },
   // Koçlar
   { id: 'kronos', label: 'Kronos', icon: ICON_KRONOS, group: 'coach', route: '/chat', params: { coach: 'KRONOS' } },

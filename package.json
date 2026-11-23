@@ -41,7 +41,8 @@
     "test:exercise": "tsx scripts/test-exercise.ts",
     "test:icons": "tsx scripts/test-icons.ts",
     "test:homegrid": "tsx scripts/test-homegrid.ts",
-    "test:quotes": "tsx scripts/test-quotes.ts"
+    "test:quotes": "tsx scripts/test-quotes.ts",
+    "test:effects": "tsx scripts/test-effects.ts"
   },
   "dependencies": {
     "expo": "~58.0.0",
