@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 export const DB_NAME = 'kronos-aura.db';
-export const DATABASE_VERSION = 12;
+export const DATABASE_VERSION = 13;
 
 /**
  * Not: SQLite'ın gerçek bir DATETIME tipi yoktur. Zaman alanlarını ISO-8601 (UTC) TEXT
@@ -256,6 +256,22 @@ CREATE TABLE IF NOT EXISTS Vocab (
 );
 CREATE INDEX IF NOT EXISTS idx_vocab_due ON Vocab(dueDay);
 `;
+/** v13: kilo kaydı (günde bir) ve akşam günlüğü (günde bir). */
+const CREATE_TABLES_V13 = `
+CREATE TABLE IF NOT EXISTS WeightLog (
+  day       TEXT PRIMARY KEY NOT NULL,
+  kg        REAL NOT NULL CHECK (kg BETWEEN 30 AND 300),
+  updatedAt TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS Journal (
+  day       TEXT PRIMARY KEY NOT NULL,
+  good      TEXT NOT NULL DEFAULT '',
+  grateful  TEXT NOT NULL DEFAULT '',
+  goal      TEXT NOT NULL DEFAULT '',
+  updatedAt TEXT NOT NULL
+);
+`;
 const ADD_ROUTINE_ICON = `ALTER TABLE Routine ADD COLUMN icon TEXT;`;
 const ADD_ROUTINE_COLOR = `ALTER TABLE Routine ADD COLUMN color TEXT;`;
 /** Hangi günler yapılır: "1,2,3" (0 = Pazar); boş = her gün */
@@ -356,8 +372,13 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {
     current = 12;
   }
 
+  if (current === 12) {
+    await db.execAsync(CREATE_TABLES_V13);
+    current = 13;
+  }
+
   // Gelecekteki migrasyonlar:
-  // if (current === 12) { await db.execAsync(`ALTER TABLE ...`); current = 13; }
+  // if (current === 13) { await db.execAsync(`ALTER TABLE ...`); current = 14; }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
 }

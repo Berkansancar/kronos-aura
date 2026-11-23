@@ -108,7 +108,7 @@ async function main(): Promise<void> {
   console.log('Veritabanı v12');
   const { db, raw } = makeTestDb();
   await migrateDbIfNeeded(db);
-  check('son sürüm 12', (raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version === DATABASE_VERSION && DATABASE_VERSION === 12);
+  check('son sürüm 13', (raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version === DATABASE_VERSION && DATABASE_VERSION === 13);
   const cols = (raw.prepare('PRAGMA table_info(Routine)').all() as { name: string }[]).map((c) => c.name);
   check('Routine tablosunda icon ve color var', cols.includes('icon') && cols.includes('color'));
   check('MoodLog tablosu var', (raw.prepare("SELECT name FROM sqlite_master WHERE name='MoodLog'").all() as unknown[]).length === 1);
@@ -124,7 +124,7 @@ async function main(): Promise<void> {
   const upgraded = await listRoutines(old.db, 'ACTIVE');
   check('v11 → v12: rutin korunur, simge, renk ve günler boş', upgraded.length === 1 && upgraded[0].title === 'Eski' && upgraded[0].icon === null && upgraded[0].color === null && upgraded[0].days === null);
   await migrateDbIfNeeded(old.db);
-  check('yükseltme tekrar çalışırsa hata vermez', (old.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version === 12);
+  check('yükseltme tekrar çalışırsa hata vermez', (old.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version === 13);
 
   console.log('Paket ekleme');
   const first = await addRoutinePack(db, 'sabah');

@@ -143,6 +143,22 @@ export interface MoodLog {
   updatedAt: string;
 }
 
+/** Günde bir kilo kaydı (kg, tek ondalık). */
+export interface WeightLog {
+  day: string;
+  kg: number;
+  updatedAt: string;
+}
+
+/** Akşam günlüğü: günde bir kayıt; üç kısa yazı. */
+export interface JournalEntry {
+  day: string;
+  good: string;
+  grateful: string;
+  goal: string;
+  updatedAt: string;
+}
+
 /**
  * ACCEPTED: "Yapacağım"  · DONE: yapıldı · SNOOZED: "Sonra" · SKIPPED: "Bugün değil"
  * RETIRED: "Bir daha yapmam"

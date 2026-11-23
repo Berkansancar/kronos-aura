@@ -79,8 +79,10 @@ npm run test:notifyactions  bildirimden Yaptım / Yapacağım / Bugün değil: a
 npm run test:weekplan     hafta planı (güne ayırma, kapasite, otomatik dağıtım, veritabanı v11), 41 kontrol
 npm run test:game         oyunlaştırma (XP, seviye, altın, seri, rozet, ödül, veritabanından türetme, yedek), 62 kontrol
 npm run test:quotes       açılış sözleri: liste (100 söz), tekrarsız seçim, saklama, selamlama, açılış penceresi ayarı, dokunana kadar ekranda kalma
-npm run test:homegrid     ana ekran ızgarası: kutular, rotalar, sayfa hesabı, ipuçları, eski ekranın korunması, 36 kontrol
+npm run test:homegrid     ana ekran ızgarası: kutular, rotalar, sayfa hesabı, ipuçları, eski ekranın korunması
 npm run test:effects      etki ekranı: içerik ve rakam doğruluğu, seri, aşamalar, tekrar ve kalori toplamı, ekran satırları
+npm run test:journal      akşam günlüğü ve "seni ne iyi yapıyor": temizleme, gün seçimi, Aura cevabı, seri, ay özeti, karşılaştırma dürüstlüğü, veritabanı v13, yedek
+npm run test:body         kilo ve rekorlar: giriş, haftalık eğilim, hedef, grafik geometrisi, egzersiz rekorları (60 seanstan sonra da), veritabanı, yedek
 npm run test:icons        simgeler: çizilen bardak ve şişeler, ada göre rutin simgesi, eski rutinleri yenileme, beslenme simgeleri, eski telefon uyumu, 111 kontrol
 npm run test:exercise     egzersiz: çizim geometrisi, içerik bütünlüğü, basamak atlama, seans kaydı, program (gün, güne başlama saati), sabah kartı, alarm, bildirim planı, yedek, 334 kontrol
 npm run test:language     dil öğrenme (uygulama süresi, kalem-kağıt, hedef, geçmiş, gün analizi, yedek, veritabanı v10), 52 kontrol
@@ -311,10 +313,10 @@ Veritabanı sürümü 11 (`TaskOutcome`, `Setting`, `DayEvent`, `SmokeLog`, `Stu
 
 Ana ekran **yatay iki sayfadır**; üstteki iki nokta hangi sayfada olduğunu gösterir (noktaya dokunarak da geçilir).
 
-- **1. sayfa (açılış): simgeli ızgara.** Üstte tarih ve ayar düğmesi, "ŞİMDİ" kartı (gün rehberinden), sonra üç sütunlu **18 simgeli kutu**
+- **1. sayfa (açılış): simgeli ızgara.** Üstte tarih ve ayar düğmesi, "ŞİMDİ" kartı (gün rehberinden), sonra üç sütunlu **21 simgeli kutu**
   ve altta açık görevlerin kısa özeti (dokununca 2. sayfaya geçer). Kutular renkle gruplanır: yeşil sağlık ve rutin (Rutinler,
-  Rutin yap, Egzersiz, Su yemek, Dil, Kelime, Etki), mavi plan ve takip (Rehber, Gün akışı, İşaretle, Hafta, Takvim, Geçmiş, Hedefler, Karne,
-  Kahraman),
+  Rutin yap, Egzersiz, Su yemek, Dil, Kelime, Etki, Kilo, Rekorlar), mavi plan ve takip (Rehber, Gün akışı, İşaretle, Hafta, Takvim, Geçmiş, Hedefler, Karne,
+  Günlük, Kahraman),
   koçlar (Kronos, Aura; sohbeti ilgili koçla açar). Su kutusunda **damacana** durur ve içtikçe dolar.
 - **Basılı tutma (yaklaşık yarım saniye) ilgili ekranı açar.** Su kutusuna **kısa dokunuş +200 ml ekler**; diğer kutulara kısa
   dokunuş yalnızca "Basılı tut: … açılır" ipucunu gösterir (yanlışlıkla açılmasın diye).
@@ -345,6 +347,34 @@ tutulan seans, su ve dil kayıtlarından hesaplanır.
   "Kaynaklar" bölümünde yazılıdır.
 - İçerik `services/effectsData.ts`, hesap `services/effectsLogic.ts`, veri toplama `services/effects.ts`, çizim `app/effects.tsx`.
 - Ana ekran ızgarasına üç kutu eklendi: **Etki**, **Kelime** (kelime defteri) ve **Karne** (aylık karne).
+
+## Akşam günlüğü, kilo ve rekorlar, "seni ne iyi yapıyor?" (Ana ekran > Günlük, Kilo, Rekorlar)
+
+**Akşam günlüğü (Günlük kutusu).** Üç kısa soru: *Bugün ne iyi gitti? Neye şükrettim? Yarının tek hedefi.* (her biri en çok 280 karakter;
+hepsi isteğe bağlı) ve isterseniz günün ruh hali. Kaydedince Aura en çok üç cümlelik, yargısız bir cevap verir (zor günde "yazman bile
+bir adım" der, hedef yazılmadıysa "bu da olur" der). **Yarının hedefi ertesi gün sekmenin başında görünür.** Gece 04:00'e kadar
+yazılan günlük dünün günlüğüne gider. "Geçmiş" sekmesinde bu ayın özeti (kaç gün yazıldı, ruh hali ortalaması), en güzel üç gün ve son
+30 yazı durur. Günlük yalnızca telefonda tutulur, yedeğe girer, yapay zekâya gönderilmez.
+
+**Kilo (Kilo kutusu).** Günde bir kilo yazılır (virgül ya da nokta, 30 ile 300 kg; aynı gün tekrar yazılırsa güncellenir). Çizgi grafik son
+90 günü gösterir; isteğe bağlı **hedef kilo** ince bir çizgi olarak çizilir. Haftalık eğilim son 28 güne en küçük kareler doğrusu
+uydurularak hesaplanır; en az 3 kayıt ve 7 gün aralık yoksa eğim verilmez (az veriyle yanıltıcı olur). Metinler yargısızdır, günlük
+dalgalanmaların normal olduğunu söyler; tıbbi tavsiye ya da kalori hedefi vermez. En yeni kilo, profildeki kiloyu da günceller (Etki ekranındaki
+kalori hesabı güncel kalsın diye). Kilo kayıtları yalnızca telefonda durur, yedeğe girer, yapay zekâya gönderilmez.
+
+**Rekorlar (Rekorlar kutusu, Kilo ekranının ikinci sekmesi).** Her egzersiz hareketi için çalıştığın en yüksek basamaktaki **en iyi tek set**,
+ilk kaydın ve aradaki kazanç. Son 7 günde kırılan rekora "yeni" etiketi konur. Rekorlar seans geçmişinden ayrı saklanır; seans geçmişi
+60 seansta kesilse de ilk kayıt ve en iyi set silinmez. Rekor alanı olmayan eski kayıtlar, ilk açılışta mevcut seanslardan kurulur.
+
+**Seni ne iyi yapıyor? (Günlük ekranının üçüncü sekmesi).** Ruh hali kayıtlarını, aynı günlerde yapılan üç işle (egzersiz, su hedefi,
+dil çalışması) yan yana koyar: "yaptığın günlerde ortalama 4,0, yapmadığın günlerde 2,0". Yapay zekâ gerekmez, yalnızca kayıtlı günlerin
+ortalaması karşılaştırılır. **Dürüstlük kuralları:** en az 14 günlük ruh hali kaydı ve her iki grupta en az 4 gün yoksa sonuç verilmez
+(ne kadar daha gerektiği yazılır); fark 0,3'ten küçükse "belirgin fark görünmüyor" denir; hiçbir cümle sebep-sonuç iddia etmez ("birlikte
+görünüyor, sebep olduğu anlamına gelmez").
+
+Veritabanı sürümü **13** oldu (yeni tablolar: `WeightLog`, `Journal`; ikisi de yedeğe girer). Mantık `services/journalLogic.ts`,
+`services/insightLogic.ts`, `services/bodyLogic.ts`; veri toplama `services/journal.ts`, `services/body.ts`; ekranlar `app/journal.tsx`,
+`app/body.tsx`, grafik `components/WeightChart.tsx`.
 
 ## Ana ekran ve İlerleme ve geçmiş
 

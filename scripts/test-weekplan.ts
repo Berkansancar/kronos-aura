@@ -97,7 +97,7 @@ async function main(): Promise<void> {
   const { db } = makeTestDb();
   await migrateDbIfNeeded(db);
   await ensureWorkSeed(db);
-  check('sürüm 12', DATABASE_VERSION === 12);
+  check('sürüm 13', DATABASE_VERSION === 13);
   const day0 = planningDay(at(9));
   const startISO = dayBounds(day0).start.toISOString();
   const t1 = await createTask(db, { title: 'Bugünkü iş', estimatedDuration: 20, cognitiveWeight: 'LOW' });

@@ -36,10 +36,24 @@ export interface ExercisePlan {
   remind: boolean;
 }
 
+/** Bir hareketin bir basamağındaki en iyi tek set (tekrar ya da saniye) ve ilk kaydın en iyi seti. */
+export interface RecordEntry {
+  best: number;
+  bestDay: string;
+  first: number;
+  firstDay: string;
+}
+
+/** Anahtar: "hareket:basamak" (örn. "push:1"). Seans geçmişi 60 seansla sınırlıdır; rekorlar sınırsız saklanır. */
+export type RecordMap = Record<string, RecordEntry>;
+
+export const recordKey = (move: MoveId, level: Level): string => `${move}:${level}`;
+
 export interface ExerciseState {
   levels: Record<MoveId, Level>;
   sessions: SessionRecord[];
   plan: ExercisePlan;
+  records: RecordMap;
 }
 
 export interface LevelUp {
@@ -63,7 +77,7 @@ export const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
 export function defaultState(): ExerciseState {
   const levels = {} as Record<MoveId, Level>;
   for (const id of MOVE_IDS) levels[id] = 1;
-  return { levels, sessions: [], plan: { ...DEFAULT_PLAN, days: [...DEFAULT_PLAN.days] } };
+  return { levels, sessions: [], plan: { ...DEFAULT_PLAN, days: [...DEFAULT_PLAN.days] }, records: {} };
 }
 
 function parsePlan(o: unknown): ExercisePlan {
@@ -82,6 +96,38 @@ function parsePlan(o: unknown): ExercisePlan {
 const isLevel = (n: unknown): n is Level => n === 1 || n === 2 || n === 3;
 const isDay = (s: unknown): s is string => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
 
+const maxSet = (sets: number[]): number => sets.reduce((m, n) => (Number.isFinite(n) && n > m ? n : m), 0);
+
+/** Seans geçmişinden rekor haritası çıkarır (eski kayıtlarda rekor alanı yoksa kullanılır). Seanslar gün sırasıyla gelmelidir. */
+export function deriveRecords(sessions: SessionRecord[]): RecordMap {
+  const out: RecordMap = {};
+  for (const s of sessions) {
+    for (const it of s.items) {
+      const best = maxSet(it.sets);
+      if (best <= 0) continue;
+      const key = recordKey(it.move, it.level);
+      const cur = out[key];
+      if (!cur) out[key] = { best, bestDay: s.day, first: best, firstDay: s.day };
+      else if (best > cur.best) out[key] = { ...cur, best, bestDay: s.day };
+    }
+  }
+  return out;
+}
+
+function parseRecords(o: unknown): RecordMap | null {
+  if (typeof o !== 'object' || o === null || Array.isArray(o)) return null;
+  const out: RecordMap = {};
+  for (const [key, v] of Object.entries(o as Record<string, unknown>)) {
+    const m = /^(\w+):([123])$/.exec(key);
+    if (!m || !MOVE_IDS.includes(m[1] as MoveId) || typeof v !== 'object' || v === null) continue;
+    const r = v as { best?: unknown; bestDay?: unknown; first?: unknown; firstDay?: unknown };
+    const ok = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n) && n > 0 && n <= 999;
+    if (!ok(r.best) || !ok(r.first) || !isDay(r.bestDay) || !isDay(r.firstDay)) continue;
+    out[key] = { best: Math.round(r.best), bestDay: r.bestDay, first: Math.round(r.first), firstDay: r.firstDay };
+  }
+  return out;
+}
+
 /** Kayıtlı metni okur; bozuk ya da eski veri varsa güvenle varsayılana düşer. */
 export function parseState(raw: string | null): ExerciseState {
   const base = defaultState();
@@ -93,7 +139,7 @@ export function parseState(raw: string | null): ExerciseState {
     return base;
   }
   if (typeof o !== 'object' || o === null) return base;
-  const obj = o as { levels?: Record<string, unknown>; sessions?: unknown; plan?: unknown };
+  const obj = o as { levels?: Record<string, unknown>; sessions?: unknown; plan?: unknown; records?: unknown };
   base.plan = parsePlan(obj.plan);
   if (obj.levels && typeof obj.levels === 'object') {
     for (const id of MOVE_IDS) {
@@ -118,11 +164,13 @@ export function parseState(raw: string | null): ExerciseState {
     }
     base.sessions = base.sessions.slice(-MAX_SESSIONS);
   }
+  // Rekor alanı yoksa (eski kayıt) seans geçmişinden kurulur; varsa kayıtlı rekorlar esas alınır
+  base.records = parseRecords(obj.records) ?? deriveRecords(base.sessions);
   return base;
 }
 
 export function serializeState(s: ExerciseState): string {
-  return JSON.stringify({ v: 1, levels: s.levels, sessions: s.sessions.slice(-MAX_SESSIONS), plan: s.plan });
+  return JSON.stringify({ v: 1, levels: s.levels, sessions: s.sessions.slice(-MAX_SESSIONS), plan: s.plan, records: s.records });
 }
 
 export function variantFor(move: MoveId, level: Level): ExerciseVariant {
@@ -164,7 +212,16 @@ export function recordSession(state: ExerciseState, day: string, items: SessionI
     sessions.push({ day, items: clean });
     sessions.sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
   }
-  return { state: { levels, sessions: sessions.slice(-MAX_SESSIONS), plan: state.plan }, levelUps };
+  const records: RecordMap = { ...state.records };
+  for (const it of clean) {
+    const best = maxSet(it.sets);
+    if (best <= 0) continue;
+    const key = recordKey(it.move, it.level);
+    const cur = records[key];
+    if (!cur) records[key] = { best, bestDay: day, first: best, firstDay: day };
+    else if (best > cur.best) records[key] = { ...cur, best, bestDay: day };
+  }
+  return { state: { levels, sessions: sessions.slice(-MAX_SESSIONS), plan: state.plan, records }, levelUps };
 }
 
 /** Haftanın Pazartesi günü (yerel). */

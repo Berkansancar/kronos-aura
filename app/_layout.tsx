@@ -133,6 +133,8 @@ export default function RootLayout() {
           <Stack.Screen name="exercise-move" />
           <Stack.Screen name="exercise-run" />
           <Stack.Screen name="effects" />
+          <Stack.Screen name="body" />
+          <Stack.Screen name="journal" />
         </Stack>
         <OpeningQuote />
       </SQLiteProvider>

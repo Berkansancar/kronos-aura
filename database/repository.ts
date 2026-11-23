@@ -35,6 +35,8 @@ import type {
   MealLog,
   WaterLog,
   MoodLog,
+  JournalEntry,
+  WeightLog,
   MoodValue,
   VocabCard,
 } from './types';
@@ -1151,4 +1153,53 @@ export async function updateVocabText(
 
 export async function deleteVocab(db: SQLiteDatabase, id: string): Promise<void> {
   await db.runAsync('DELETE FROM Vocab WHERE id = ?', [id]);
+}
+
+// ---------------------------------------------------------------------------
+// Kilo kaydı ve akşam günlüğü (günde bir kayıt; aynı gün tekrar yazılırsa güncellenir)
+// ---------------------------------------------------------------------------
+
+export async function setWeightLog(db: SQLiteDatabase, day: string, kg: number, at: Date): Promise<WeightLog> {
+  const log: WeightLog = { day, kg: Math.round(kg * 10) / 10, updatedAt: at.toISOString() };
+  await db.runAsync(
+    `INSERT INTO WeightLog (day, kg, updatedAt) VALUES (?, ?, ?)
+     ON CONFLICT(day) DO UPDATE SET kg = excluded.kg, updatedAt = excluded.updatedAt`,
+    [log.day, log.kg, log.updatedAt]
+  );
+  return log;
+}
+
+export async function listWeightLogs(db: SQLiteDatabase): Promise<WeightLog[]> {
+  return db.getAllAsync<WeightLog>('SELECT day, kg, updatedAt FROM WeightLog ORDER BY day ASC');
+}
+
+export async function deleteWeightLog(db: SQLiteDatabase, day: string): Promise<void> {
+  await db.runAsync('DELETE FROM WeightLog WHERE day = ?', [day]);
+}
+
+export async function saveJournalEntry(
+  db: SQLiteDatabase,
+  day: string,
+  fields: { good: string; grateful: string; goal: string },
+  at: Date
+): Promise<JournalEntry> {
+  const entry: JournalEntry = { day, good: fields.good, grateful: fields.grateful, goal: fields.goal, updatedAt: at.toISOString() };
+  await db.runAsync(
+    `INSERT INTO Journal (day, good, grateful, goal, updatedAt) VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(day) DO UPDATE SET good = excluded.good, grateful = excluded.grateful, goal = excluded.goal, updatedAt = excluded.updatedAt`,
+    [entry.day, entry.good, entry.grateful, entry.goal, entry.updatedAt]
+  );
+  return entry;
+}
+
+export async function getJournalEntry(db: SQLiteDatabase, day: string): Promise<JournalEntry | null> {
+  return db.getFirstAsync<JournalEntry>('SELECT * FROM Journal WHERE day = ?', [day]);
+}
+
+export async function listJournalSince(db: SQLiteDatabase, sinceDay: string): Promise<JournalEntry[]> {
+  return db.getAllAsync<JournalEntry>('SELECT * FROM Journal WHERE day >= ? ORDER BY day ASC', [sinceDay]);
+}
+
+export async function deleteJournalEntry(db: SQLiteDatabase, day: string): Promise<void> {
+  await db.runAsync('DELETE FROM Journal WHERE day = ?', [day]);
 }
