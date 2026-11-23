@@ -47,7 +47,7 @@ const emojiLike = (s: string) => [...s].some((ch) => (ch.codePointAt(0) ?? 0) >=
 
 async function main(): Promise<void> {
   console.log('Söz listesi');
-  check('en az 40 söz var', QUOTES.length >= 40, String(QUOTES.length));
+  check('en az 100 söz var', QUOTES.length >= 100, String(QUOTES.length));
   check('her sözün metni ve söyleyeni dolu', QUOTES.every((q) => q.text.trim().length > 0 && q.author.trim().length > 0));
   check('sözler birbirinden farklı', new Set(QUOTES.map((q) => q.text)).size === QUOTES.length);
   check('her söz noktalama ile biter', QUOTES.every((q) => /[.!?]$/.test(q.text)));
