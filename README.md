@@ -78,6 +78,7 @@ npm run test:quests       haftalık görevler: seçim, ilerleme, bonus XP, geçm
 npm run test:notifyactions  bildirimden Yaptım / Yapacağım / Bugün değil: ayrıştırma, karar, kuyruk, kayıt, 47 kontrol
 npm run test:weekplan     hafta planı (güne ayırma, kapasite, otomatik dağıtım, veritabanı v11), 41 kontrol
 npm run test:game         oyunlaştırma (XP, seviye, altın, seri, rozet, ödül, veritabanından türetme, yedek), 62 kontrol
+npm run test:homegrid     ana ekran ızgarası: kutular, rotalar, sayfa hesabı, ipuçları, eski ekranın korunması, 36 kontrol
 npm run test:icons        simgeler: çizilen bardak ve şişeler, ada göre rutin simgesi, eski rutinleri yenileme, beslenme simgeleri, eski telefon uyumu, 111 kontrol
 npm run test:exercise     egzersiz: çizim geometrisi, içerik bütünlüğü, basamak atlama, seans kaydı, program (gün, güne başlama saati), sabah kartı, alarm, bildirim planı, yedek, 334 kontrol
 npm run test:language     dil öğrenme (uygulama süresi, kalem-kağıt, hedef, geçmiş, gün analizi, yedek, veritabanı v10), 52 kontrol
@@ -285,6 +286,21 @@ Gündüz çalışan ve telefona bakamayan biri için: her şey akşam topluca da
   **elle kopyala-yapıştır** yolunda aynı şekilde çalışır; elle yol bozulmadı, istem yalnızca yeni alanları ister.
 
 Veritabanı sürümü 11 (`TaskOutcome`, `Setting`, `DayEvent`, `SmokeLog`, `StudyLog` tabloları, `Task.workOk`, `Task.commuteOk` ve `Task.plannedDay`).
+
+## Ana ekran: iki sayfa (simgeli ızgara + tüm akış)
+
+Ana ekran **yatay iki sayfadır**; alttaki iki nokta hangi sayfada olduğunu gösterir (noktaya dokunarak da geçilir).
+
+- **1. sayfa (açılış): simgeli ızgara.** Üstte tarih ve ayar düğmesi, "ŞİMDİ" kartı (gün rehberinden), sonra üç sütunlu **15 simgeli kutu**
+  ve altta açık görevlerin kısa özeti (dokununca 2. sayfaya geçer). Kutular renkle gruplanır: yeşil sağlık ve rutin (Rutinler,
+  Rutin yap, Egzersiz, Su yemek, Dil), mavi plan ve takip (Rehber, Gün akışı, İşaretle, Hafta, Takvim, Geçmiş, Hedefler, Kahraman),
+  koçlar (Kronos, Aura; sohbeti ilgili koçla açar). Su kutusunda **damacana** durur ve içtikçe dolar.
+- **Basılı tutma (yaklaşık yarım saniye) ilgili ekranı açar.** Su kutusuna **kısa dokunuş +200 ml ekler**; diğer kutulara kısa
+  dokunuş yalnızca "Basılı tut: … açılır" ipucunu gösterir (yanlışlıkla açılmasın diye).
+- **2. sayfa (yana kaydır): eski ana ekran aynen.** Koç konsolu, ruh hali, zor gün, sabah egzersizi, brifing, hızlı düğmeler,
+  "Daha fazla" kutuları ve tam görev listesi burada durur. Izgarada olmayan ekranlara (Aylık karne, Haftalık özet, Sabah
+  brifingi, Gün analizi) buradan girilir.
+- Kutu listesi, rotalar ve sayfa hesabı `services/homeGrid.ts`, çizim `components/HomeGrid.tsx`, sayfalama `app/index.tsx`.
 
 ## Ana ekran ve İlerleme ve geçmiş
 
