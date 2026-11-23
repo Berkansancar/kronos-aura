@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, Text
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
+import { WaterIcon } from '../components/WaterIcon';
 import { colors, radius, spacing } from '../constants/theme';
 import type { MealKind, MealLog, WaterLog } from '../database/types';
 import { FOOD_GROUPS, estimateMeal, groupLabel } from '../services/foodTable';
@@ -19,9 +20,11 @@ import {
   suggestMealKind,
   type DayNutrition,
 } from '../services/nutritionLogic';
+import { drinkIcon, groupIcon, mealIcon } from '../services/nutritionIcons';
 import { getNutritionOptions } from '../services/nutritionSettings';
 import { refreshReminders } from '../services/reminderSync';
 import type { NutritionOptions } from '../services/nutrition';
+import { waterKindForMl } from '../services/waterIcon';
 
 const AGO_CHOICES: { minutes: number; label: string }[] = [
   { minutes: 0, label: 'Şimdi' },
@@ -190,12 +193,22 @@ export default function NutritionScreen() {
               <View style={styles.track}>
                 <View style={[styles.fill, { width: `${Math.round(n.waterRatio * 100)}%` }]} />
               </View>
-              <View style={styles.chipRow}>
+              <View style={styles.waterRow}>
                 {WATER_PRESETS.map((p) => (
-                  <Pressable key={p.ml} disabled={busy} onPress={() => void run(async () => void (await addWater(db, new Date(), p.ml)))} style={styles.chip}>
-                    <Text style={styles.chipText}>
-                      + {p.label} {p.ml}
+                  <Pressable
+                    key={p.ml}
+                    disabled={busy}
+                    onPress={() => void run(async () => void (await addWater(db, new Date(), p.ml)))}
+                    style={styles.waterTile}
+                    accessibilityLabel={`${p.label} ${p.ml} mililitre su ekle`}
+                  >
+                    <View style={styles.waterIconBox}>
+                      <WaterIcon kind={waterKindForMl(p.ml)} size={46} />
+                    </View>
+                    <Text style={styles.waterLabel} numberOfLines={1}>
+                      {p.label}
                     </Text>
+                    <Text style={styles.waterMl}>+{p.ml} ml</Text>
                   </Pressable>
                 ))}
               </View>
@@ -214,7 +227,7 @@ export default function NutritionScreen() {
                 {DRINK_PRESETS.map((p) => (
                   <Pressable key={p.id} disabled={busy} onPress={() => void run(async () => void (await addDrink(db, new Date(), p.id)))} style={styles.chip}>
                     <Text style={styles.chipText}>
-                      + {p.label}
+                      {drinkIcon(p.id)} + {p.label}
                       {drinkCounts[p.id] ? ` · ${drinkCounts[p.id]}` : ''}
                     </Text>
                   </Pressable>
@@ -234,7 +247,9 @@ export default function NutritionScreen() {
                 <View style={styles.chipRow}>
                   {MEAL_KINDS.map((m) => (
                     <Pressable key={m.id} onPress={() => setKind(m.id)} style={[styles.chip, kind === m.id && styles.chipOn]}>
-                      <Text style={[styles.chipText, kind === m.id && styles.chipTextOn]}>{m.label}</Text>
+                      <Text style={[styles.chipText, kind === m.id && styles.chipTextOn]}>
+                        {mealIcon(m.id)} {m.label}
+                      </Text>
                     </Pressable>
                   ))}
                 </View>
@@ -290,7 +305,9 @@ export default function NutritionScreen() {
                     const on = groupOn(g.id);
                     return (
                       <Pressable key={g.id} onPress={() => setManual((m) => ({ ...m, [g.id]: !on }))} style={[styles.chip, on && styles.chipOn]}>
-                        <Text style={[styles.chipText, on && styles.chipTextOn]}>{g.label}</Text>
+                        <Text style={[styles.chipText, on && styles.chipTextOn]}>
+                          {groupIcon(g.id)} {g.label}
+                        </Text>
                       </Pressable>
                     );
                   })}
@@ -351,7 +368,7 @@ export default function NutritionScreen() {
                     {FOOD_GROUPS.filter((g) => (n.groupCounts[g.id] ?? 0) > 0).map((g) => (
                       <View key={g.id} style={[styles.chip, styles.chipStatic]}>
                         <Text style={styles.chipText}>
-                          {g.label} · {n.groupCounts[g.id]}
+                          {groupIcon(g.id)} {g.label} · {n.groupCounts[g.id]}
                         </Text>
                       </View>
                     ))}
@@ -370,6 +387,9 @@ export default function NutritionScreen() {
                   return (
                     <View key={r.log.id} style={styles.logRow}>
                       <Text style={styles.logTime}>{time}</Text>
+                      <View style={styles.logIcon}>
+                        <WaterIcon kind={waterKindForMl(r.log.amountMl)} size={26} />
+                      </View>
                       <Text style={styles.logText}>Su · {r.log.amountMl} ml</Text>
                       <Pressable hitSlop={10} disabled={busy} onPress={() => confirmDelete(`Su · ${r.log.amountMl} ml`, () => removeWater(db, r.log.id))}>
                         <Text style={styles.del}>✕</Text>
@@ -382,6 +402,7 @@ export default function NutritionScreen() {
                 return (
                   <View key={m.id} style={styles.logRow}>
                     <Text style={styles.logTime}>{time}</Text>
+                    <Text style={styles.logEmoji}>{mealIcon(m.kind)}</Text>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.logText}>{label}</Text>
                       {m.kcal !== null && <Text style={styles.logSub}>≈{formatKcal(m.kcal)}</Text>}
@@ -480,6 +501,22 @@ const styles = StyleSheet.create({
   logRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   logTime: { color: colors.textMuted, fontSize: 12, fontWeight: '700', width: 42 },
   logText: { color: colors.text, fontSize: 14, lineHeight: 20, flex: 1 },
+  logIcon: { width: 26, alignItems: 'center' },
+  logEmoji: { fontSize: 20, width: 26, textAlign: 'center' },
+  waterRow: { flexDirection: 'row', gap: spacing.sm },
+  waterTile: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+  },
+  waterIconBox: { height: 48, justifyContent: 'flex-end', alignItems: 'center' },
+  waterLabel: { color: colors.text, fontSize: 11, fontWeight: '700' },
+  waterMl: { color: colors.aura, fontSize: 12, fontWeight: '800' },
   logSub: { color: colors.textMuted, fontSize: 12 },
   del: { color: colors.textMuted, fontSize: 16, paddingHorizontal: 4 },
   done: { alignItems: 'center', paddingVertical: spacing.md },

@@ -14,6 +14,7 @@ import { colors, radius, spacing } from '../constants/theme';
 import type { CognitiveWeight, Routine, RoutineCategory } from '../database/types';
 import { CATEGORY_LABEL } from '../services/routineTemplates';
 import { ROUTINE_COLORS, ROUTINE_ICONS, routineColor, routineIcon } from '../services/routineLook';
+import { RoutineIcon } from './WaterIcon';
 import { DAY_SHORT, DAYS_PRESETS, WEEK_ORDER, daysLabel, parseDays } from '../services/routineDaysLogic';
 
 const DURATIONS = [5, 10, 15, 20, 30, 45, 60];
@@ -90,7 +91,8 @@ export function RoutineEditor({ visible, routine, onClose, onSubmit }: Props) {
   };
 
   // Seçim yapılmadıysa kategorinin varsayılanı gösterilir ve kaydedilir.
-  const shownIcon = routineIcon({ icon, category });
+  // Simge seçilmediyse yazılan ada uyan simge önerilir (örn. "su şişesi" yazınca şişe)
+  const shownIcon = routineIcon({ icon, category, title });
   const shownColor = routineColor({ color, category });
 
   // En az bir gün seçili kalır; yedi günün hepsi "her gün" demektir.
@@ -123,7 +125,9 @@ export function RoutineEditor({ visible, routine, onClose, onSubmit }: Props) {
             />
 
             <View style={[styles.preview, { borderColor: shownColor }]}>
-              <Text style={styles.previewIcon}>{shownIcon}</Text>
+              <View style={styles.previewIcon}>
+                <RoutineIcon icon={shownIcon} size={26} />
+              </View>
               <Text style={[styles.previewText, { color: shownColor }]} numberOfLines={1}>
                 {title.trim() || 'Rutin adı'}
               </Text>
@@ -137,7 +141,7 @@ export function RoutineEditor({ visible, routine, onClose, onSubmit }: Props) {
                   onPress={() => setIcon(ic)}
                   style={[styles.iconBtn, shownIcon === ic && { borderColor: shownColor, backgroundColor: colors.surfaceAlt }]}
                 >
-                  <Text style={styles.iconText}>{ic}</Text>
+                  <RoutineIcon icon={ic} size={22} />
                 </Pressable>
               ))}
             </View>
@@ -297,7 +301,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     backgroundColor: colors.surfaceAlt,
   },
-  previewIcon: { fontSize: 26 },
+  previewIcon: { minWidth: 32, alignItems: 'center' },
   previewText: { flex: 1, fontSize: 16, fontWeight: '700' },
   iconBtn: {
     width: 44,

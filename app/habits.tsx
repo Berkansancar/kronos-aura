@@ -18,7 +18,7 @@ import { loadHabitScreen, setMoodForDay, type HabitScreenData } from '../service
 import { formatMood, MOODS, moodInfo } from '../services/moodLogic';
 import { markRoutineDoneOnDay, unmarkRoutineDay } from '../services/routineFlow';
 import { refreshReminders } from '../services/reminderSync';
-import { CATEGORY_COLOR, routineColor, routineIcon, withAlpha } from '../services/routineLook';
+import { CATEGORY_COLOR, routineColor, routineIconText, withAlpha } from '../services/routineLook';
 import { tipOfDay } from '../services/selfCareTips';
 
 type Tab = 'HABITS' | 'MOOD';
@@ -133,7 +133,7 @@ export default function HabitsScreen() {
                 ]}
               >
                 <Text style={styles.chipText}>
-                  {routineIcon(r)} {r.title.length > 18 ? `${r.title.slice(0, 17)}…` : r.title}
+                  {routineIconText(r)} {r.title.length > 18 ? `${r.title.slice(0, 17)}…` : r.title}
                 </Text>
               </Pressable>
             ))}
@@ -209,7 +209,7 @@ export default function HabitsScreen() {
                 {detail.done.map((r) => (
                   <View key={r.id} style={styles.markRow}>
                     <Text style={[styles.detailRow, { color: routineColor(r), flex: 1 }]}>
-                      ✓ {routineIcon(r)} {r.title}
+                      ✓ {routineIconText(r)} {r.title}
                     </Text>
                     {!selectedIsFuture && !lockedDone(selected, data.logs).has(r.id) && (
                       <Pressable disabled={busy} onPress={() => toggleDone(r, true)} hitSlop={6}>
@@ -221,7 +221,7 @@ export default function HabitsScreen() {
                 {detail.notDone.map((r) => (
                   <View key={r.id} style={styles.markRow}>
                     <Text style={[styles.detailRow, { color: colors.textMuted, flex: 1 }]}>
-                      ○ {routineIcon(r)} {r.title}
+                      ○ {routineIconText(r)} {r.title}
                     </Text>
                     {!selectedIsFuture && (
                       <Pressable

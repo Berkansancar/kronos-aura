@@ -28,6 +28,7 @@ import {
   type RunState,
   type TimerState,
 } from '../services/routineModeLogic';
+import { RoutineIcon } from '../components/WaterIcon';
 import { withAlpha } from '../services/routineLook';
 import { CATEGORY_LABEL } from '../services/routineTemplates';
 
@@ -203,7 +204,9 @@ export default function RoutineRunScreen() {
         </View>
 
         <View style={[styles.stepCard, { borderColor: cur.color, backgroundColor: withAlpha(cur.color, 0.08) }]}>
-          <Text style={styles.stepIcon}>{cur.icon}</Text>
+          <View style={styles.stepIcon}>
+            <RoutineIcon icon={cur.icon} size={48} />
+          </View>
           <Text style={styles.stepTitle}>{cur.title}</Text>
           <Text style={styles.muted}>
             {CATEGORY_LABEL[cur.category]} · ~{cur.minutes} dk
@@ -274,7 +277,7 @@ const styles = StyleSheet.create({
     minHeight: 280,
     justifyContent: 'center',
   },
-  stepIcon: { fontSize: 48 },
+  stepIcon: { alignItems: 'center', minHeight: 60, justifyContent: 'center' },
   stepTitle: { color: colors.text, fontSize: 26, fontWeight: '800', textAlign: 'center' },
   timer: { color: colors.text, fontSize: 44, fontWeight: '800', marginTop: spacing.md, fontVariant: ['tabular-nums'] },
   timerBtn: { borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: spacing.lg, paddingVertical: 8 },

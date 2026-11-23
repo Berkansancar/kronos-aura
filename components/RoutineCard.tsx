@@ -3,6 +3,7 @@ import { colors, radius, spacing } from '../constants/theme';
 import type { RoutineBrief } from '../database/types';
 import { formatAskTime } from '../services/routineLogic';
 import { routineColor, routineIcon } from '../services/routineLook';
+import { RoutineIcon } from './WaterIcon';
 
 interface Props {
   brief: RoutineBrief;
@@ -35,9 +36,10 @@ export function RoutineCard({ brief, busy, onAccept, onDone, onLater, onSkipToda
         <Text style={[styles.time, { color: accent }]}>{formatAskTime(routine)}</Text>
         <Text style={styles.meta}>{routine.estimatedDuration} dk</Text>
       </View>
-      <Text style={styles.title}>
-        {routineIcon(routine)} {routine.title}
-      </Text>
+      <View style={styles.titleRow}>
+        <RoutineIcon icon={routineIcon(routine)} size={22} />
+        <Text style={styles.title}>{routine.title}</Text>
+      </View>
       <Text style={styles.question}>
         {stats.streak >= 2 ? `${stats.streak} gündür devam ediyorsun. Bugün de yapacak mısın?` : 'Bugün bunu yapacak mısın?'}
       </Text>
@@ -77,7 +79,8 @@ const styles = StyleSheet.create({
   top: { flexDirection: 'row', justifyContent: 'space-between' },
   time: { color: colors.aura, fontSize: 12, fontWeight: '800', letterSpacing: 0.8 },
   meta: { color: colors.textMuted, fontSize: 12 },
-  title: { color: colors.text, fontSize: 17, fontWeight: '700' },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  title: { color: colors.text, fontSize: 17, fontWeight: '700', flexShrink: 1 },
   question: { color: colors.textMuted, fontSize: 13 },
   row: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
   primary: {

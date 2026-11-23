@@ -14,7 +14,7 @@ export interface RoutineTemplate {
   askMinute: number;
   /** Tek cümlelik fayda */
   why: string;
-  /** Varsayılan simge (emoji) */
+  /** Varsayılan simge: emoji ya da çizilen simge anahtarı ("ico:glass", "ico:bottle") */
   icon: string;
   /** Yalnızca bu günlerde yapılır (0 = Pazar); yoksa her gün */
   days?: number[];
@@ -31,7 +31,7 @@ export const ROUTINE_TEMPLATES: RoutineTemplate[] = [
   // Sağlık ve hareket
   {
     id: 'su-ic',
-    icon: '💧',
+    icon: 'ico:glass',
     title: 'Bir bardak su iç',
     category: 'SAGLIK',
     estimatedDuration: 5,
@@ -189,7 +189,7 @@ export const ROUTINE_TEMPLATES: RoutineTemplate[] = [
   },
   {
     id: 'dis-yuz',
-    icon: '🪥',
+    icon: '🦷',
     title: 'Diş fırçala, yüzünü yıka',
     category: 'SAGLIK',
     estimatedDuration: 5,

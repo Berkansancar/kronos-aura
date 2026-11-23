@@ -78,6 +78,7 @@ npm run test:quests       haftalık görevler: seçim, ilerleme, bonus XP, geçm
 npm run test:notifyactions  bildirimden Yaptım / Yapacağım / Bugün değil: ayrıştırma, karar, kuyruk, kayıt, 47 kontrol
 npm run test:weekplan     hafta planı (güne ayırma, kapasite, otomatik dağıtım, veritabanı v11), 41 kontrol
 npm run test:game         oyunlaştırma (XP, seviye, altın, seri, rozet, ödül, veritabanından türetme, yedek), 62 kontrol
+npm run test:icons        simgeler: çizilen bardak ve şişeler, ada göre rutin simgesi, eski rutinleri yenileme, beslenme simgeleri, eski telefon uyumu, 111 kontrol
 npm run test:exercise     egzersiz: çizim geometrisi, içerik bütünlüğü, basamak atlama, seans kaydı, program (gün, güne başlama saati), sabah kartı, alarm, bildirim planı, yedek, 334 kontrol
 npm run test:language     dil öğrenme (uygulama süresi, kalem-kağıt, hedef, geçmiş, gün analizi, yedek, veritabanı v10), 52 kontrol
 ```
@@ -463,6 +464,15 @@ Ekipmansız güç programı artık "Daha fazla" menüsünde değil; **sabah saat
 - **30 dakikalık seans**: her hareket 3 set. 2 dk ısınma + 3 blok: Bacak ↔ Çekme, İtme ↔ Arka zincir, Karın. Bloktaki iki hareket dönüşümlü yapılır, setler arası 60 sn dinlenme (90 sn ya da 3 dk da seçilebilir). Aynı hareketin iki seti arası yaklaşık 3 dakika olur, güç için yeterli. Tahmini süre ekranda görünür; dinlenme uzarsa son blok (karın) atlanabilir.
 - **Günü değerlendirme**: sabah egzersizi yapıldıysa özetteki çipe ("sabah egzersizi yapıldı"), kural tabanlı değerlendirme metnine ve yapay zekâ komutuna (hangi hareket, kaç set) girer. Planlı ama yapılmadıysa yargılamadan yalnızca veri olarak anılır. Programın olduğu günlerde yeni "egzersiz" rutini önerilmez; önerilen rutin saatleri iş saatlerine ve sabah egzersiz penceresine denk gelmez (gerekirse iş çıkışına kaydırılır).
 - Veriler Setting tablosundadır (`exercise_v1`), yedeğe kendiliğinden dahildir; eski kayıtlar varsayılan programla açılır.
+
+## Simgeler: su bardağı, şişe ve diğerleri
+
+- **Su ekranı (Su ve yemek)**: dört hazır miktarın her biri kendi simgesiyle dokunulabilir kutu olarak gelir: Bardak (200 ml), Küçük şişe (330 ml), Şişe (500 ml), Büyük şişe (750 ml). Bardak ve şişeler emoji değil, uygulamanın içinde çizilir (yazı tipine ve telefona bağlı değildir). Bugünkü kayıtlar listesinde her su kaydının yanında miktarına uyan simge görünür. Ana ekrandaki "+200 ml" düğmesinde ve Gün akışındaki "+200 ml su içtim" düğmesinde de bardak vardır.
+- **Beslenme**: çay 🍵, kahve ☕, şekerli içecek 🥤; öğünler kahvaltı 🍳, öğle 🍽️, akşam 🍲, ara öğün 🍪; yiyecek grupları (sebze 🥗, meyve 🍎, protein 🍗, ekmek ve tahıl 🍞, süt ürünü 🥛, kuruyemiş 🥜, tatlı 🍰, kızartma 🍟).
+- **Rutinler**: simge seçilmediyse rutin adına uyan simge kendiliğinden gelir ("Bir bardak su iç" bardak, "Öğle arası su şişesi doldurma" şişe, "Çalışma masası yüzey düzeni" süpürge, "Oda Havalandırma ve Nefes" rüzgâr, "Zihinsel Odaklanma Seansı" beyin ...). Rutin düzenleme penceresinde bardak ve şişe seçilebilir; ad yazıldıkça önizlemedeki simge de değişir.
+- **Eski rutinler**: uygulama bir kez, simgesi boş olan ya da yalnızca kategorinin varsayılan simgesini taşıyan rutinlerin simgesini adına göre yeniler. Kendi seçtiğin simgeye dokunulmaz. Sonradan değiştirdiğin simge bir daha otomatik değişmez.
+- **Eski telefon uyumu**: yalnızca Emoji 11 ve öncesi kullanıldı. Diş fırçası emojisi (🪥) eski Samsung ve Android telefonlarda kutucuk olarak göründüğü için diş 🦷 ile değiştirildi. Test, Emoji 12 ve sonrası (U+1FA70 üstü) bir simgenin eklenmesini engeller.
+- Çizilen simgeler rutinde `ico:glass` ve `ico:bottle` anahtarıyla saklanır; yedeğe ve geri yüklemeye kendiliğinden dahildir.
 
 ## Logo ve ikon
 

@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
+import { WaterIcon } from '../components/WaterIcon';
 import { colors, radius, spacing } from '../constants/theme';
 import type { DayEventKind } from '../database/types';
 import {
@@ -107,7 +108,10 @@ export default function DayFlowScreen() {
               }
               style={styles.primary}
             >
-              <Text style={styles.primaryText}>+200 ml su içtim</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm }}>
+                <WaterIcon kind="glass" size={26} />
+                <Text style={styles.primaryText}>+200 ml su içtim</Text>
+              </View>
             </Pressable>
           </View>
         )}

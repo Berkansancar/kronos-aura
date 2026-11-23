@@ -98,10 +98,11 @@ async function main(): Promise<void> {
   check('getPack bilinmeyen id için undefined', getPack('yok') === undefined && getPack('sabah')?.title === 'Güne güzel başla');
 
   console.log('Simge ve renk');
-  check('8 renk geçerli hex, 24 simge benzersiz', ROUTINE_COLORS.length === 8 && ROUTINE_COLORS.every((c) => isHexColor(c.value)) && new Set(ROUTINE_ICONS).size === ROUTINE_ICONS.length && ROUTINE_ICONS.length === 24);
-  check('seçim yoksa kategori varsayılanı', routineIcon(routine()) === CATEGORY_ICON.SAGLIK && routineColor(routine()) === CATEGORY_COLOR.SAGLIK);
+  check('8 renk geçerli hex, 36 simge benzersiz', ROUTINE_COLORS.length === 8 && ROUTINE_COLORS.every((c) => isHexColor(c.value)) && new Set(ROUTINE_ICONS).size === ROUTINE_ICONS.length && ROUTINE_ICONS.length === 36);
+  check('seçim yoksa ve ad bir şeye uymuyorsa kategori varsayılanı', routineIcon(routine({ title: 'Bilinmeyen bir şey' })) === CATEGORY_ICON.SAGLIK && routineColor(routine()) === CATEGORY_COLOR.SAGLIK);
+  check('seçim yoksa ada uyan simge (Yürüyüş: 🚶)', routineIcon(routine()) === '🚶');
   check('seçim varsa o gösterilir', routineIcon(routine({ icon: '🎨' })) === '🎨' && routineColor(routine({ color: '#F472B6' })) === '#F472B6');
-  check('bozuk renk/boş simge varsayılana döner', routineColor(routine({ color: 'kırmızı' })) === CATEGORY_COLOR.SAGLIK && routineIcon(routine({ icon: '  ' })) === CATEGORY_ICON.SAGLIK);
+  check('bozuk renk/boş simge varsayılana döner', routineColor(routine({ color: 'kırmızı' })) === CATEGORY_COLOR.SAGLIK && routineIcon(routine({ icon: '  ', title: 'Bilinmeyen bir şey' })) === CATEGORY_ICON.SAGLIK);
   check('withAlpha', withAlpha('#FF0000', 0.5) === 'rgba(255,0,0,0.5)' && withAlpha('bozuk', 2).startsWith('rgba(95,214,180,1'));
 
   console.log('Veritabanı v12');
@@ -130,7 +131,7 @@ async function main(): Promise<void> {
   const listed = await listRoutines(db, 'ACTIVE');
   check('sabah paketi 5 rutin ekler', first.added === 5 && first.skipped === 0 && listed.length === 5);
   check('paket saatleri uygulanır (06:35 yatak)', listed.some((r) => r.templateId === 'yatagi-topla' && r.askHour === 6 && r.askMinute === 35));
-  check('şablonun simgesi kaydedilir', listed.find((r) => r.templateId === 'su-ic')?.icon === '💧');
+  check('şablonun simgesi kaydedilir', listed.find((r) => r.templateId === 'su-ic')?.icon === 'ico:glass');
   const again = await addRoutinePack(db, 'sabah');
   check('aynı paket ikinci kez eklenmez', again.added === 0 && again.skipped === 5 && (await listRoutines(db, 'ACTIVE')).length === 5);
   const evening = await addRoutinePack(db, 'aksam');

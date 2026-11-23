@@ -6,6 +6,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { CoachConsole } from '../components/CoachConsole';
 import { EnergyCheckModal } from '../components/EnergyCheckModal';
 import { HomeTile } from '../components/HomeTile';
+import { WaterIcon } from '../components/WaterIcon';
 import { MoodCard } from '../components/MoodCard';
 import { ReasonModal } from '../components/ReasonModal';
 import { RoutineCard } from '../components/RoutineCard';
@@ -61,6 +62,7 @@ import { endHardDay, startHardDay } from '../services/hardDay';
 import { countExhaustedSince, shouldSuggestHardDay } from '../services/hardDayLogic';
 import { isEssentialRoutine } from '../services/routineRemindersLogic';
 import { addWater, loadDayNutrition } from '../services/nutrition';
+import { upgradeRoutineIcons } from '../services/routineIconUpgrade';
 import { formatWater, type DayNutrition } from '../services/nutritionLogic';
 import { getNutritionOptions } from '../services/nutritionSettings';
 import { loadGoalState } from '../services/goals';
@@ -165,6 +167,7 @@ export default function HomeScreen() {
     const { start, end } = dayBounds(planningDay(current));
     const u = await getOrCreateUser(db);
     // Dün akşam "yarın yapacağım" denen rutinler bugünün planına girer (hata verirse atlanır)
+    await upgradeRoutineIcons(db).catch(() => 0);
     await materializePlannedRoutines(db, current).catch(() => 0);
     // Dün "yapmadım / yapamadım" denen işler yeni günün planına geri döner (hata verirse atlanır)
     await carryOverMissed(db, current).catch(() => []);
@@ -796,7 +799,10 @@ export default function HomeScreen() {
             onPress={() => run(async () => void (await addWater(db, new Date(), 200)))}
             style={styles.quickBtn}
           >
-            <Text style={styles.quickMain}>💧 +200 ml</Text>
+            <View style={styles.quickWater}>
+              <WaterIcon kind="glass" size={20} />
+              <Text style={styles.quickMain}>+200 ml</Text>
+            </View>
             <Text style={styles.quickSub} numberOfLines={1}>
               {nutrition ? `${formatWater(nutrition.waterMl)} / ${formatWater(nutrition.waterGoalMl)}` : 'Su'}
             </Text>
@@ -1077,6 +1083,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 2,
   },
+  quickWater: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   quickMain: { color: colors.text, fontSize: 13, fontWeight: '800', textAlign: 'center' },
   quickSub: { color: colors.textMuted, fontSize: 11, textAlign: 'center' },
   moreRow: {

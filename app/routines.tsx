@@ -23,6 +23,7 @@ import { refreshReminders } from '../services/reminderSync';
 import { askNotificationPermission, hasNotificationPermission } from '../services/routineReminders';
 import { CATEGORY_LABEL, ROUTINE_PACKS, ROUTINE_TEMPLATES } from '../services/routineTemplates';
 import { routineColor, routineIcon } from '../services/routineLook';
+import { RoutineIcon } from '../components/WaterIcon';
 import { daysLabel, routineDaysLabel, serializeDays } from '../services/routineDaysLogic';
 
 const CATEGORY_ORDER: RoutineCategory[] = ['SAGLIK', 'ZIHIN', 'ODAK', 'DUZEN'];
@@ -204,7 +205,9 @@ export default function RoutinesScreen() {
             return (
               <View key={b.routine.id} style={[styles.card, { borderLeftWidth: 4, borderLeftColor: routineColor(b.routine) }]}>
                 <View style={styles.cardTop}>
-                  <Text style={styles.cardIcon}>{routineIcon(b.routine)}</Text>
+                  <View style={styles.cardIcon}>
+                    <RoutineIcon icon={routineIcon(b.routine)} size={22} />
+                  </View>
                   <Text style={styles.cardTitle}>{b.routine.title}</Text>
                   <Text style={[styles.cardTime, { color: routineColor(b.routine) }]}>{formatAskTime(b.routine)}</Text>
                 </View>
@@ -265,7 +268,7 @@ export default function RoutinesScreen() {
           const missing = p.items.filter((i) => !activeTemplateIds.has(i.templateId)).length;
           return (
             <View key={p.id} style={styles.template}>
-              <Text style={styles.packIcon}>{p.icon}</Text>
+              <Text style={styles.packEmoji}>{p.icon}</Text>
               <View style={{ flex: 1, gap: 2 }}>
                 <Text style={styles.templateTitle}>{p.title}</Text>
                 <Text style={styles.templateWhy}>{p.about}</Text>
@@ -292,7 +295,9 @@ export default function RoutinesScreen() {
               const added = activeTemplateIds.has(t.id);
               return (
                 <View key={t.id} style={styles.template}>
-                  <Text style={styles.packIcon}>{t.icon}</Text>
+                  <View style={styles.packIcon}>
+                    <RoutineIcon icon={t.icon} size={26} />
+                  </View>
                   <View style={{ flex: 1, gap: 2 }}>
                     <Text style={styles.templateTitle}>{t.title}</Text>
                     <Text style={styles.templateMeta}>
@@ -391,7 +396,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md },
-  cardIcon: { fontSize: 22 },
+  cardIcon: { minWidth: 26, alignItems: 'center' },
   cardTitle: { color: colors.text, fontSize: 16, fontWeight: '700', flex: 1 },
   cardTime: { color: colors.aura, fontSize: 14, fontWeight: '800' },
   cardMeta: { color: colors.textMuted, fontSize: 12, lineHeight: 17 },
@@ -430,7 +435,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   calendarBtnText: { color: colors.text, fontSize: 14, fontWeight: '700' },
-  packIcon: { fontSize: 26 },
+  packIcon: { minWidth: 32, alignItems: 'center' },
+  packEmoji: { fontSize: 26, minWidth: 32, textAlign: 'center' },
   customBtn: {
     borderWidth: 1,
     borderColor: colors.aura,
