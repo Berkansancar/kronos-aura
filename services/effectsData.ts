@@ -48,7 +48,7 @@ export interface EffectProfile {
 
 // Ortak güç aşamaları: kas adı `{kas}` yerine konur
 const common = (focus: string, w8: string): Record<StageId, string> => ({
-  d1: `Bugün ${focus} çalıştı. Direnç çalışmasından sonra kas protein yapımı ilk 24 saatte yaklaşık iki katına çıkar, 36 saatte neredeyse normale döner. Kalınlık bugün değişmez; çalışan yerde hafif dolgunluk ve yorgunluk normaldir.`,
+  d1: `Seans günü: ${focus} çalışır. Direnç çalışmasından sonra kas protein yapımı ilk 24 saatte yaklaşık iki katına çıkar, 36 saatte neredeyse normale döner. Kalınlık o gün değişmez; çalışan yerde hafif dolgunluk ve yorgunluk normaldir.`,
   d2: 'Toparlanma günü. Protein yapımı normale döndü, kaslar kendini onarıyor. Bugün dinlen; bir sonraki seans uyarıyı yeniden başlatır. Hafif ağrı normaldir, keskin ağrı normal değildir.',
   w1: 'Sinir sistemi hareketi öğrenir: aynı hareketi daha kolay ve daha dengeli yaparsın. İlk haftalardaki güç artışı büyük ölçüde sinir uyumudur; kas henüz belirgin kalınlaşmaz.',
   w4: 'Kas büyümesi ölçülebilir hale gelmeye başlar (çalışmalarda yaklaşık 4. haftadan sonra). Hareket gözle görülür biçimde kolaylaşır; bir üst basamağa geçme zamanı yaklaşır.',
@@ -78,7 +78,7 @@ export const PROFILES: EffectProfile[] = [
     restCounts: true,
     unit: 'rep',
     kcalPer70: 0.4,
-    stages: common('göğüs, ön omuz ve arka kolu', PUSH_W8),
+    stages: common('göğüs, ön omuz ve arka kol', PUSH_W8),
     note: PROGRAM_NOTE,
   },
   {
@@ -91,7 +91,7 @@ export const PROFILES: EffectProfile[] = [
     restCounts: true,
     unit: 'rep',
     kcalPer70: 0.5,
-    stages: common('kalça ve uyluk kaslarını', OTHER_W8),
+    stages: common('kalça ve uyluk kasları', OTHER_W8),
     note: PROGRAM_NOTE,
   },
   {
@@ -104,7 +104,7 @@ export const PROFILES: EffectProfile[] = [
     restCounts: true,
     unit: 'rep',
     kcalPer70: 0.45,
-    stages: common('sırt ve pazı kaslarını', OTHER_W8),
+    stages: common('sırt ve pazı kasları', OTHER_W8),
     note: PROGRAM_NOTE,
   },
   {
@@ -117,7 +117,7 @@ export const PROFILES: EffectProfile[] = [
     restCounts: true,
     unit: 'rep',
     kcalPer70: 0.4,
-    stages: common('kalça, uyluk arkası ve bel kaslarını', OTHER_W8),
+    stages: common('kalça, uyluk arkası ve bel kasları', OTHER_W8),
     note: PROGRAM_NOTE,
   },
   {
@@ -130,7 +130,7 @@ export const PROFILES: EffectProfile[] = [
     restCounts: true,
     unit: 'sec',
     kcalPer70: 0.07,
-    stages: common('karın ve gövde kaslarını', OTHER_W8),
+    stages: common('karın ve gövde kasları', OTHER_W8),
     note: PROGRAM_NOTE,
   },
   {

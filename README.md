@@ -335,7 +335,7 @@ tutulan seans, su ve dil kayıtlarından hesaplanır.
 - **Seri.** Egzersizde iki seans arası en çok 3 gün olursa seri sürer (Pzt-Çar-Cum düzeninde Cuma'dan Pazartesi'ye 3 gün); dinlenme
   günleri de aşamayı ilerletir. Su ve dilde her gün yapılması gerekir (su için günlük hedefe ulaşmak). Seri bitince en uzun seri
   saklanır ve suçlayıcı bir söz yazılmaz ("bugün yeniden başlamak için uygun").
-- **Dürüstlük kuralı.** Bir günlük şınavın ölçülebilir kalınlık yaptığı yazılmaz; 1. gün metni "kalınlık bugün değişmez" der.
+- **Dürüstlük kuralı.** Bir günlük şınavın ölçülebilir kalınlık yaptığı yazılmaz; 1. gün metni "kalınlık o gün değişmez" der.
   Kalınlık rakamı yalnızca **şınavın 8. haftasında** verilir ve yayımlanmış çalışmadan birebir alınır (göğüs yaklaşık 3,8 mm, arka kol
   yaklaşık 2,7 mm; haftada 2 gün, genç erkekler, ultrason). Programın amacı güç olduğu için "bu aralığın alt ucunu bekle" denir.
   Diğer hareketler için sayı uydurulmaz. Kalori değerleri kabadır (tekrar başına katsayı x kilo / 70; kilo yoksa 70 kg).

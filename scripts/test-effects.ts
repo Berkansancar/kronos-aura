@@ -59,7 +59,7 @@ check('şınav 8. hafta rakamları kaynak farklarıyla aynı (3,8 ve 2,7 mm)', p
 check('kaynak listesi bu rakamları ve 66 günü içerir', SOURCES.some((s) => s.includes('17,0 → 20,8') && s.includes('27,7 → 30,4')) && SOURCES.some((s) => s.includes('66 gün')));
 check('kaynak sayısı 5, hepsi yıl içerir', SOURCES.length === 5 && SOURCES.every((s) => /(19|20)\d{2}/.test(s)));
 check('1. ve 2. gün metinlerinde kalınlık sözü verilmez', PROFILES.filter((p) => p.strength).every((p) => !/kalın(laş|lık)[^.]*(artar|arttı)/i.test(p.stages.d1 + p.stages.d2)));
-check('1. gün metni kalınlığın değişmediğini açıkça söyler', PROFILES.filter((p) => p.strength).every((p) => p.stages.d1.includes('Kalınlık bugün değişmez')));
+check('1. gün metni kalınlığın değişmediğini açıkça söyler', PROFILES.filter((p) => p.strength).every((p) => p.stages.d1.includes('Kalınlık o gün değişmez')));
 check('güç hareketlerinde program notu var', PROFILES.filter((p) => p.strength).every((p) => (p.note ?? '').includes('kalınlaşmadan güç')));
 check('dürüstlük notu rakamların ortalama olduğunu söyler', HONESTY_NOTE.includes('araştırma ortalamaları') && HONESTY_NOTE.includes('Kalori'));
 
