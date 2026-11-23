@@ -78,6 +78,7 @@ npm run test:quests       haftalık görevler: seçim, ilerleme, bonus XP, geçm
 npm run test:notifyactions  bildirimden Yaptım / Yapacağım / Bugün değil: ayrıştırma, karar, kuyruk, kayıt, 47 kontrol
 npm run test:weekplan     hafta planı (güne ayırma, kapasite, otomatik dağıtım, veritabanı v11), 41 kontrol
 npm run test:game         oyunlaştırma (XP, seviye, altın, seri, rozet, ödül, veritabanından türetme, yedek), 62 kontrol
+npm run test:quotes       açılış sözleri: liste, tekrarsız seçim, saklama, selamlama, süre, açılış penceresi ayarı, 49 kontrol
 npm run test:homegrid     ana ekran ızgarası: kutular, rotalar, sayfa hesabı, ipuçları, eski ekranın korunması, 36 kontrol
 npm run test:icons        simgeler: çizilen bardak ve şişeler, ada göre rutin simgesi, eski rutinleri yenileme, beslenme simgeleri, eski telefon uyumu, 111 kontrol
 npm run test:exercise     egzersiz: çizim geometrisi, içerik bütünlüğü, basamak atlama, seans kaydı, program (gün, güne başlama saati), sabah kartı, alarm, bildirim planı, yedek, 334 kontrol
@@ -286,6 +287,23 @@ Gündüz çalışan ve telefona bakamayan biri için: her şey akşam topluca da
   **elle kopyala-yapıştır** yolunda aynı şekilde çalışır; elle yol bozulmadı, istem yalnızca yeni alanları ister.
 
 Veritabanı sürümü 11 (`TaskOutcome`, `Setting`, `DayEvent`, `SmokeLog`, `StudyLog` tabloları, `Task.workOk`, `Task.commuteOk` ve `Task.plannedDay`).
+
+## Açılış ekranı ve sözler
+
+- **Beyaz açılış ekranı kalktı.** Telefonun açılış penceresi eskiden beyazdı (#FFFFFF); artık uygulamanın koyu zemini ve logosu
+  (`expo-splash-screen`, ayar `app.json`'da). Açılış penceresi, söz ekranı çizilene kadar açık tutulur; arada beyaz ya da boş
+  bir an görünmez.
+- **Açılış sözü.** Uygulama her açıldığında koyu bir ekranda selamlama (Günaydın, İyi günler, İyi akşamlar, İyi geceler), tarih ve
+  **her seferinde farklı bir söz** görünür. Dokununca, geri tuşuna basınca ya da yaklaşık 3-5 saniye sonra (söz uzunsa biraz daha)
+  ana ekrana geçilir; altta kalan süreyi gösteren ince çizgi vardır. Uygulama 20 dakikadan uzun süre arka plandaysa, geri
+  dönünce de yeni bir söz gelir.
+- **Tekrarsız seçim.** Sözler karıştırılıp sırayla gösterilir: tüm sözler birer kez görünmeden hiçbiri tekrar etmez; yeni turun ilk
+  sözü bir önceki turun sonuncusu olmaz. Durum telefonda saklanır, yedeğe girer.
+- **Sözler.** 51 söz: 12 atasözü, 15 bilge söz (Lao Tzu, Marcus Aurelius, Epiktetos, Seneca, Sokrates, Herakleitos, Franklin, Goethe,
+  Mandela, Camus, Atatürk; serbest çeviridir), 12 Kronos (zaman) ve 12 Aura (enerji) sözü. Kronos ve Aura sözleri bu uygulama
+  için yazıldı. Yeni söz eklemek için `services/quotes.ts` içindeki `QUOTES` listesine bir satır eklemek yeter.
+- **Kapatma.** Ayarlar > **Açılış sözü** anahtarı. Kapalıyken doğrudan ana ekran açılır.
+- Mantık `services/quotes.ts`, saklama `services/quoteStore.ts`, çizim `components/OpeningQuote.tsx`, kök düzen `app/_layout.tsx`.
 
 ## Ana ekran: iki sayfa (simgeli ızgara + tüm akış)
 

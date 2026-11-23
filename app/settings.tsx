@@ -27,6 +27,7 @@ import { makeBackupText, restoreFromText } from '../services/backup';
 import { getLastBackup } from '../services/backupNudge';
 import { backupStamp, inspectBackup } from '../services/backupLogic';
 import { refreshReminders } from '../services/reminderSync';
+import { getOpeningEnabled, setOpeningEnabled } from '../services/quoteStore';
 import { KCAL_TARGET_MAX, KCAL_TARGET_MIN, WATER_GOALS, formatWater } from '../services/nutritionLogic';
 import { getKcalTarget, getWaterGoal, saveKcalTarget, setWaterGoal } from '../services/nutritionSettings';
 import {
@@ -49,6 +50,7 @@ export default function SettingsScreen() {
   const [model, setModelState] = useState<string>(DEFAULT_MODEL);
   const [busy, setBusy] = useState(false);
   const [reviewReminder, setReviewReminder] = useState(true);
+  const [openingQuote, setOpeningQuote] = useState(true);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const [freeProvider, setFreeProviderState] = useState<FreeProvider>('GEMINI');
   const [freeKey, setFreeKeyInput] = useState('');
@@ -68,6 +70,7 @@ export default function SettingsScreen() {
       setModelState(await getModel());
       setLastBackup(await getLastBackup(db));
       setReviewReminder(await getReviewReminderEnabled());
+      setOpeningQuote(await getOpeningEnabled(db));
       setMorning(await getMorningSettings());
       setWaterGoalState(await getWaterGoal());
       const kt = await getKcalTarget();
@@ -385,6 +388,24 @@ export default function SettingsScreen() {
             yapılır. İkisi de varsa gün sonunda önce ücretsiz olan denenir. Adım, ekran, uyku, su/yemek özeti
             (yemek adları asla) ve sigara sayacının yalnızca toplamı yalnızca gün analizi paylaşımını açtıysan gider.
           </Text>
+        </View>
+
+        <View style={styles.switchRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.switchTitle}>Açılış sözü</Text>
+            <Text style={styles.switchText}>
+              Uygulama her açıldığında anlamlı bir söz gösterilir; her seferinde farklı biri gelir. Dokununca geçilir.
+              Kapatırsan doğrudan ana ekran açılır.
+            </Text>
+          </View>
+          <Switch
+            value={openingQuote}
+            onValueChange={async (on) => {
+              setOpeningQuote(on);
+              await setOpeningEnabled(db, on).catch(() => undefined);
+            }}
+            trackColor={{ true: colors.aura, false: colors.border }}
+          />
         </View>
 
         <View style={styles.switchRow}>

@@ -3,14 +3,19 @@ import { ActivityIndicator, AppState, View } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { router, Stack } from 'expo-router';
 import { SQLiteProvider, type SQLiteDatabase } from 'expo-sqlite';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { colors } from '../constants/theme';
 import { DB_NAME, migrateDbIfNeeded } from '../database/schema';
 import { ensureWorkSeed } from '../services/workSettings';
 import { ensureTracking } from '../services/activity';
+import { OpeningQuote } from '../components/OpeningQuote';
 import { RoutineActionRunner } from '../components/RoutineActionRunner';
 import { enqueueAction } from '../services/notificationActionQueue';
 import { actionKey, isStale, parseRoutineAction } from '../services/routineActionLogic';
+
+// Telefonun açılış penceresi (koyu zemin + logo), açılış sözü ekranı çizilene kadar açık kalır; böylece beyaz ekran görünmez.
+SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 /** Bildirime dokunulunca bildirimin belirttiği ekranı (sabah brifingi, gün sonu) açar. */
 const ALLOWED_ROUTES = new Set(['/morning', '/review', '/nutrition', '/goals', '/mark', '/day', '/exercise-run']);
@@ -76,6 +81,11 @@ async function initDatabase(db: SQLiteDatabase): Promise<void> {
 
 export default function RootLayout() {
   useNotificationOpen();
+  // Her ihtimale karşı: açılış penceresi 8 saniyeden uzun takılı kalmasın
+  useEffect(() => {
+    const t = setTimeout(() => SplashScreen.hideAsync().catch(() => undefined), 8000);
+    return () => clearTimeout(t);
+  }, []);
   // Arka plan takibi açık bırakıldıysa, uygulama her öne geldiğinde servisin çalıştığından emin ol.
   useEffect(() => {
     ensureTracking();
@@ -123,6 +133,7 @@ export default function RootLayout() {
           <Stack.Screen name="exercise-move" />
           <Stack.Screen name="exercise-run" />
         </Stack>
+        <OpeningQuote />
       </SQLiteProvider>
     </Suspense>
   );
