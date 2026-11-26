@@ -30,6 +30,10 @@ jobs:
           npx expo install expo-router expo-sqlite expo-secure-store expo-status-bar expo-constants expo-linking expo-notifications expo-clipboard expo-location expo-task-manager react react-native react-native-screens react-native-safe-area-context
           npm install --save-dev typescript @types/react
 
+      - name: Surum kodunu derleme numarasina esitle
+        run: |
+          node -e "const fs=require('fs');const a=JSON.parse(fs.readFileSync('app.json','utf8'));a.expo.android.versionCode=${{ github.run_number }};a.expo.version='0.1.${{ github.run_number }}';fs.writeFileSync('app.json',JSON.stringify(a,null,2))"
+
       - name: Android projesini olustur
         run: npx expo prebuild --platform android --no-install
 
@@ -37,17 +41,35 @@ jobs:
         working-directory: android
         run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
 
+      - name: APK dosyasini adlandir
+        id: apk
+        run: |
+          NAME="Kronos-Aura-${{ github.run_number }}.apk"
+          cp android/app/build/outputs/apk/release/app-release.apk "$NAME"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "sha=$(sha256sum "$NAME" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "size=$(du -h "$NAME" | cut -f1)" >> "$GITHUB_OUTPUT"
+
       - name: APK dosyasini sakla
         uses: actions/upload-artifact@v4
         with:
           name: kronos-aura-apk
-          path: android/app/build/outputs/apk/release/*.apk
+          path: ${{ steps.apk.outputs.name }}
 
       - name: Indirilebilir surum olustur
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "apk-${{ github.run_number }}" \
-            android/app/build/outputs/apk/release/*.apk \
-            --title "Kronos ve Aura APK ${{ github.run_number }}" \
-            --notes "Android telefonda indirip ac. Bilinmeyen kaynaklardan yuklemeye izin vermen istenebilir."
+          cat > notes.md <<'NOTES'
+          **Uygulama adı:** Kronos & Aura
+          **Dosya:** ${{ steps.apk.outputs.name }} (${{ steps.apk.outputs.size }})
+          **Paket:** com.kronosaura.app · sürüm 0.1.${{ github.run_number }} (kod ${{ github.run_number }})
+          **SHA-256:** ${{ steps.apk.outputs.sha }}
+
+          Android telefonda indirip aç. "Bilinmeyen kaynaklardan yükleme" izni ve Google Play Koruma taraması istenebilir; bu, Play Store dışından kurulan her uygulamada çıkar.
+          Eski sürümün üstüne kurulur, verilerin silinmez.
+          NOTES
+          sed -i 's/^          //' notes.md
+          gh release create "apk-${{ github.run_number }}" "${{ steps.apk.outputs.name }}" \
+            --title "Kronos & Aura APK ${{ github.run_number }}" \
+            --notes-file notes.md
