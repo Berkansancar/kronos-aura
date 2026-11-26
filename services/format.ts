@@ -19,6 +19,12 @@ export function formatClock(d: Date): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+/** Pazartesi */
+export const formatWeekday = (d: Date): string => DAYS[d.getDay()];
+
+/** 16 Kasım 2026 */
+export const formatFullDate = (d: Date): string => `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+
 /** 16 Kasım, Pazartesi */
 export function formatDayTitle(d: Date): string {
   return `${d.getDate()} ${MONTHS[d.getMonth()]}, ${DAYS[d.getDay()]}`;

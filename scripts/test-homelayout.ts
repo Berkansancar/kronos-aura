@@ -109,10 +109,13 @@ console.log('Ekran bağlantıları');
 const grid = readFileSync(join(root, 'components', 'HomeGrid.tsx'), 'utf8');
 const home = readFileSync(join(root, 'app', 'index.tsx'), 'utf8');
 const layout = readFileSync(join(root, 'app', '_layout.tsx'), 'utf8');
-check('ızgara kutuları dışarıdan alır, sabit listeyi kullanmaz', grid.includes('p.tiles') && !grid.includes('chunkTiles(HOME_TILES'));
-check('ızgarada Düzenle düğmesi var', grid.includes('onEdit') && grid.includes('Düzenle'));
-check('ana ekran düzeni her odaklanışta yükler', home.includes('getHomeLayout') && home.includes('tilesFor') && home.includes("router.push('/home-layout')"));
-check('düzenleme ekranı kayıtlı', layout.includes('name="home-layout"') && existsSync(join(root, 'app', 'home-layout.tsx')));
+check('düzenleme ana ekranın kendisinde: ayrı ekran yok', !existsSync(join(root, 'app', 'home-layout.tsx')) && !layout.includes('home-layout') && !home.includes("'/home-layout'"));
+check('ızgara kutuları kullanıcı düzeninden alır, sabit listeyi kullanmaz', grid.includes('tilesFor(p.order)') && !grid.includes('chunkTiles(HOME_TILES'));
+check('ızgarada Düzenle / Bitti düğmesi ve taşıma paneli var', grid.includes('✎ Düzenle') && grid.includes('✓ Bitti') && grid.includes('moveBy(') && grid.includes('removeTile(') && grid.includes('addTile('));
+check('düzenlerken basılı tutma ekran açmaz, dokunuş seçer', grid.includes('editing ? undefined : p.onOpen(tile)') && grid.includes('setSelected(sel === tile.id ? null : tile.id)'));
+check('ana ekran düzeni yükler, her değişiklikte kaydeder, sıfırlar', home.includes('getHomeLayout(db)') && home.includes('saveHomeLayout(db, next)') && home.includes('resetHomeLayout(db)'));
+check('üstte gün, tarih ve saat; altında doğrudan analiz', grid.includes('formatClock(now)') && grid.includes('formatWeekday(now)') && grid.includes('formatFullDate(now)') && grid.includes('<HomeAnalysis'));
+check('analiz ve görevler düzenlerken gizlenir', grid.includes('{!editing && <HomeAnalysis'));
 
 dbTests()
   .then(() => console.log(`\nTüm kontroller geçti (${passed}).`))

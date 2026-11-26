@@ -74,9 +74,9 @@ import { endHardDay, startHardDay } from '../services/hardDay';
 import { countExhaustedSince, shouldSuggestHardDay } from '../services/hardDayLogic';
 import { isEssentialRoutine } from '../services/routineRemindersLogic';
 import { addWater, loadDayNutrition } from '../services/nutrition';
-import { getHomeLayout, tilesFor } from '../services/homeLayout';
+import { defaultOrder, getHomeLayout, resetHomeLayout, saveHomeLayout } from '../services/homeLayout';
 import { upgradeRoutineIcons } from '../services/routineIconUpgrade';
-import { HOME_PAGES, HOME_TILES, QUICK_WATER_ML, pageFromOffset, quickWaterMessage, tapHint, type HomeTileDef } from '../services/homeGrid';
+import { HOME_PAGES, QUICK_WATER_ML, pageFromOffset, quickWaterMessage, tapHint, type HomeTileDef } from '../services/homeGrid';
 import { formatWater, type DayNutrition } from '../services/nutritionLogic';
 import { getNutritionOptions } from '../services/nutritionSettings';
 import { loadGoalState } from '../services/goals';
@@ -172,7 +172,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const pager = useRef<ScrollViewInstance>(null);
   const [page, setPage] = useState(0);
-  const [tiles, setTiles] = useState<HomeTileDef[]>(HOME_TILES);
+  const [homeOrder, setHomeOrder] = useState<string[]>(defaultOrder);
   const [editing, setEditing] = useState<Task | null>(null);
   const [typicalCommute, setTypicalCommute] = useState<number | null>(null);
   const [lang, setLang] = useState<LanguageDayState | null>(null);
@@ -290,9 +290,9 @@ export default function HomeScreen() {
     useCallback(() => {
       load();
       loadActivity();
-      // Kutu düzeni (Düzenle ekranından dönünce de tazelenir)
+      // Kullanıcının kutu düzeni
       getHomeLayout(db)
-        .then((order) => setTiles(tilesFor(order)))
+        .then(setHomeOrder)
         .catch(() => undefined);
     }, [db, load, loadActivity])
   );
@@ -632,9 +632,19 @@ export default function HomeScreen() {
       >
         <View style={{ width: pageW }}>
           <HomeGrid
-            title={formatDayTitle(planDay)}
-            tiles={tiles}
-            onEdit={() => router.push('/home-layout')}
+            order={homeOrder}
+            onOrder={(next) => {
+              setHomeOrder(next);
+              saveHomeLayout(db, next).catch(() => undefined);
+            }}
+            onResetOrder={() =>
+              Alert.alert('Varsayılan düzene dönülsün mü?', 'Kutuların sırası ve eklediklerin ya da kaldırdıkların ilk haline döner.', [
+                { text: 'Vazgeç', style: 'cancel' },
+                { text: 'Dön', onPress: () => resetHomeLayout(db).then(setHomeOrder).catch(() => undefined) },
+              ])
+            }
+            analysisKey={`${nutrition?.waterMl ?? 0}-${dayKey(now)}`}
+            onAnalysisDetail={() => router.push('/analysis')}
             subtitle={isTomorrow ? 'Yarın için plan' : 'Bugünün akışı'}
             nowText={guideNowState && guideText ? guideText.now : null}
             nowNote={guideNowState?.current?.note ?? null}

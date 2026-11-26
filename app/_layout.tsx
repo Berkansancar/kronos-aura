@@ -140,7 +140,6 @@ export default function RootLayout() {
           <Stack.Screen name="journal" />
           <Stack.Screen name="location" />
           <Stack.Screen name="analysis" />
-          <Stack.Screen name="home-layout" />
         </Stack>
         <OpeningQuote />
       </SQLiteProvider>
