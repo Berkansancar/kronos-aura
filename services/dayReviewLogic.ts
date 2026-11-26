@@ -237,11 +237,11 @@ const CATEGORIES: RoutineCategory[] = ['SAGLIK', 'ZIHIN', 'ODAK', 'DUZEN'];
  * Yapay zekâya gidecek gün özeti. Adım, ekran ve uyku yalnızca paylaşım izni varsa eklenir;
  * görev ve rutin adları her zaman gider (kullanıcı kendi yazdı, koç sohbetiyle aynı kapsam).
  */
-export function buildReviewPrompt(
+export function reviewFactLines(
   f: DayFacts,
   existingTitles: string[],
   shareActivity: boolean
-): string {
+): string[] {
   const lines: string[] = ['Bugünün özeti (gün sonu değerlendirmesi için):'];
   lines.push(
     f.tasksDone.length > 0
@@ -314,7 +314,12 @@ export function buildReviewPrompt(
       : '- Henüz hiç rutini yok.'
   );
 
-  lines.push(
+  return lines;
+}
+
+/** Günlük değerlendirmenin görev ve kural satırları (JSON biçimi dahil). */
+export function reviewTaskLines(f: DayFacts, shareActivity: boolean): string[] {
+  return [
     '',
     'GÖREV: Günü yargılamadan değerlendir, yarın için kısa bir yaklaşım öner ve kullanıcının yapabileceği 3 FARKLI yeni rutin fikri çıkar.',
     'Kurallar:',
@@ -334,9 +339,16 @@ export function buildReviewPrompt(
     'Sadece şu JSON\'u döndür, başka hiçbir şey yazma:',
     shareActivity
       ? '{"reflection":"...","tomorrow":"...","ideas":[{"title":"...","category":"SAGLIK","minutes":15,"hour":9,"minute":0,"why":"..."}],"timeUse":"...","screenAlternatives":[{"title":"...","minutes":15,"why":"..."}]}'
-      : '{"reflection":"...","tomorrow":"...","ideas":[{"title":"...","category":"SAGLIK","minutes":15,"hour":9,"minute":0,"why":"..."}],"timeUse":"..."}'
-  );
-  return lines.join('\n');
+      : '{"reflection":"...","tomorrow":"...","ideas":[{"title":"...","category":"SAGLIK","minutes":15,"hour":9,"minute":0,"why":"..."}],"timeUse":"..."}',
+  ];
+}
+
+export function buildReviewPrompt(
+  f: DayFacts,
+  existingTitles: string[],
+  shareActivity: boolean
+): string {
+  return [...reviewFactLines(f, existingTitles, shareActivity), ...reviewTaskLines(f, shareActivity)].join('\n');
 }
 
 /**

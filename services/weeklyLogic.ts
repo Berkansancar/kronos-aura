@@ -146,7 +146,7 @@ function avg(values: number[], minCount: number): number | null {
 }
 
 /** Rutin bu gün planlı mı? (gün anahtarı yyyy-mm-dd) */
-function scheduledOn(r: WeekRoutineInput, key: string): boolean {
+export function scheduledOn(r: WeekRoutineInput, key: string): boolean {
   return !r.days || r.days.length === 0 || r.days.includes(parseDayKey(key).getDay());
 }
 

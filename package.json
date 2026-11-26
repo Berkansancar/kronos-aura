@@ -44,7 +44,8 @@
     "test:quotes": "tsx scripts/test-quotes.ts",
     "test:effects": "tsx scripts/test-effects.ts",
     "test:journal": "tsx scripts/test-journal.ts",
-    "test:body": "tsx scripts/test-body.ts"
+    "test:body": "tsx scripts/test-body.ts",
+    "test:period": "tsx scripts/test-period.ts"
   },
   "dependencies": {
     "expo": "~58.0.0",

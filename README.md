@@ -83,6 +83,7 @@ npm run test:homegrid     ana ekran ızgarası: kutular, rotalar, sayfa hesabı,
 npm run test:effects      etki ekranı: içerik ve rakam doğruluğu, seri, aşamalar, tekrar ve kalori toplamı, ekran satırları
 npm run test:journal      akşam günlüğü ve "seni ne iyi yapıyor": temizleme, gün seçimi, Aura cevabı, seri, ay özeti, karşılaştırma dürüstlüğü, veritabanı v13, yedek
 npm run test:body         kilo ve rekorlar: giriş, haftalık eğilim, hedef, grafik geometrisi, egzersiz rekorları (60 seanstan sonra da), veritabanı, yedek
+npm run test:period       tüm günlerin değerlendirmesi: dönem hesabı, toplamlar, gün satırları, komut ve gizlilik, cevabın doğrulanması, saklama, yedek
 npm run test:icons        simgeler: çizilen bardak ve şişeler, ada göre rutin simgesi, eski rutinleri yenileme, beslenme simgeleri, eski telefon uyumu, 111 kontrol
 npm run test:exercise     egzersiz: çizim geometrisi, içerik bütünlüğü, basamak atlama, seans kaydı, program (gün, güne başlama saati), sabah kartı, alarm, bildirim planı, yedek, 334 kontrol
 npm run test:language     dil öğrenme (uygulama süresi, kalem-kağıt, hedef, geçmiş, gün analizi, yedek, veritabanı v10), 52 kontrol
@@ -375,6 +376,30 @@ görünüyor, sebep olduğu anlamına gelmez").
 Veritabanı sürümü **13** oldu (yeni tablolar: `WeightLog`, `Journal`; ikisi de yedeğe girer). Mantık `services/journalLogic.ts`,
 `services/insightLogic.ts`, `services/bodyLogic.ts`; veri toplama `services/journal.ts`, `services/body.ts`; ekranlar `app/journal.tsx`,
 `app/body.tsx`, grafik `components/WeightChart.tsx`.
+
+## Tüm günlerin değerlendirmesi (Gün sonu > Ücretsiz yapay zekâyla > "Tüm günleri kopyala")
+
+Gün sonu ekranında "Bugünün özetini kopyala" yanında **"Tüm günleri kopyala (N gün)"** düğmesi vardır. Dönem seçilmez: uygulamayı
+kullanmaya başladığın günden (ilk kaydın olduğu gün) bugüne kadar **bütün günler** otomatik alınır; 60 günden uzunsa son 60 gün
+alınır ve komutta belirtilir. En az iki günlük kayıt gerekir.
+
+- **Komutta ne var:** (1) uygulamanın hesapladığı **"şu kadar günde böyle"** toplamları (kayıt olan gün: 3 / 5, rutin: 3 / 10 (%30),
+  egzersiz: 1 / 2 program günü, ruh hali ortalaması, uyku, adım, ekran, su hedefi, dil, yolda ve iş yerinde geçen süre...);
+  (2) **gün gün tek satır** kayıtlar (tarih, gün adı, görev, rutin, egzersiz, adım, ekran, uyku, su, ruh hali, dil, yol, sigara sayısı);
+  (3) bugünün özeti (gün sonu komutuyla aynı) ve görev kuralları. Sayıları yapay zekâ değil uygulama hesaplar.
+- **Dürüstlük:** yazılmayan alan "o gün kayıt yok" demektir, sıfır demek değildir; kaydı olmayan gün "yapılmadı" diye okunmaz.
+  Konum verisi yoktur; komut yapay zekâya "yolda / işte / evde" ayrımını uydurmamasını söyler, yalnızca gün akışı damgalarından gelen
+  "yolda" ve "iş yerinde" sürelerini verir. Komut kullanıcının şoför olduğunu (gün boyu hareket hâlinde, sabit iş yeri olmayabilir)
+  söyler ve sürüş sırasında telefon gerektiren fikir verilmemesini ister.
+- **Cevap:** bugünün eski alanlarına (yorum, yarın, rutin fikirleri, zaman, ekran yerine) ek olarak `periodSummary` ("Son N günde ..."),
+  `patterns` (en çok 3 örüntü; sebep iddiası yok), `dayNotes` (her güne tek kısa not) ve `nextPeriod` (Kronos: önümüzdeki günler).
+  Cevabı "Cevabı ekle" ile yapıştırınca bugünün değerlendirmesi her zamanki gibi kaydolur, dönem kısmı ayrıca "Tüm günlerin
+  değerlendirmesi" kartlarında görünür (özet, uygulamanın sayıları, örüntüler, Kronos yaklaşımı, gün gün notlar). Rutin fikirleri
+  mevcut "yarın yapacağım" akışıyla eklenir. Son 6 değerlendirme saklanır; dönem alanı yoksa ya da uygunsuz sözcük içeriyorsa yalnızca o
+  kısım atılır.
+- **Gizlilik:** ruh hali notu, günlük yazıları, kilo ve konum komuta girmez (konum zaten tutulmaz).
+- Veritabanı değişmedi: dönem kayıtları `Setting` tablosunda (`period_reviews_v1`) durur ve yedeğe girer.
+  Mantık `services/periodLogic.ts`, veri toplama `services/periodReview.ts`, komut `services/dayReview.ts` (`buildAllDaysManualPrompt`).
 
 ## Ana ekran ve İlerleme ve geçmiş
 

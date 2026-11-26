@@ -23,7 +23,9 @@ import { getAiConfig } from '../services/ai/settings';
 import { getNutritionOptions } from '../services/nutritionSettings';
 import {
   addIdeaAsRoutine,
+  buildAllDaysManualPrompt,
   buildManualReviewPrompt,
+  describePeriod,
   loadOrCreateReview,
   planForTomorrow,
   reviewAvailable,
@@ -33,6 +35,8 @@ import {
   tomorrowAnswers,
   type TomorrowAnswer,
 } from '../services/dayReview';
+import { loadPeriodReviews } from '../services/periodReview';
+import { dayShortLabel, periodRangeLabel, type StoredPeriodReview } from '../services/periodLogic';
 import { factChips, type DayFacts } from '../services/dayReviewLogic';
 import { formatDayTitle, formatDuration } from '../services/format';
 import { addTask } from '../services/taskFlow';
@@ -71,11 +75,25 @@ export default function ReviewScreen() {
   const [manualText, setManualText] = useState('');
   const [manualMsg, setManualMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copiedAll, setCopiedAll] = useState(false);
+  const [span, setSpan] = useState<{ days: number; enough: boolean; capped: boolean } | null>(null);
+  const [periods, setPeriods] = useState<StoredPeriodReview[]>([]);
+  const [openPeriod, setOpenPeriod] = useState<string | null>(null);
+  const [showNotes, setShowNotes] = useState(false);
 
   const loadLists = useCallback(async () => {
     const n = new Date();
     setRoutines(await listRoutines(db, 'ACTIVE'));
     setAnswers(await tomorrowAnswers(db, n));
+    try {
+      const d = await describePeriod(db, n);
+      setSpan({ days: d.days, enough: d.enough, capped: d.capped });
+      const list = await loadPeriodReviews(db);
+      setPeriods(list);
+      setOpenPeriod((cur) => cur ?? list[0]?.to ?? null);
+    } catch {
+      // dönem özeti okunamazsa gün sonu ekranı yine de açılır
+    }
   }, [db]);
 
   const generate = useCallback(
@@ -185,6 +203,22 @@ export default function ReviewScreen() {
     }
   };
 
+  // "Tüm günler": uygulamayı kullanmaya başladığın günden bugüne gün gün özet ve komut
+  const copyAllPrompt = async () => {
+    setManualMsg(null);
+    try {
+      const { text } = await buildAllDaysManualPrompt(db, new Date(), await getNutritionOptions());
+      try {
+        await Clipboard.setStringAsync(text);
+        setCopiedAll(true);
+      } catch {
+        await Share.share({ message: text });
+      }
+    } catch (e) {
+      setManualMsg({ text: e instanceof Error ? e.message : String(e), ok: false });
+    }
+  };
+
   const pasteAnswer = async () => {
     try {
       const text = await Clipboard.getStringAsync();
@@ -203,11 +237,12 @@ export default function ReviewScreen() {
     setBusy(true);
     setManualMsg(null);
     try {
-      const saved = await saveManualReview(db, new Date(), manualText);
+      const saved = await saveManualReview(db, new Date(), manualText, await getNutritionOptions());
       setReview(saved);
       setAiError(null);
       setManualText('');
       setCopied(false);
+      setCopiedAll(false);
       setManualMsg({ text: 'Eklendi. Yorum ve fikirler yukarıda.', ok: true });
       await loadLists();
       await refreshReminders(db).catch(() => undefined);
@@ -444,6 +479,75 @@ export default function ReviewScreen() {
               </>
             )}
 
+            {periods.length > 0 && (
+              <>
+                <Text style={styles.section}>Tüm günlerin değerlendirmesi</Text>
+                {periods.map((p) => {
+                  const open = openPeriod === p.to;
+                  return (
+                    <View key={p.to} style={styles.card}>
+                      <Pressable onPress={() => setOpenPeriod(open ? null : p.to)} style={styles.rowBetween}>
+                        <Text style={styles.cardTitle}>
+                          Son {p.days} gün · {periodRangeLabel(p.from, p.to)}
+                        </Text>
+                        <Text style={styles.time}>{open ? '▲' : '▼'}</Text>
+                      </Pressable>
+                      {open && (
+                        <>
+                          <View style={styles.chips}>
+                            {p.stats.map((c) => (
+                              <View key={c} style={styles.chip}>
+                                <Text style={styles.chipText}>{c}</Text>
+                              </View>
+                            ))}
+                          </View>
+                          <View style={[styles.coach, { borderColor: colors.aura, backgroundColor: colors.auraSoft }]}>
+                            <Text style={[styles.coachName, { color: colors.aura }]}>AURA · {p.days} günün özeti</Text>
+                            <Text style={styles.coachText}>{p.summary}</Text>
+                          </View>
+                          {p.patterns.length > 0 && (
+                            <View style={{ gap: 4 }}>
+                              <Text style={styles.cardTitle}>Örüntüler</Text>
+                              {p.patterns.map((t) => (
+                                <Text key={t} style={styles.cardText}>
+                                  • {t}
+                                </Text>
+                              ))}
+                            </View>
+                          )}
+                          {p.next ? (
+                            <View style={[styles.coach, { borderColor: colors.kronos, backgroundColor: colors.kronosSoft }]}>
+                              <Text style={[styles.coachName, { color: colors.kronos }]}>KRONOS · önümüzdeki günler</Text>
+                              <Text style={styles.coachText}>{p.next}</Text>
+                            </View>
+                          ) : null}
+                          {p.dayNotes.length > 0 && (
+                            <>
+                              <Pressable onPress={() => setShowNotes((v) => !v)} hitSlop={8}>
+                                <Text style={styles.addBtnText}>
+                                  {showNotes ? 'Gün notlarını gizle' : `Gün gün notlar (${p.dayNotes.length})`}
+                                </Text>
+                              </Pressable>
+                              {showNotes &&
+                                p.dayNotes.map((n) => (
+                                  <View key={n.day} style={{ gap: 2 }}>
+                                    <Text style={styles.cardTitle}>{dayShortLabel(n.day)}</Text>
+                                    <Text style={styles.cardText}>{n.note}</Text>
+                                  </View>
+                                ))}
+                            </>
+                          )}
+                        </>
+                      )}
+                    </View>
+                  );
+                })}
+                <Text style={styles.hint}>
+                  Sayılar uygulamanın kayıtlarından hesaplanır; yorumları senin yapıştırdığın yapay zekâ cevabı yazar.
+                </Text>
+              </>
+            )}
+
             <Text
               style={styles.section}
               onLayout={(e) => {
@@ -455,13 +559,29 @@ export default function ReviewScreen() {
             </Text>
             <View style={styles.card}>
               <Text style={styles.cardText}>
-                1. "Özeti kopyala"ya bas.{'\n'}2. Gemini, ChatGPT ya da Claude uygulamasını aç, yapıştırıp
-                gönder.{'\n'}3. Gelen cevabı (kod bloğuyla birlikte) kopyala, buraya yapıştır ve "Cevabı ekle"ye
-                bas.
+                1. Bugünün özetini ya da tüm günleri kopyala.{'\n'}2. Gemini, ChatGPT ya da Claude uygulamasını aç,
+                yapıştırıp gönder.{'\n'}3. Gelen cevabı (kod bloğuyla birlikte) kopyala, buraya yapıştır ve "Cevabı
+                ekle"ye bas.
               </Text>
               <Pressable disabled={busy} onPress={copyPrompt} style={styles.addBtn}>
-                <Text style={styles.addBtnText}>{copied ? 'Kopyalandı ✓ (tekrar kopyala)' : 'Özeti kopyala'}</Text>
+                <Text style={styles.addBtnText}>{copied ? 'Kopyalandı ✓ (tekrar kopyala)' : 'Bugünün özetini kopyala'}</Text>
               </Pressable>
+              {span?.enough ? (
+                <Pressable disabled={busy} onPress={copyAllPrompt} style={styles.addBtn}>
+                  <Text style={styles.addBtnText}>
+                    {copiedAll ? 'Kopyalandı ✓ (tekrar kopyala)' : `Tüm günleri kopyala (${span.days} gün)`}
+                  </Text>
+                </Pressable>
+              ) : (
+                <Text style={styles.hint}>Tüm günler için en az iki günlük kayıt gerekir.</Text>
+              )}
+              {span?.enough ? (
+                <Text style={styles.hint}>
+                  "Tüm günleri kopyala": uygulamayı kullanmaya başladığın günden bugüne{span.capped ? ' (son 60 gün)' : ''} gün gün
+                  kayıtların, "şu kadar günde böyle" toplamları ve bugünün özeti tek komutta gider. Cevapta dönem yorumu, her
+                  güne bir not, örüntüler ve yeni rutin fikirleri gelir.
+                </Text>
+              ) : null}
               <TextInput
                 value={manualText}
                 onChangeText={setManualText}
@@ -491,7 +611,7 @@ export default function ReviewScreen() {
                 </Text>
               )}
               <Text style={styles.hint}>
-                Kopyalanan metinde görev ve rutin adların ile adım, ekran süresi, uyku bilgin ve o gün seçtiğin ruh hali (notun değil) var. Ücretsiz
+                Kopyalanan metinde görev ve rutin adların ile adım, ekran süresi, uyku bilgin, su, sigara sayacı, yolda ve iş yerinde geçen süre ve seçtiğin ruh hali (notun değil) var; günlük yazıların, kilon ve konumun yok. Ücretsiz
                 sohbet uygulamaları konuşmaları kendi ürünlerini geliştirmek için kullanabilir; istemediğin bir
                 şey varsa yapıştırmadan önce metinden sil.
               </Text>

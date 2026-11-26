@@ -31,10 +31,13 @@ import { getSmokeLimit } from './dayFlow';
 import {
   buildManualPrompt,
   buildRulesReview,
+  extractJsonLenient,
   parseManualResponse,
   withTimeUse,
   type DayFacts,
 } from './dayReviewLogic';
+import { describePeriod, gatherPeriodFacts, savePeriodExtras } from './periodReview';
+import { buildPeriodPrompt, periodStats } from './periodLogic';
 import { FREE_PROVIDERS, type FreeConfig } from './ai/freeClient';
 import { generateAiReview, generateFreeReview } from './ai/reviewAI';
 import type { AiConfig } from './ai/settings';
@@ -314,13 +317,30 @@ export async function buildManualReviewPrompt(
 }
 
 /**
+ * Kopyalanıp ücretsiz sohbet uygulamasına yapıştırılacak "tüm günlerin" özeti ve komutu: uygulamayı kullanmaya
+ * başladığın günden bugüne (en çok 60 gün) gün gün kayıtlar, dönem toplamları ve bugünün özeti.
+ */
+export async function buildAllDaysManualPrompt(
+  db: SQLiteDatabase,
+  now: Date,
+  nutritionOpts?: NutritionOptions
+): Promise<{ text: string; days: number }> {
+  const [facts, period] = await Promise.all([gatherDayFacts(db, now, nutritionOpts), gatherPeriodFacts(db, now, nutritionOpts)]);
+  const text = buildPeriodPrompt(period, periodStats(period), facts, await allRoutineTitles(db));
+  return { text, days: period.days.length };
+}
+
+export { describePeriod };
+
+/**
  * Sohbet uygulamasından yapıştırılan cevabı okur ve günün değerlendirmesi olarak kaydeder.
  * Cevap okunamazsa fırlatır ve mevcut değerlendirmeye dokunmaz.
  */
 export async function saveManualReview(
   db: SQLiteDatabase,
   now: Date,
-  pastedText: string
+  pastedText: string,
+  nutritionOpts?: NutritionOptions
 ): Promise<DayReview> {
   const facts = await gatherDayFacts(db, now);
   const titles = await allRoutineTitles(db);
@@ -328,6 +348,12 @@ export async function saveManualReview(
   if (!parsed.ok) throw new Error(parsed.message);
   const payload = withTimeUse(parsed.payload, buildRulesReview(facts, titles, []), facts);
   await upsertDayReview(db, facts.day, payload, now);
+  // Cevapta dönem alanları da varsa ("tüm günler" komutu) ayrıca saklanır; hata günün değerlendirmesini bozmaz
+  try {
+    await savePeriodExtras(db, now, extractJsonLenient(pastedText.trim()), nutritionOpts);
+  } catch {
+    // dönem özeti saklanamadı; günlük değerlendirme yine de kayıtlı
+  }
   return { day: facts.day, payload, createdAt: now.toISOString() };
 }
 
