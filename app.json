@@ -30,6 +30,14 @@
         }
       ],
       [
+        "expo-location",
+        {
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true,
+          "locationAlwaysAndWhenInUsePermission": "Gün haritası için evde, yolda ve durakta geçen süreyi hesaplamak üzere konum kullanılır. Koordinatlar telefonda kalır."
+        }
+      ],
+      [
         "expo-notifications",
         {
           "icon": "./assets/notification-icon.png",

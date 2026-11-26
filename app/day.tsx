@@ -94,6 +94,10 @@ export default function DayFlowScreen() {
         <Text style={styles.heading}>Gün akışı</Text>
         <Text style={styles.sub}>Her adımda bir dokunuş; süreleri ben hesaplarım.</Text>
 
+        <Pressable onPress={() => router.push('/location')} style={styles.mapLink}>
+          <Text style={styles.mapLinkText}>📍 Gün haritası: evde, yolda, durakta kaç dakika (otomatik)</Text>
+        </Pressable>
+
         {wakeFresh && !drank && (
           <View style={[styles.coach, { borderColor: colors.aura, backgroundColor: colors.auraSoft }]}>
             <Text style={[styles.coachName, { color: colors.aura }]}>AURA</Text>
@@ -339,4 +343,13 @@ const styles = StyleSheet.create({
   },
   primaryText: { color: colors.bg, fontSize: 15, fontWeight: '800' },
   footnote: { color: colors.textMuted, fontSize: 11, lineHeight: 16, marginTop: spacing.md },
+  mapLink: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  mapLinkText: { color: colors.aura, fontSize: 13, fontWeight: '700' },
 });

@@ -22,6 +22,7 @@ import { buildFlow } from './dayFlowLogic';
 import { loadExercise } from './exercise';
 import { isExerciseDay } from './exerciseLogic';
 import { languageForDays } from './language';
+import { isLocationShared, listLocationDays, rollupLocation, type SessionProvider } from './location';
 import type { NutritionOptions } from './nutrition';
 import { DEFAULT_WATER_GOAL } from './nutritionLogic';
 import { parseDays } from './routineDaysLogic';
@@ -42,6 +43,7 @@ import {
   type PeriodSpan,
   type StoredPeriodReview,
 } from './periodLogic';
+import type { DayLocationSummary } from './locationLogic';
 import { weekEndDate, windowKeys, type WeekRoutineInput } from './weeklyLogic';
 
 /** Uygulamada kaydı olan en eski gün (yoksa null). Yalnızca gün sütunu olan tablolara bakılır. */
@@ -67,7 +69,12 @@ export async function describePeriod(db: SQLiteDatabase, now: Date): Promise<Per
   return { ...span, to, enough: span.days >= MIN_PERIOD_DAYS };
 }
 
-export async function gatherPeriodFacts(db: SQLiteDatabase, now: Date, nutritionOpts?: NutritionOptions): Promise<PeriodFacts> {
+export async function gatherPeriodFacts(
+  db: SQLiteDatabase,
+  now: Date,
+  nutritionOpts?: NutritionOptions,
+  sessions?: SessionProvider
+): Promise<PeriodFacts> {
   const to = dayKey(weekEndDate(now));
   const span = periodSpan(await firstDataDay(db), to);
   const keys = windowKeys(to, span.days);
@@ -131,6 +138,13 @@ export async function gatherPeriodFacts(db: SQLiteDatabase, now: Date, nutrition
     eventsByDay.set(e.day, list);
   }
 
+  // Konum: yalnızca dakika toplamları; kullanıcı paylaşımı kapattıysa hiç eklenmez
+  const locByDay = new Map<string, DayLocationSummary>();
+  if (await isLocationShared(db).catch(() => false)) {
+    await rollupLocation(db, now, sessions).catch(() => 0);
+    for (const l of await listLocationDays(db, startKey, to).catch(() => [])) locByDay.set(l.day, l);
+  }
+
   const days: PeriodDay[] = keys.map((k) => {
     const st = statByDay.get(k);
     const info = taskByDay.get(k);
@@ -167,6 +181,7 @@ export async function gatherPeriodFacts(db: SQLiteDatabase, now: Date, nutrition
       languageMinutes: l && l.total > 0 ? l.total : null,
       roadMinutes,
       siteMinutes,
+      loc: locByDay.get(k) ?? null,
     };
   });
 
@@ -195,9 +210,10 @@ export async function savePeriodExtras(
   db: SQLiteDatabase,
   now: Date,
   obj: Record<string, unknown> | null,
-  nutritionOpts?: NutritionOptions
+  nutritionOpts?: NutritionOptions,
+  sessions?: SessionProvider
 ): Promise<StoredPeriodReview | null> {
-  const facts = await gatherPeriodFacts(db, now, nutritionOpts);
+  const facts = await gatherPeriodFacts(db, now, nutritionOpts, sessions);
   const extras: PeriodExtras | null = parsePeriodExtras(
     obj,
     facts.days.map((d) => d.day)

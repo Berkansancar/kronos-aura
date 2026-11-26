@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 export const DB_NAME = 'kronos-aura.db';
-export const DATABASE_VERSION = 13;
+export const DATABASE_VERSION = 14;
 
 /**
  * Not: SQLite'ın gerçek bir DATETIME tipi yoktur. Zaman alanlarını ISO-8601 (UTC) TEXT
@@ -272,6 +272,44 @@ CREATE TABLE IF NOT EXISTS Journal (
   updatedAt TEXT NOT NULL
 );
 `;
+/**
+ * v14: gün haritası. Place: kayıtlı ev ve iş noktaları (koordinat telefonda kalır, yedeğe girmez).
+ * LocationPoint: ham konum örnekleri (en çok 3 gün saklanır, yedeğe girmez). LocationDay: günün dakika toplamları.
+ */
+const CREATE_TABLES_V14 = `
+CREATE TABLE IF NOT EXISTS Place (
+  id        TEXT PRIMARY KEY NOT NULL,
+  name      TEXT NOT NULL,
+  kind      TEXT NOT NULL CHECK (kind IN ('HOME', 'WORK')),
+  lat       REAL NOT NULL,
+  lon       REAL NOT NULL,
+  radiusM   INTEGER NOT NULL DEFAULT 150 CHECK (radiusM BETWEEN 50 AND 500),
+  createdAt TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS LocationPoint (
+  ts    INTEGER PRIMARY KEY NOT NULL,
+  lat   REAL NOT NULL,
+  lon   REAL NOT NULL,
+  speed REAL,
+  acc   REAL
+);
+
+CREATE TABLE IF NOT EXISTS LocationDay (
+  day           TEXT PRIMARY KEY NOT NULL,
+  homeMin       INTEGER NOT NULL DEFAULT 0,
+  workMin       INTEGER,
+  roadMin       INTEGER NOT NULL DEFAULT 0,
+  stopMin       INTEGER NOT NULL DEFAULT 0,
+  trackedMin    INTEGER NOT NULL DEFAULT 0,
+  leftHome      TEXT,
+  backHome      TEXT,
+  screenHomeMin INTEGER,
+  screenRoadMin INTEGER,
+  screenOutMin  INTEGER,
+  updatedAt     TEXT NOT NULL
+);
+`;
 const ADD_ROUTINE_ICON = `ALTER TABLE Routine ADD COLUMN icon TEXT;`;
 const ADD_ROUTINE_COLOR = `ALTER TABLE Routine ADD COLUMN color TEXT;`;
 /** Hangi günler yapılır: "1,2,3" (0 = Pazar); boş = her gün */
@@ -377,8 +415,13 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {
     current = 13;
   }
 
+  if (current === 13) {
+    await db.execAsync(CREATE_TABLES_V14);
+    current = 14;
+  }
+
   // Gelecekteki migrasyonlar:
-  // if (current === 13) { await db.execAsync(`ALTER TABLE ...`); current = 14; }
+  // if (current === 14) { await db.execAsync(`ALTER TABLE ...`); current = 15; }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
 }

@@ -10,7 +10,9 @@ import { DB_NAME, migrateDbIfNeeded } from '../database/schema';
 import { ensureWorkSeed } from '../services/workSettings';
 import { ensureTracking } from '../services/activity';
 import { OpeningQuote } from '../components/OpeningQuote';
+import { LocationBoot } from '../components/LocationBoot';
 import { RoutineActionRunner } from '../components/RoutineActionRunner';
+import '../services/locationTask'; // arka plan konum görevi uygulama açılırken tanımlanmalı
 import { enqueueAction } from '../services/notificationActionQueue';
 import { actionKey, isStale, parseRoutineAction } from '../services/routineActionLogic';
 
@@ -100,6 +102,7 @@ export default function RootLayout() {
       <SQLiteProvider databaseName={DB_NAME} onInit={initDatabase} useSuspense>
         <StatusBar style="light" />
         <RoutineActionRunner />
+        <LocationBoot />
         <Stack
           screenOptions={{
             headerShown: false,
@@ -135,6 +138,7 @@ export default function RootLayout() {
           <Stack.Screen name="effects" />
           <Stack.Screen name="body" />
           <Stack.Screen name="journal" />
+          <Stack.Screen name="location" />
         </Stack>
         <OpeningQuote />
       </SQLiteProvider>

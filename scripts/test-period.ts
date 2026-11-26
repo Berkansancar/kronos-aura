@@ -281,7 +281,7 @@ async function main(): Promise<void> {
   const screen = readFileSync(join(root, 'app/review.tsx'), 'utf8');
   check('ekranda "Tüm günleri kopyala" ve sonuç kartı', screen.includes('Tüm günleri kopyala') && screen.includes('Tüm günlerin değerlendirmesi') && screen.includes('Gün gün notlar'));
   check('dönem seçimi yok (hepsi otomatik)', !screen.includes('Kendin seç') && !screen.includes('7 gün') && !screen.includes('30 gün'));
-  check('şema sürümü değişmedi (Setting kullanılır)', DATABASE_VERSION === 13);
+  check('şema sürümü 14 (dönem yorumu Setting\'te, konum tabloları v14\'te)', DATABASE_VERSION === 14);
   check('dosyalar var', existsSync(join(root, 'services/periodLogic.ts')) && existsSync(join(root, 'services/periodReview.ts')));
   const tooNew = (s: string) => [...s].some((ch) => (ch.codePointAt(0) ?? 0) >= 0x1fa70);
   check('metinlerde yeni emoji yok', !tooNew(screen) && !tooNew(readFileSync(join(root, 'services/periodLogic.ts'), 'utf8')));

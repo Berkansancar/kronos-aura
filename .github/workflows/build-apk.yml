@@ -27,7 +27,7 @@ jobs:
       - name: Paketleri kur
         run: |
           npm install
-          npx expo install expo-router expo-sqlite expo-secure-store expo-status-bar expo-constants expo-linking expo-notifications expo-clipboard react react-native react-native-screens react-native-safe-area-context
+          npx expo install expo-router expo-sqlite expo-secure-store expo-status-bar expo-constants expo-linking expo-notifications expo-clipboard expo-location expo-task-manager react react-native react-native-screens react-native-safe-area-context
           npm install --save-dev typescript @types/react
 
       - name: Android projesini olustur

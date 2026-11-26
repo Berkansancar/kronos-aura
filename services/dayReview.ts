@@ -36,6 +36,7 @@ import {
   withTimeUse,
   type DayFacts,
 } from './dayReviewLogic';
+import type { SessionProvider } from './location';
 import { describePeriod, gatherPeriodFacts, savePeriodExtras } from './periodReview';
 import { buildPeriodPrompt, periodStats } from './periodLogic';
 import { FREE_PROVIDERS, type FreeConfig } from './ai/freeClient';
@@ -323,9 +324,10 @@ export async function buildManualReviewPrompt(
 export async function buildAllDaysManualPrompt(
   db: SQLiteDatabase,
   now: Date,
-  nutritionOpts?: NutritionOptions
+  nutritionOpts?: NutritionOptions,
+  sessions?: SessionProvider
 ): Promise<{ text: string; days: number }> {
-  const [facts, period] = await Promise.all([gatherDayFacts(db, now, nutritionOpts), gatherPeriodFacts(db, now, nutritionOpts)]);
+  const [facts, period] = await Promise.all([gatherDayFacts(db, now, nutritionOpts), gatherPeriodFacts(db, now, nutritionOpts, sessions)]);
   const text = buildPeriodPrompt(period, periodStats(period), facts, await allRoutineTitles(db));
   return { text, days: period.days.length };
 }
@@ -340,7 +342,8 @@ export async function saveManualReview(
   db: SQLiteDatabase,
   now: Date,
   pastedText: string,
-  nutritionOpts?: NutritionOptions
+  nutritionOpts?: NutritionOptions,
+  sessions?: SessionProvider
 ): Promise<DayReview> {
   const facts = await gatherDayFacts(db, now);
   const titles = await allRoutineTitles(db);
@@ -350,7 +353,7 @@ export async function saveManualReview(
   await upsertDayReview(db, facts.day, payload, now);
   // Cevapta dönem alanları da varsa ("tüm günler" komutu) ayrıca saklanır; hata günün değerlendirmesini bozmaz
   try {
-    await savePeriodExtras(db, now, extractJsonLenient(pastedText.trim()), nutritionOpts);
+    await savePeriodExtras(db, now, extractJsonLenient(pastedText.trim()), nutritionOpts, sessions);
   } catch {
     // dönem özeti saklanamadı; günlük değerlendirme yine de kayıtlı
   }

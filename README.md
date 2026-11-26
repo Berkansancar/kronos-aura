@@ -84,6 +84,7 @@ npm run test:effects      etki ekranı: içerik ve rakam doğruluğu, seri, aşa
 npm run test:journal      akşam günlüğü ve "seni ne iyi yapıyor": temizleme, gün seçimi, Aura cevabı, seri, ay özeti, karşılaştırma dürüstlüğü, veritabanı v13, yedek
 npm run test:body         kilo ve rekorlar: giriş, haftalık eğilim, hedef, grafik geometrisi, egzersiz rekorları (60 seanstan sonra da), veritabanı, yedek
 npm run test:period       tüm günlerin değerlendirmesi: dönem hesabı, toplamlar, gün satırları, komut ve gizlilik, cevabın doğrulanması, saklama, yedek
+npm run test:location     gün haritası: evde / yolda / durakta / iş noktasında dakikalar, çıkış ve dönüş saati, ekran süresi, uzun boşluklar, takip kapanışı, silme, yedek, komuta yalnızca dakikaların girmesi, 91 kontrol
 npm run test:icons        simgeler: çizilen bardak ve şişeler, ada göre rutin simgesi, eski rutinleri yenileme, beslenme simgeleri, eski telefon uyumu, 111 kontrol
 npm run test:exercise     egzersiz: çizim geometrisi, içerik bütünlüğü, basamak atlama, seans kaydı, program (gün, güne başlama saati), sabah kartı, alarm, bildirim planı, yedek, 334 kontrol
 npm run test:language     dil öğrenme (uygulama süresi, kalem-kağıt, hedef, geçmiş, gün analizi, yedek, veritabanı v10), 52 kontrol
@@ -388,18 +389,46 @@ alınır ve komutta belirtilir. En az iki günlük kayıt gerekir.
   (2) **gün gün tek satır** kayıtlar (tarih, gün adı, görev, rutin, egzersiz, adım, ekran, uyku, su, ruh hali, dil, yol, sigara sayısı);
   (3) bugünün özeti (gün sonu komutuyla aynı) ve görev kuralları. Sayıları yapay zekâ değil uygulama hesaplar.
 - **Dürüstlük:** yazılmayan alan "o gün kayıt yok" demektir, sıfır demek değildir; kaydı olmayan gün "yapılmadı" diye okunmaz.
-  Konum verisi yoktur; komut yapay zekâya "yolda / işte / evde" ayrımını uydurmamasını söyler, yalnızca gün akışı damgalarından gelen
-  "yolda" ve "iş yerinde" sürelerini verir. Komut kullanıcının şoför olduğunu (gün boyu hareket hâlinde, sabit iş yeri olmayabilir)
-  söyler ve sürüş sırasında telefon gerektiren fikir verilmemesini ister.
+  Gün haritası kapalıysa komut yapay zekâya "yolda / işte / evde" ayrımını uydurmamasını söyler ve yalnızca gün akışı damgalarından gelen
+  "yolda" ve "iş yerinde" sürelerini verir; gün haritası açıksa bunların yerine konumdan hesaplanan dakikalar da girer (aşağıdaki bölüm).
+  Komut kullanıcının şoför olduğunu (gün boyu hareket hâlinde, sabit iş yeri olmayabilir) söyler ve sürüş sırasında telefon gerektiren
+  fikir verilmemesini ister.
 - **Cevap:** bugünün eski alanlarına (yorum, yarın, rutin fikirleri, zaman, ekran yerine) ek olarak `periodSummary` ("Son N günde ..."),
   `patterns` (en çok 3 örüntü; sebep iddiası yok), `dayNotes` (her güne tek kısa not) ve `nextPeriod` (Kronos: önümüzdeki günler).
   Cevabı "Cevabı ekle" ile yapıştırınca bugünün değerlendirmesi her zamanki gibi kaydolur, dönem kısmı ayrıca "Tüm günlerin
   değerlendirmesi" kartlarında görünür (özet, uygulamanın sayıları, örüntüler, Kronos yaklaşımı, gün gün notlar). Rutin fikirleri
   mevcut "yarın yapacağım" akışıyla eklenir. Son 6 değerlendirme saklanır; dönem alanı yoksa ya da uygunsuz sözcük içeriyorsa yalnızca o
   kısım atılır.
-- **Gizlilik:** ruh hali notu, günlük yazıları, kilo ve konum komuta girmez (konum zaten tutulmaz).
-- Veritabanı değişmedi: dönem kayıtları `Setting` tablosunda (`period_reviews_v1`) durur ve yedeğe girer.
+- **Gizlilik:** ruh hali notu, günlük yazıları ve kilo komuta girmez. Konum yalnızca **dakika toplamı ve çıkış-dönüş saati** olarak girer
+  (koordinat, adres ve yer adı girmez; "Gün haritası" ekranından kapatılabilir).
+- Dönem kayıtları `Setting` tablosunda (`period_reviews_v1`) durur ve yedeğe girer.
   Mantık `services/periodLogic.ts`, veri toplama `services/periodReview.ts`, komut `services/dayReview.ts` (`buildAllDaysManualPrompt`).
+
+## Gün haritası: evde, yolda, durakta kaç dakika (Gün akışı > "Gün haritası")
+
+Şoför için sabit bir iş yeri yoktur ama **ev kesindir**: her gün eve dönülür. Bu yüzden ev çıpadır; evden çıkış, dışarıda geçen süre ve eve
+dönüş saati her gün otomatik hesaplanır. Dükkan değişse de sorun olmaz, iş noktaları isteğe bağlıdır.
+
+- **Kurulum (bir kere):** Gün haritası ekranında "Gün haritasını aç" (konum izni, sonra "Her zaman izin ver"), evdeyken "Şu an evdeyim, evi kaydet",
+  istersen dükkandayken "Buradayım, iş noktası olarak kaydet" (ad verilir; yenisi eklenir, eskisini silmek gerekmez). İş noktası kaydetmezsen
+  oradaki süre "Durakta" sayılır.
+- **Ne hesaplanır:** evde, yolda (araçla hareket), durakta (dışarıda duruş ya da yürüyüş), varsa kayıtlı iş noktasında dakikalar; ilk evden
+  çıkış ve son eve dönüş saati; **ekranın açık kaldığı süre** bu parçalara bölünür (evde, yolda, duraklarda). Ekran için Aktivite
+  ekranındaki Kullanım erişimi gerekir. Dükkana uğramayan gün bir kusur değildir: yalnızca "iş noktasında 0 dk" yazar.
+- **Nasıl çalışır:** arka plan görevi dakikada en çok bir konum örneği alır (dengeli doğruluk; pil dostu). Android telefon uyku modunda ve
+  durağansa örnek vermez; süre bir sonraki örneğe kadar aynı yerde sayılır (evde 60 saate, dışarıda 14 saate kadar; hareketliyken 30 dakikaya
+  kadar). Aşan kısım "bilinmiyor" olur ve çubukta gri görünür. Takip kapatılırsa kapalı süre evde sayılmaz. Kırmızı ışık gibi iki hareket
+  arasındaki 4 dakikadan kısa duruşlar "yolda" sayılır; evdeki konum sapması hareket sayılmaz. Bildirim çubuğunda küçük bir bildirim durur
+  (Android'in ön plan hizmeti kuralı).
+- **Gizlilik:** koordinatlar ve yer adları yalnızca telefonda kalır. Ham konum örnekleri 3 gün sonra silinir, geriye günlük dakika toplamları
+  kalır. Kayıtlı yerler ve ham örnekler **yedeğe girmez**; günlük dakika toplamları girer. "Tüm günler" komutuna yalnızca dakika ve saatler gider
+  (anahtarla kapatılabilir); "Tüm konum verisini sil" her şeyi siler.
+- **Komutta:** "Evde (konumdan): günlük ortalama ...", "Dışarıda ...: bunun yolda ...", "Kayıtlı iş noktasında bulunulan gün: 3 / 5", "Evden çıkış:
+  ortalama 07:20", ekranın evde ve yolda dağılımı ve gün gün `konum: evde 6 sa, yolda 9 sa ...` satırı. Komut yapay zekâya şunu söyler: yolda
+  geçen ekran süresi navigasyon ya da müzik olabilir, kınama; dükkana uğranmayan günü yargılama.
+- **APK gerekir:** yeni paketler (`expo-location`, `expo-task-manager`) ve konum izinleri var; telefonda görmek için "APK" demen gerekir.
+- Veritabanı v14: `Place`, `LocationPoint`, `LocationDay`. Mantık `services/locationLogic.ts`, veritabanı `services/location.ts`, izin ve takip
+  `services/locationTracking.ts`, arka plan görevi `services/locationTask.ts`, ekran `app/location.tsx`.
 
 ## Ana ekran ve İlerleme ve geçmiş
 

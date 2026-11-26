@@ -15,7 +15,7 @@ echo  [1/2] Paketler kuruluyor. Birkac dakika surebilir, pencereyi kapatma.
 echo.
 call npm install
 if errorlevel 1 goto hata
-call npx expo install expo-router expo-sqlite expo-secure-store expo-status-bar expo-constants expo-linking react react-native react-native-screens react-native-safe-area-context
+call npx expo install expo-router expo-sqlite expo-secure-store expo-status-bar expo-constants expo-linking expo-location expo-task-manager react react-native react-native-screens react-native-safe-area-context
 if errorlevel 1 goto hata
 call npm install --save-dev typescript @types/react tsx
 if errorlevel 1 goto hata

@@ -38,6 +38,8 @@ export const BACKUP_TABLES = [
   'Vocab',
   'WeightLog',
   'Journal',
+  // Konum: yalnızca günlük dakika toplamları. Kayıtlı yerler (Place) ve ham örnekler (LocationPoint) yedeğe GİRMEZ.
+  'LocationDay',
 ] as const;
 export type BackupTable = (typeof BACKUP_TABLES)[number];
 
@@ -68,6 +70,7 @@ const TABLE_LABELS: Partial<Record<BackupTable, string>> = {
   Vocab: 'Kelime',
   WeightLog: 'Kilo kaydı',
   Journal: 'Günlük yazısı',
+  LocationDay: 'Konum günü (dakika toplamı)',
   DayReview: 'Gün sonu değerlendirmesi',
 };
 

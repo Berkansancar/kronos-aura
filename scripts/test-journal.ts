@@ -152,7 +152,7 @@ async function main(): Promise<void> {
   await migrateDbIfNeeded(u.db);
   const tables = (u.raw.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('WeightLog','Journal')").all() as { name: string }[]).map((x) => x.name).sort().join();
   check('iki yeni tablo oluşur', tables === 'Journal,WeightLog');
-  check('sürüm 13 ve eski veri yerinde', DATABASE_VERSION === 13 && (u.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version === 13 && (u.raw.prepare('SELECT COUNT(*) AS n FROM MoodLog').get() as { n: number }).n === 1);
+  check('sürüm 14 ve eski veri yerinde', DATABASE_VERSION === 14 && (u.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version === 14 && (u.raw.prepare('SELECT COUNT(*) AS n FROM MoodLog').get() as { n: number }).n === 1);
   check('kilo aralık kuralı: 30 altı reddedilir', (() => { try { u.raw.prepare("INSERT INTO WeightLog (day, kg, updatedAt) VALUES ('2026-10-01', 12, 'x')").run(); return false; } catch { return true; } })());
   await migrateDbIfNeeded(u.db);
   check('tekrar çalışınca bozulmaz', true);

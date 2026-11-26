@@ -42,6 +42,7 @@ import { formatDayTitle, formatDuration } from '../services/format';
 import { addTask } from '../services/taskFlow';
 import { refreshReminders } from '../services/reminderSync';
 import { retireRoutine } from '../services/routineFlow';
+import { screenSessions } from '../services/locationTracking';
 import { isRoutineDay } from '../services/routineDaysLogic';
 import { formatAskTime } from '../services/routineLogic';
 import { askNotificationPermission, hasNotificationPermission } from '../services/routineReminders';
@@ -207,7 +208,7 @@ export default function ReviewScreen() {
   const copyAllPrompt = async () => {
     setManualMsg(null);
     try {
-      const { text } = await buildAllDaysManualPrompt(db, new Date(), await getNutritionOptions());
+      const { text } = await buildAllDaysManualPrompt(db, new Date(), await getNutritionOptions(), screenSessions);
       try {
         await Clipboard.setStringAsync(text);
         setCopiedAll(true);
@@ -237,7 +238,7 @@ export default function ReviewScreen() {
     setBusy(true);
     setManualMsg(null);
     try {
-      const saved = await saveManualReview(db, new Date(), manualText, await getNutritionOptions());
+      const saved = await saveManualReview(db, new Date(), manualText, await getNutritionOptions(), screenSessions);
       setReview(saved);
       setAiError(null);
       setManualText('');
@@ -611,7 +612,7 @@ export default function ReviewScreen() {
                 </Text>
               )}
               <Text style={styles.hint}>
-                Kopyalanan metinde görev ve rutin adların ile adım, ekran süresi, uyku bilgin, su, sigara sayacı, yolda ve iş yerinde geçen süre ve seçtiğin ruh hali (notun değil) var; günlük yazıların, kilon ve konumun yok. Ücretsiz
+                Kopyalanan metinde görev ve rutin adların ile adım, ekran süresi, uyku bilgin, su, sigara sayacı, yolda ve iş yerinde geçen süre ve seçtiğin ruh hali (notun değil) var; günlük yazıların ve kilon yok; konum açıksa yalnızca evde, yolda ve durakta geçen dakika toplamları (adres ve koordinat değil) var. Ücretsiz
                 sohbet uygulamaları konuşmaları kendi ürünlerini geliştirmek için kullanabilir; istemediğin bir
                 şey varsa yapıştırmadan önce metinden sil.
               </Text>

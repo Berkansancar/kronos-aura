@@ -10,6 +10,7 @@ import { formatSteps } from './activityLogic';
 import { MANUAL_PREAMBLE, hasBannedWords, reviewFactLines, reviewTaskLines, type DayFacts } from './dayReviewLogic';
 import { dayDiff } from './effectsLogic';
 import { formatDuration } from './format';
+import { MIN_WORK_STAY_MIN, hasLocationRecord, outMinutes, type DayLocationSummary } from './locationLogic';
 import { formatMood } from './moodLogic';
 import { rangeLabel, scheduledOn, totalsOf, weekdayShort, windowKeys, type WeekDay, type WeekRoutineInput } from './weeklyLogic';
 
@@ -22,6 +23,10 @@ export const MAX_STORED_REVIEWS = 6;
 /** Komuta yazılan iş bilgisi: sabit bir iş yeri olmayabilir, gün boyu hareket hâlindedir. */
 export const WORK_NOTE =
   'Kullanıcının işi şoförlük: gün boyu hareket hâlindedir ve sabit bir iş yeri olmayabilir.';
+
+/** Konum dakikaları verildiğinde komuta yazılan açıklama (adres, koordinat ve yer adı yoktur). */
+export const LOCATION_NOTE =
+  'Konum özeti verildi (telefonun arka plan konumundan): yalnızca dakika ve saatlerdir; adres, koordinat ve yer adı yoktur. "evde", "yolda" (araçla hareket hâlinde), "durakta" (dışarıda duruş ya da yürüyüş) ve varsa "kayıtlı iş noktasında" ayrımını yalnızca yazılan dakikalardan çıkar. Evden çıkış ve eve dönüş saatleri günün çerçevesidir. Dükkana ya da kayıtlı bir iş noktasına uğranmayan gün bir kusur değildir; yargılama. Yolda geçen ekran süresi navigasyon ya da müzik olabilir; bunu kınama, tehlikeli kullanım diye yorumlama. Kaydı olmayan süreyi evde ya da yolda sayma.';
 
 // ───────────────────────── Dönem ─────────────────────────
 
@@ -53,6 +58,8 @@ export interface PeriodDay extends WeekDay {
   roadMinutes: number | null;
   /** Gün akışı damgalarından iş yerinde geçen süre; damga yoksa null */
   siteMinutes: number | null;
+  /** Telefonun konumundan günün dakika toplamları (yalnızca dakika; koordinat ve yer adı yok). Yoksa ya da paylaşılmıyorsa boş. */
+  loc?: DayLocationSummary | null;
 }
 
 export interface PeriodFacts {
@@ -107,7 +114,30 @@ export interface PeriodStats {
   roadAvg: number | null;
   siteDays: number;
   siteAvg: number | null;
+  /** Konum kaydı (en az 30 dk bilinen süre) olan gün sayısı */
+  locDays: number;
+  locHomeAvg: number | null;
+  /** Dışarıda: yol + durak + iş noktası */
+  locOutAvg: number | null;
+  locRoadAvg: number | null;
+  locStopAvg: number | null;
+  /** İş noktası kaydı olan günlerden kaçında en az 5 dk bulunuldu */
+  locWorkDays: number;
+  locWorkTracked: number;
+  /** Ortalama evden çıkış ve eve dönüş (gün içi dakika) */
+  locLeaveAvg: number | null;
+  locBackAvg: number | null;
+  locScreenHomeAvg: number | null;
+  locScreenRoadAvg: number | null;
+  locScreenOutAvg: number | null;
 }
+
+const clockMinutes = (hhmm: string | null): number | null => {
+  const m = hhmm ? /^(\d{2}):(\d{2})$/.exec(hhmm) : null;
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+};
+
+const clockText = (min: number): string => `${String(Math.floor(min / 60) % 24).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
 
 const avgOf = (xs: number[], minCount = 1): number | null => (xs.length >= minCount ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : null);
 
@@ -123,7 +153,8 @@ export const hasRecord = (d: PeriodDay): boolean =>
   (d.smoke ?? 0) > 0 ||
   (d.languageMinutes ?? 0) > 0 ||
   d.roadMinutes !== null ||
-  d.siteMinutes !== null;
+  d.siteMinutes !== null ||
+  hasLocationRecord(d.loc);
 
 export function periodStats(f: PeriodFacts): PeriodStats {
   const t = totalsOf(f.days, f.routines, f.countEndDay, f.waterGoalMl);
@@ -132,6 +163,9 @@ export function periodStats(f: PeriodFacts): PeriodStats {
   const lang = f.days.map((d) => d.languageMinutes).filter((x): x is number => x !== null && x > 0);
   const roads = f.days.map((d) => d.roadMinutes).filter((x): x is number => x !== null);
   const sites = f.days.map((d) => d.siteMinutes).filter((x): x is number => x !== null);
+  const locs = f.days.map((d) => d.loc).filter(hasLocationRecord);
+  const nums = (xs: (number | null)[]): number[] => xs.filter((x): x is number => x !== null);
+  const workTracked = locs.filter((l) => l.workMin !== null);
   return {
     days: f.days.length,
     recordedDays: f.days.filter(hasRecord).length,
@@ -159,6 +193,18 @@ export function periodStats(f: PeriodFacts): PeriodStats {
     roadAvg: avgOf(roads, 3),
     siteDays: sites.length,
     siteAvg: avgOf(sites, 3),
+    locDays: locs.length,
+    locHomeAvg: avgOf(locs.map((l) => l.homeMin), 2),
+    locOutAvg: avgOf(locs.map(outMinutes), 2),
+    locRoadAvg: avgOf(locs.map((l) => l.roadMin), 2),
+    locStopAvg: avgOf(locs.map((l) => l.stopMin), 2),
+    locWorkDays: workTracked.filter((l) => (l.workMin as number) >= MIN_WORK_STAY_MIN).length,
+    locWorkTracked: workTracked.length,
+    locLeaveAvg: avgOf(nums(locs.map((l) => clockMinutes(l.leftHome))), 3),
+    locBackAvg: avgOf(nums(locs.map((l) => clockMinutes(l.backHome))), 3),
+    locScreenHomeAvg: avgOf(nums(locs.map((l) => l.screenHomeMin)), 2),
+    locScreenRoadAvg: avgOf(nums(locs.map((l) => l.screenRoadMin)), 2),
+    locScreenOutAvg: avgOf(nums(locs.map((l) => l.screenOutMin)), 2),
   };
 }
 
@@ -181,12 +227,41 @@ export function statLines(s: PeriodStats): string[] {
   if (s.languageDays > 0) out.push(`Dil: ${s.languageDays} gün, toplam ${formatDuration(s.languageMinutes)}`);
   if (s.roadAvg !== null) out.push(`Yolda: günlük ortalama ${formatDuration(s.roadAvg)} (${s.roadDays} gün damga)`);
   if (s.siteAvg !== null) out.push(`İş yerinde (damgayla): günlük ortalama ${formatDuration(s.siteAvg)} (${s.siteDays} gün)`);
+  if (s.locDays > 0) {
+    out.push(`Konum kaydı olan gün: ${s.locDays}`);
+    if (s.locHomeAvg !== null) out.push(`Evde (konumdan): günlük ortalama ${formatDuration(s.locHomeAvg)}`);
+    if (s.locOutAvg !== null) {
+      const road = s.locRoadAvg !== null ? `, bunun yolda ${formatDuration(s.locRoadAvg)}` : '';
+      const stop = s.locStopAvg !== null ? `, durakta ${formatDuration(s.locStopAvg)}` : '';
+      out.push(`Dışarıda (konumdan): günlük ortalama ${formatDuration(s.locOutAvg)}${road}${stop}`);
+    }
+    if (s.locWorkTracked > 0) out.push(`Kayıtlı iş noktasında bulunulan gün: ${s.locWorkDays} / ${s.locWorkTracked}`);
+    if (s.locLeaveAvg !== null) out.push(`Evden çıkış: ortalama ${clockText(s.locLeaveAvg)}`);
+    if (s.locBackAvg !== null) out.push(`Eve dönüş: ortalama ${clockText(s.locBackAvg)}`);
+    if (s.locScreenHomeAvg !== null && s.locScreenRoadAvg !== null && s.locScreenOutAvg !== null) {
+      out.push(
+        `Ekran açık (konuma göre, günlük ortalama): evde ${formatDuration(s.locScreenHomeAvg)}, yolda ${formatDuration(s.locScreenRoadAvg)}, duraklarda ${formatDuration(s.locScreenOutAvg)}`
+      );
+    }
+  }
   if (s.smokeAvg !== null) out.push(`Sigara sayacı: günlük ortalama ${s.smokeAvg} (${s.smokeDays} gün, yalnızca veri)`);
   if (s.hardDays > 0) out.push(`Zor gün modu: ${s.hardDays} gün`);
   return out;
 }
 
 // ───────────────────────── Komut ─────────────────────────
+
+/** Günün konum parçası: yalnızca dakikalar ve saatler (yer adı, koordinat yok). */
+export function locationPart(l: DayLocationSummary): string {
+  const parts = [`evde ${formatDuration(l.homeMin)}`, `yolda ${formatDuration(l.roadMin)}`, `durakta ${formatDuration(l.stopMin)}`];
+  if (l.workMin !== null) parts.push(`kayıtlı iş noktasında ${formatDuration(l.workMin)}`);
+  if (l.leftHome) parts.push(`evden çıkış ${l.leftHome}`);
+  if (l.backHome) parts.push(`eve dönüş ${l.backHome}`);
+  if (l.screenHomeMin !== null && l.screenRoadMin !== null && l.screenOutMin !== null) {
+    parts.push(`ekran açık evde ${formatDuration(l.screenHomeMin)}, yolda ${formatDuration(l.screenRoadMin)}, duraklarda ${formatDuration(l.screenOutMin)}`);
+  }
+  return parts.join(', ');
+}
 
 /** Gün gün tek satır; yazılmayan alan o gün kayıt yok demektir. */
 export function dayLine(d: PeriodDay): string {
@@ -203,6 +278,7 @@ export function dayLine(d: PeriodDay): string {
   if ((d.languageMinutes ?? 0) > 0) parts.push(`dil ${formatDuration(d.languageMinutes as number)}`);
   if (d.roadMinutes !== null) parts.push(`yolda ${formatDuration(d.roadMinutes)}`);
   if (d.siteMinutes !== null) parts.push(`iş yerinde ${formatDuration(d.siteMinutes)}`);
+  if (hasLocationRecord(d.loc)) parts.push(`konum: ${locationPart(d.loc)}`);
   if ((d.smoke ?? 0) > 0) parts.push(`sigara ${d.smoke}`);
   if (d.hardDay) parts.push('zor gün modu');
   return `- ${d.day} ${weekdayShort(d.day)}: ${parts.length > 0 ? parts.join(', ') : 'kayıt yok'}`;
@@ -212,7 +288,7 @@ export function dayLine(d: PeriodDay): string {
 function periodRuleLines(n: number): string[] {
   return [
     `- "periodSummary": Aura sesiyle en fazla 4 kısa cümle. İlk cümle "Son ${n} günde" diye başlasın ve kaç günde ne olduğunu sayılarla söylesin. Yalnızca yukarıdaki sayıları kullan; sayı ya da olay uydurma.`,
-    '- "patterns": en çok 3 kısa gözlem; gün gün kayıtlarda görünen örüntüler (hafta içi ve hafta sonu farkı, egzersiz yapılan günlerde ruh hali ya da uyku, ekranı yüksek günler, yolda geçen süre). "Sebep" iddiası kurma, "birlikte görünüyor" de. Kayıt olan gün sayısı 5\'ten azsa boş liste ver.',
+    '- "patterns": en çok 3 kısa gözlem; gün gün kayıtlarda görünen örüntüler (hafta içi ve hafta sonu farkı, egzersiz yapılan günlerde ruh hali ya da uyku, ekranı yüksek günler, yolda geçen süre, evden çıkış ve dönüş saatleri, ekranın evde ve yolda dağılımı). "Sebep" iddiası kurma, "birlikte görünüyor" de. Kayıt olan gün sayısı 5\'ten azsa boş liste ver.',
     '- "dayNotes": yukarıda listelenen HER gün için bir kayıt: {"day": "yyyy-mm-dd", "note": en fazla 90 karakter, yargısız tek kısa cümle}. Kaydı olmayan gün için "Bu gün için kayıt yok." yaz.',
     `- "nextPeriod": Kronos sesiyle en fazla 3 kısa cümle: önümüzdeki günler için tek bir somut yaklaşım (tepe enerji saatleri, yol ve iş yoğunluğu gözetilerek).`,
     '- "ideas" için ek kural: her fikir yukarıdaki bir bulguya dayansın ve "why" içinde o bulguyu kısa söylesin. Sürüş sırasında telefon kullanımı gerektiren fikir verme; ses ya da durak ve mola gibi güvenli anlara uygun olsun.',
@@ -236,7 +312,7 @@ export function buildPeriodPrompt(f: PeriodFacts, stats: PeriodStats, today: Day
     MANUAL_PREAMBLE.trimEnd(),
     '',
     `TÜM GÜNLERİN ÖZETİ: ${n} gün (${f.from} – ${f.to})${f.capped ? ', uygulamadaki en son 60 gün' : ', uygulamayı kullanmaya başladığın günden bugüne'}.`,
-    `- ${WORK_NOTE} Konum verisi verilmedi: "yolda", "işte" ve "evde" ayrımını yalnızca aşağıda yazan "yolda" ve "iş yerinde" sürelerinden çıkar; yazılmayan şeyi uydurma.`,
+    stats.locDays > 0 ? `- ${WORK_NOTE} ${LOCATION_NOTE}` : `- ${WORK_NOTE} Konum verisi verilmedi: "yolda", "işte" ve "evde" ayrımını yalnızca aşağıda yazan "yolda" ve "iş yerinde" sürelerinden çıkar; yazılmayan şeyi uydurma.`,
     '- Bir alan yazılmadıysa o gün o konuda kayıt yok demektir (sıfır demek değildir). Kaydı olmayan günü "yapılmadı" diye yorumlama.',
     '',
     'Uygulamanın hesapladığı toplamlar (sayıları buradan al):',
