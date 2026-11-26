@@ -86,6 +86,7 @@ npm run test:body         kilo ve rekorlar: giriş, haftalık eğilim, hedef, gr
 npm run test:period       tüm günlerin değerlendirmesi: dönem hesabı, toplamlar, gün satırları, komut ve gizlilik, cevabın doğrulanması, saklama, yedek
 npm run test:location     gün haritası: evde / yolda / durakta / iş noktasında dakikalar, çıkış ve dönüş saati, ekran süresi, uzun boşluklar, takip kapanışı, silme, yedek, komuta yalnızca dakikaların girmesi, 91 kontrol
 npm run test:analysis     analiz: sürgü aralığı (1 gün … ilk kayıttan bugüne), dil / adım / su / günlük toplamları, yol ve damacana kıyasları, veritabanı, 112 kontrol
+npm run test:homelayout   ana ekran düzeni: kutu kataloğu, sırayı değiştirme, kaldırma ve ekleme, kayıt, yedek, 43 kontrol
 npm run test:icons        simgeler: çizilen bardak ve şişeler, ada göre rutin simgesi, eski rutinleri yenileme, beslenme simgeleri, eski telefon uyumu, 111 kontrol
 npm run test:exercise     egzersiz: çizim geometrisi, içerik bütünlüğü, basamak atlama, seans kaydı, program (gün, güne başlama saati), sabah kartı, alarm, bildirim planı, yedek, 334 kontrol
 npm run test:language     dil öğrenme (uygulama süresi, kalem-kağıt, hedef, geçmiş, gün analizi, yedek, veritabanı v10), 52 kontrol
@@ -451,6 +452,17 @@ dönüş saati her gün otomatik hesaplanır. Dükkan değişse de sorun olmaz, 
 - Ana ekran 1. sayfada "Analiz" (📊), "Harita" (📍) ve "Haftalık" (📆) kutuları eklendi.
 - **APK gerekir:** telefonda görmek için "APK" demen gerekir. Veritabanı değişmedi (v14). Mantık `services/analysisLogic.ts`, veri `services/analysis.ts`,
   sürgü `components/HorizonSlider.tsx`, ekran `app/analysis.tsx`.
+
+## Ana ekranı düzenle (Ana ekran 1. sayfa > "✎ Düzenle")
+
+- 1. sayfanın sağ üstündeki **✎ Düzenle** düğmesi düzenleme ekranını açar. Üstte ana ekrandaki kutular **canlı ızgara** olarak görünür (3 sütun).
+  Bir kutuya dokununca seçilir; ekranın altındaki panelde **◀ ▶** (bir kutu sola/sağa), **▲ ▼** (bir satır yukarı/aşağı) ve **Kaldır** düğmeleri çıkar.
+  Panelde kutunun şu anki yeri yazar ("2. satır, 3. sütun").
+- **Eklenebilir** bölümü ana ekranda olmayan kutuları gösterir (kaldırdıkların ve hiç eklenmemiş menüler: Aktivite, Sabah, Gün sonu, Profil, Ayarlar).
+  Dokununca kutu ızgaranın sonuna eklenir, sonra yerini değiştirebilirsin. 2. sayfadaki "Daha fazla" menüsü olduğu gibi durur.
+- Her değişiklik **anında kaydedilir** ("Kaydet" yok). **Varsayılan düzene dön** ilk haline çevirir. Hiç kutu bırakmak da serbesttir; o zaman ana ekranda bir not görünür.
+- Düzen ayar tablosunda (`home_layout_v1`) durur ve **yedeğe girer**, yedekten dönünce aynı düzen gelir. Kutuya ana ekranda basılı tutmak yine ilgili ekranı açar; **Ayarlar** dişlisi her zaman sağ üstte kalır.
+- **APK gerekir:** telefonda görmek için "APK" demen gerekir. Mantık `services/homeLayout.ts`, katalog `services/homeGrid.ts` (`ALL_TILES`), ekran `app/home-layout.tsx`.
 
 ## Ana ekran ve İlerleme ve geçmiş
 

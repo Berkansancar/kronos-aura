@@ -58,6 +58,18 @@ export const HOME_TILES: HomeTileDef[] = [
   { id: 'aura', label: 'Aura', icon: ICON_AURA, group: 'coach', route: '/chat', params: { coach: 'AURA' } },
 ];
 
+/** Varsayılan düzende görünmeyen ama istenirse ana ekrana eklenebilen kutular (2. sayfadaki ve diğer menüler). */
+export const EXTRA_TILES: HomeTileDef[] = [
+  { id: 'aktivite', label: 'Aktivite', icon: '📱', group: 'plan', route: '/activity' },
+  { id: 'sabah', label: 'Sabah', icon: '🌅', group: 'plan', route: '/morning' },
+  { id: 'gun-sonu', label: 'Gün sonu', icon: '🌙', group: 'plan', route: '/review' },
+  { id: 'profil', label: 'Profil', icon: '👤', group: 'plan', route: '/profile' },
+  { id: 'ayarlar', label: 'Ayarlar', icon: '⚙️', group: 'plan', route: '/settings' },
+];
+
+/** Düzenleme ekranında seçilebilecek tüm kutular. */
+export const ALL_TILES: HomeTileDef[] = [...HOME_TILES, ...EXTRA_TILES];
+
 export const isSpecialIcon = (icon: string): boolean => icon.startsWith('@');
 
 /** Satırlara böler (son satır eksik kalabilir). */

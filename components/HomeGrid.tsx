@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { colors, radius, spacing } from '../constants/theme';
 import {
-  HOME_TILES,
   ICON_AURA,
   ICON_DAMACANA,
   ICON_KRONOS,
@@ -18,6 +17,10 @@ import { Damacana } from './Damacana';
 
 interface Props {
   title: string;
+  /** Görünen kutular, sırayla (kullanıcının düzeni) */
+  tiles: HomeTileDef[];
+  /** "Düzenle": kutuları seç, kaldır, sırasını değiştir */
+  onEdit: () => void;
   subtitle: string;
   /** "ŞİMDİ" kartı (rehberden); yoksa kart görünmez */
   nowText: string | null;
@@ -36,7 +39,7 @@ interface Props {
   onOpen: (tile: HomeTileDef) => void;
 }
 
-const TINT: Record<TileGroup, string> = {
+export const TINT: Record<TileGroup, string> = {
   health: 'rgba(95,214,180,0.16)',
   plan: 'rgba(124,156,255,0.16)',
   coach: colors.surfaceAlt,
@@ -56,7 +59,7 @@ export function HomeGrid(p: Props) {
   };
 
   const peek = taskPeek(p.openTitles);
-  const rows = chunkTiles(HOME_TILES, TILE_COLUMNS);
+  const rows = chunkTiles(p.tiles, TILE_COLUMNS);
 
   return (
     <View style={styles.root}>
@@ -66,6 +69,9 @@ export function HomeGrid(p: Props) {
             <Text style={styles.date}>{p.title}</Text>
             <Text style={styles.subtitle}>{p.subtitle}</Text>
           </View>
+          <Pressable onPress={p.onEdit} hitSlop={10} style={styles.editChip} accessibilityLabel="Ana ekranı düzenle">
+            <Text style={styles.editText}>✎ Düzenle</Text>
+          </Pressable>
           <Pressable onPress={p.onSettings} hitSlop={12} accessibilityLabel="Ayarlar">
             <Text style={styles.gear}>⚙</Text>
           </Pressable>
@@ -86,6 +92,8 @@ export function HomeGrid(p: Props) {
             ) : null}
           </Pressable>
         )}
+
+        {p.tiles.length === 0 && <Text style={styles.empty}>Ana ekranda kutu yok. Sağ üstteki "✎ Düzenle"den istediğini ekleyebilirsin.</Text>}
 
         <View style={styles.grid}>
           {rows.map((row, i) => (
@@ -142,7 +150,7 @@ export function HomeGrid(p: Props) {
   );
 }
 
-function TileIcon({ tile, waterRatio }: { tile: HomeTileDef; waterRatio: number }) {
+export function TileIcon({ tile, waterRatio }: { tile: HomeTileDef; waterRatio: number }) {
   if (tile.icon === ICON_DAMACANA) return <Damacana ratio={waterRatio} size={40} />;
   if (tile.icon === ICON_KRONOS || tile.icon === ICON_AURA) {
     const kronos = tile.icon === ICON_KRONOS;
@@ -162,6 +170,9 @@ const styles = StyleSheet.create({
   date: { color: colors.text, fontSize: 24, fontWeight: '800' },
   subtitle: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
   gear: { color: colors.textMuted, fontSize: 22 },
+  editChip: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: 6 },
+  editText: { color: colors.text, fontSize: 12, fontWeight: '700' },
+  empty: { color: colors.textMuted, fontSize: 13, lineHeight: 19 },
   hint: { color: colors.textMuted, fontSize: 12, lineHeight: 17 },
   nowCard: {
     backgroundColor: colors.surface,
