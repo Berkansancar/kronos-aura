@@ -17,7 +17,7 @@ export const DEFAULT_STRIDE_M = 0.75;
 /** Kitap sayfası başına kelime ve kısa bir romanın sayfası */
 export const WORDS_PER_PAGE = 250;
 export const NOVEL_PAGES = 200;
-/** Kelime hızı için aralıkta en az bu kadar dil çalışması gerekir (dk) */
+/** Kelime hızı için aralıkta dil uygulamasında en az bu kadar süre gerekir (dk) */
 export const MIN_RATE_MINUTES = 60;
 
 // ───────────────────────── Girdi ─────────────────────────
@@ -31,8 +31,12 @@ export interface AnalysisData {
   today: string;
   /** İlk kaydın günü (hiç kayıt yoksa null) */
   firstDay: string | null;
-  /** gün -> dil çalışması (dk) */
-  studyByDay: Record<string, number>;
+  /** gün -> dil uygulamasında (Duolingo) geçen süre (dk): ekran süresinden, o okunamıyorsa elle girilen "Uygulama" kaydı */
+  appByDay: Record<string, number>;
+  /** gün -> kalem-kağıt çalışması (dk); uygulama süresinden ayrı sayılır */
+  paperByDay: Record<string, number>;
+  /** gün -> dinleme / konuşma (dk); uygulama süresinden ayrı sayılır */
+  otherByDay: Record<string, number>;
   /** gün -> adım */
   stepsByDay: Record<string, number>;
   /** gün -> içilen su (ml) */
@@ -50,7 +54,9 @@ export interface AnalysisData {
 export const emptyData = (today: string): AnalysisData => ({
   today,
   firstDay: null,
-  studyByDay: {},
+  appByDay: {},
+  paperByDay: {},
+  otherByDay: {},
   stepsByDay: {},
   waterByDay: {},
   journalByDay: {},
@@ -234,9 +240,14 @@ export function strideFromHeight(heightCm: number | null): { m: number; assumed:
 // ───────────────────────── Aralık hesabı ─────────────────────────
 
 export interface LanguageStats {
+  /** Dil uygulamasında (Duolingo) geçen süre: asıl çalışma süresi budur, kelime hızı bununla hesaplanır */
   minutes: number;
   hours: number;
+  /** Uygulamayı kullandığın gün sayısı */
   studyDays: number;
+  /** Kalem-kağıt ve dinleme / konuşma: uygulama süresine eklenmez, kelime hızına girmez */
+  paperMinutes: number;
+  otherMinutes: number;
   learned: number;
   added: number;
   /** Aralıktaki kelime hızı (kelime / saat); en az 1 saat çalışma yoksa null */
@@ -296,7 +307,9 @@ const sumKeys = (map: Record<string, number>, keys: string[]): { total: number; 
 
 function languageIn(data: AnalysisData, keys: string[], all: boolean): LanguageStats {
   const first = keys[0];
-  const study = sumKeys(data.studyByDay, keys);
+  const study = sumKeys(data.appByDay, keys);
+  const paper = sumKeys(data.paperByDay, keys);
+  const other = sumKeys(data.otherByDay, keys);
   const inWin = (day: string | null): boolean => (all ? true : day !== null && day >= first && day <= data.today);
   const learned = data.learned.filter((w) => inWin(w.day)).length;
   const added = data.addedDays.filter((d) => inWin(d)).length;
@@ -305,6 +318,8 @@ function languageIn(data: AnalysisData, keys: string[], all: boolean): LanguageS
     minutes: study.total,
     hours,
     studyDays: study.days,
+    paperMinutes: paper.total,
+    otherMinutes: other.total,
     learned,
     added,
     wordsPerHour: study.total >= MIN_RATE_MINUTES ? learned / hours : null,
@@ -378,9 +393,9 @@ export const fmtStudy = (minutes: number): string => (minutes > 0 ? formatDurati
 
 /** "Saatte ortalama 7,1 kelime" ya da neden hesaplanamadığı (yargısız) */
 export function wordRateText(lang: LanguageStats, allTimeRate: number | null): string {
-  if (lang.wordsPerHour !== null) return `Saatte ortalama ${fmtNum(lang.wordsPerHour, 1)} kelime öğrenildi`;
-  const base = lang.minutes > 0 ? 'Kelime hızı için bu aralıkta en az 1 saat dil çalışması gerekir.' : 'Bu aralıkta dil çalışması kaydı yok.';
-  return allTimeRate !== null ? `${base} Tüm zamanlarda saatte ortalama ${fmtNum(allTimeRate, 1)} kelime.` : base;
+  if (lang.wordsPerHour !== null) return `Uygulamada saatte ortalama ${fmtNum(lang.wordsPerHour, 1)} kelime öğrenildi`;
+  const base = lang.minutes > 0 ? 'Kelime hızı için bu aralıkta dil uygulamasında en az 1 saat gerekir.' : 'Bu aralıkta dil uygulaması süresi kaydı yok.';
+  return allTimeRate !== null ? `${base} Tüm zamanlarda uygulamada saatte ortalama ${fmtNum(allTimeRate, 1)} kelime.` : base;
 }
 
 /** Günlük kıyas satırı: "Önceki 30 güne göre 120 kelime fazla" */

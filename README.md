@@ -85,7 +85,7 @@ npm run test:journal      akşam günlüğü ve "seni ne iyi yapıyor": temizlem
 npm run test:body         kilo ve rekorlar: giriş, haftalık eğilim, hedef, grafik geometrisi, egzersiz rekorları (60 seanstan sonra da), veritabanı, yedek
 npm run test:period       tüm günlerin değerlendirmesi: dönem hesabı, toplamlar, gün satırları, komut ve gizlilik, cevabın doğrulanması, saklama, yedek
 npm run test:location     gün haritası: evde / yolda / durakta / iş noktasında dakikalar, çıkış ve dönüş saati, ekran süresi, uzun boşluklar, takip kapanışı, silme, yedek, komuta yalnızca dakikaların girmesi, 91 kontrol
-npm run test:analysis     analiz: sürgü aralığı (1 gün … ilk kayıttan bugüne), dil / adım / su / günlük toplamları, yol ve damacana kıyasları, veritabanı, 107 kontrol
+npm run test:analysis     analiz: sürgü aralığı (1 gün … ilk kayıttan bugüne), dil / adım / su / günlük toplamları, yol ve damacana kıyasları, veritabanı, 112 kontrol
 npm run test:icons        simgeler: çizilen bardak ve şişeler, ada göre rutin simgesi, eski rutinleri yenileme, beslenme simgeleri, eski telefon uyumu, 111 kontrol
 npm run test:exercise     egzersiz: çizim geometrisi, içerik bütünlüğü, basamak atlama, seans kaydı, program (gün, güne başlama saati), sabah kartı, alarm, bildirim planı, yedek, 334 kontrol
 npm run test:language     dil öğrenme (uygulama süresi, kalem-kağıt, hedef, geçmiş, gün analizi, yedek, veritabanı v10), 52 kontrol
@@ -436,8 +436,10 @@ dönüş saati her gün otomatik hesaplanır. Dükkan değişse de sorun olmaz, 
 - **Sürgü:** ekranın altındaki sürgüyü çekersin; en solda **1 gün**, en sağda **uygulamayı kullanmaya başladığından bugüne geçen gün sayısı** durur
   (örnek: 48 gün geçtiyse sınır 48). Zaman geçtikçe sınır kendiliğinden uzar. Altında hızlı seçimler (1 gün, 1 hafta, 1 ay, 3 ay, 1 yıl, Tümü) ve
   gün gün ince ayar için −/+ düğmeleri vardır. **Gösterilenler gerçek toplamlardır, gelecek tahmini yoktur**: "son N gün" seçilince bugünden geriye N günün kaydı toplanır.
-- **Dil:** çalışma süresi, çalışılan gün, öğrenilen ve deftere eklenen kelime, **saatte ortalama kaç kelime öğrenildi** (aralıkta en az 1 saat dil çalışması
-  varsa; yoksa nedeni yazılır ve tüm zamanların hızı gösterilir). Öğrenildi = kelime defterinde en yüksek kutuya ulaşan kelime; son çalıştığı güne göre aralığa girer.
+- **Dil:** çalışma süresi **dil uygulamasının (Duolingo) ekran süresidir**; ayarlardaki uygulama adıyla aranır, elle girilen "Uygulama" kaydı onunla çift sayılmaz.
+  Kalem kağıt ve dinleme / konuşma **ayrı satırda** gösterilir, uygulama süresine eklenmez ve kelime hızına girmez. Ayrıca kullandığın gün, öğrenilen ve deftere eklenen kelime ile
+  **uygulamada saatte ortalama kaç kelime öğrenildi** gösterilir (aralıkta uygulamada en az 1 saat varsa; yoksa nedeni yazılır ve tüm zamanların hızı gösterilir).
+  Öğrenildi = kelime defterinde en yüksek kutuya ulaşan kelime (Duolingo'nun kendi kelime sayısı okunamaz); son çalıştığı güne göre aralığa girer.
 - **Adım:** toplam adım, **km** (adım × adım uzunluğu; adım uzunluğu Hedefler sayfasındaki boyundan hesaplanır, boy yoksa 75 cm varsayılır ve not düşülür) ve
   yola ya da yapıya **kıyas**: futbol sahası, Eyfel Kulesi, Burj Khalifa, 15 Temmuz Şehitler Köprüsü, 1915 Çanakkale Köprüsü, Everest, maraton,
   İstanbul–Edirne / Ankara / İzmir, Dünya çevresi, Dünya–Ay. Sıradaki hedefe ne kadar kaldığı çubukla gösterilir. Karayolu uzaklıkları yaklaşıktır.

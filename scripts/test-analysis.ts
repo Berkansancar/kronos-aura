@@ -131,7 +131,7 @@ for (let i = 0; i < 41; i++) {
   if (i % 2 === 0) base.stepsByDay[dayAgo(i)] = 8000; // 21 kayıtlı gün
   base.waterByDay[dayAgo(i)] = 2000; // her gün 2 L
 }
-for (let i = 0; i < 10; i++) base.studyByDay[dayAgo(i)] = 30; // son 10 gün, günde 30 dk
+for (let i = 0; i < 10; i++) base.appByDay[dayAgo(i)] = 30; // son 10 gün, günde 30 dk uygulama (Duolingo)
 for (let i = 0; i < 20; i++) base.journalByDay[dayAgo(i)] = 100; // son 20 gün, günde 100 kelime
 for (let i = 20; i < 30; i++) base.journalByDay[dayAgo(i)] = 60; // önceki 10 gün
 base.learned = [
@@ -146,7 +146,7 @@ base.addedDays = [dayAgo(2), dayAgo(30), dayAgo(31)];
 console.log('Analiz: son 10 gün');
 const a10 = analyze(base, 10);
 check('pencere 10 gün, bitiş bugün', a10.days === 10 && a10.to === TODAY && a10.from === dayAgo(9));
-check('dil: 300 dk = 5 saat, 10 gün', a10.language.minutes === 300 && near(a10.language.hours, 5) && a10.language.studyDays === 10);
+check('dil: uygulama 300 dk = 5 saat, 10 gün', a10.language.minutes === 300 && near(a10.language.hours, 5) && a10.language.studyDays === 10);
 check('dil: aralıktaki öğrenilen 3 (tarihi bilinmeyen ve eskiler hariç)', a10.language.learned === 3, String(a10.language.learned));
 check('dil: eklenen 1', a10.language.added === 1);
 check('dil: saatte 0,6 kelime (3/5)', a10.language.wordsPerHour !== null && near(a10.language.wordsPerHour, 0.6));
@@ -206,10 +206,10 @@ check('çalışma 1 saatin altındaysa hız yok', analyze(base, 1).language.word
 check('hızsız aralıkta açıklama ve tüm zamanlar hızı', (() => {
   const r = analyze(base, 1);
   const t = wordRateText(r.language, r.languageAllTimeRate);
-  return t.includes('en az 1 saat') && t.includes('Tüm zamanlarda saatte ortalama 1 kelime');
+  return t.includes('en az 1 saat') && t.includes('Tüm zamanlarda uygulamada saatte ortalama 1 kelime');
 })(), (() => { const r = analyze(base, 1); return wordRateText(r.language, r.languageAllTimeRate); })());
-check('çalışma yoksa yargısız açıklama', wordRateText({ minutes: 0, hours: 0, studyDays: 0, learned: 0, added: 0, wordsPerHour: null }, null) === 'Bu aralıkta dil çalışması kaydı yok.');
-check('hız varsa cümle', wordRateText(a10.language, a10.languageAllTimeRate) === 'Saatte ortalama 0,6 kelime öğrenildi');
+check('çalışma yoksa yargısız açıklama', wordRateText({ minutes: 0, hours: 0, studyDays: 0, paperMinutes: 0, otherMinutes: 0, learned: 0, added: 0, wordsPerHour: null }, null) === 'Bu aralıkta dil uygulaması süresi kaydı yok.');
+check('hız varsa cümle', wordRateText(a10.language, a10.languageAllTimeRate) === 'Uygulamada saatte ortalama 0,6 kelime öğrenildi');
 
 console.log('Boş ve kısmi veri');
 const empty = analyze(emptyData(TODAY), 1);
@@ -263,7 +263,7 @@ async function dbTests(): Promise<void> {
   const res = await loadAnalysis(db, now, 175);
   check('ilk kayıt 10 gün önceki dil kaydı', res.data.firstDay === dayAgo(10), String(res.data.firstDay));
   check('span 11', res.span === 11, String(res.span));
-  check('dil dakikaları gün başına toplanır', res.data.studyByDay[dayAgo(10)] === 60 && res.data.studyByDay[dayAgo(2)] === 30);
+  check('dil: elle girilen uygulama kaydı uygulama süresine, kalem-kağıt ve dinleme ayrı yazılır', res.data.appByDay[dayAgo(2)] === 30 && res.data.appByDay[dayAgo(10)] === undefined && res.data.paperByDay[dayAgo(10)] === 40 && res.data.otherByDay[dayAgo(10)] === 20);
   check('adım yalnızca 0’dan büyük günler', res.data.stepsByDay[dayAgo(5)] === 9000 && res.data.stepsByDay[dayAgo(30)] === undefined);
   check('su gün başına toplanır', res.data.waterByDay[dayAgo(4)] === 1250 && res.data.waterByDay[dayAgo(1)] === 300);
   check('günlük: yalnızca kelime sayısı (iyi geçen gün 3 + sağlık 1 + hedef 4)', res.data.journalByDay[dayAgo(6)] === 8, String(res.data.journalByDay[dayAgo(6)]));
@@ -273,8 +273,8 @@ async function dbTests(): Promise<void> {
   check('deftere eklenen günler', res.data.addedDays.length === 3);
 
   const r = analyze(res.data, res.span);
-  check('tüm zamanlar: dil 90 dk', r.language.minutes === 90 && r.language.studyDays === 2);
-  check('tüm zamanlar: 2 öğrenilen, hız = 2 / 1,5 saat', r.language.learned === 2 && r.language.wordsPerHour !== null && near(r.language.wordsPerHour, 2 / 1.5));
+  check('tüm zamanlar: uygulama 30 dk, kalem-kağıt 40 ve dinleme 20 ayrı', r.language.minutes === 30 && r.language.studyDays === 1 && r.language.paperMinutes === 40 && r.language.otherMinutes === 20);
+  check('tüm zamanlar: 2 öğrenilen; uygulama 1 saatten az olduğu için hız yok (ayrı süreler katılmaz)', r.language.learned === 2 && r.language.wordsPerHour === null);
   check('tüm zamanlar: 16000 adım', r.steps.steps === 16_000 && r.steps.days === 2);
   check('tüm zamanlar: 1550 ml su', r.water.ml === 1550 && r.water.days === 2);
   const r3 = analyze(res.data, 3);
@@ -293,6 +293,24 @@ async function dbTests(): Promise<void> {
   const v = await loadAnalysis(only.db, now, null);
   check('yalnızca kelime eklenmişse ilk gün o gündür', v.data.firstDay === dayAgo(4) && v.span === 5, `${v.data.firstDay} ${v.span}`);
   only.raw.close();
+
+  // Duolingo ekran süresi çalışma süresidir; elle girilen "uygulama" kaydı onunla çift sayılmaz; kalem-kağıt ayrı kalır
+  const duo = makeTestDb();
+  await migrateDbIfNeeded(duo.db);
+  await upsertDailyStat(duo.db, { day: dayAgo(1), steps: 0, screenMinutes: 300, topApps: [{ label: 'Duolingo', minutes: 45 }, { label: 'YouTube', minutes: 90 }] });
+  await upsertDailyStat(duo.db, { day: dayAgo(2), steps: 0, screenMinutes: 200, topApps: [{ label: 'duolingo: dil öğren', minutes: 30 }] });
+  await addStudyLog(duo.db, dayAgo(1), 'APP', 20, when(1));
+  await addStudyLog(duo.db, dayAgo(1), 'PAPER', 15, when(1));
+  await addStudyLog(duo.db, dayAgo(2), 'OTHER', 10, when(2));
+  await insertVocab(duo.db, card('k1', 5, dayAgo(1), when(3)));
+  const dd = await loadAnalysis(duo.db, now, null);
+  check('uygulama süresi ekran süresindeki Duolingo’dur (YouTube katılmaz, elle uygulama kaydı çift sayılmaz)', dd.data.appByDay[dayAgo(1)] === 45 && dd.data.appByDay[dayAgo(2)] === 30);
+  check('kalem-kağıt ve dinleme ayrı tutulur', dd.data.paperByDay[dayAgo(1)] === 15 && dd.data.otherByDay[dayAgo(2)] === 10);
+  const dr = analyze(dd.data, dd.span);
+  check('toplam çalışma = yalnızca Duolingo (75 dk); ayrı süreler gösterilir ama katılmaz', dr.language.minutes === 75 && dr.language.paperMinutes === 15 && dr.language.otherMinutes === 10);
+  check('kelime hızı Duolingo saatine göre: 1 kelime / 1,25 saat', dr.language.wordsPerHour !== null && near(dr.language.wordsPerHour, 1 / 1.25));
+  check('uygulama adı ayarlardan gelir', dd.appLabel === 'Duolingo');
+  duo.raw.close();
   raw.close();
 }
 

@@ -75,12 +75,14 @@ export default function AnalysisScreen() {
             {/* Dil */}
             <View style={styles.card}>
               <Text style={styles.cardTitle}>🌍 Dil</Text>
-              <Row label="Çalışma" value={fmtStudy(result.language.minutes)} />
-              <Row label="Çalışılan gün" value={`${result.language.studyDays} gün`} />
+              <Row label={`${loaded.appLabel} (ekran süresi)`} value={fmtStudy(result.language.minutes)} />
+              <Row label="Kullandığın gün" value={`${result.language.studyDays} gün`} />
+              {result.language.paperMinutes > 0 && <Row label="Kalem kağıt (ayrı)" value={fmtStudy(result.language.paperMinutes)} />}
+              {result.language.otherMinutes > 0 && <Row label="Dinleme / konuşma (ayrı)" value={fmtStudy(result.language.otherMinutes)} />}
               <Row label="Öğrenilen kelime" value={String(result.language.learned)} />
               <Row label="Deftere eklenen" value={String(result.language.added)} />
               <Text style={styles.note}>{wordRateText(result.language, result.languageAllTimeRate)}</Text>
-              <Text style={styles.hint}>Öğrenildi: en yüksek kutuya ulaşan kelime; son çalıştığı güne göre aralığa girer.</Text>
+              <Text style={styles.hint}>Çalışma süresi dil uygulamasının ekran süresidir; kalem kağıt ve dinleme ayrı gösterilir, toplanmaz. Öğrenildi: kelime defterinde en yüksek kutuya ulaşan kelime.</Text>
             </View>
 
             {/* Adım */}

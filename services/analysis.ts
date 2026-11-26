@@ -5,7 +5,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { listDailyStats, listJournalSince, listVocab, listWaterLogsSince } from '../database/repository';
 import { analyze, emptyData, spanDays, type AnalysisData, type WindowAnalysis } from './analysisLogic';
-import { languageForDays } from './language';
+import { getLanguageSettings, languageForDays } from './language';
 import { nutritionDay } from './nutritionLogic';
 import { isLearned } from './vocabLogic';
 import { windowKeys } from './weeklyLogic';
@@ -54,7 +54,10 @@ export async function loadAnalysisData(db: SQLiteDatabase, now: Date, heightCm: 
   const keys = windowKeys(today, span);
 
   for (const d of await languageForDays(db, keys).catch(() => [])) {
-    if (d.summary.total > 0) data.studyByDay[d.day] = d.summary.total;
+    // Uygulama (Duolingo) süresi ana çalışma süresidir; kalem-kağıt ve dinleme ayrı tutulur, toplanmaz.
+    if (d.summary.appMinutes > 0) data.appByDay[d.day] = d.summary.appMinutes;
+    if (d.summary.paperMinutes > 0) data.paperByDay[d.day] = d.summary.paperMinutes;
+    if (d.summary.otherMinutes > 0) data.otherByDay[d.day] = d.summary.otherMinutes;
   }
   for (const s of await listDailyStats(db, span + 7)) {
     if (s.steps > 0) data.stepsByDay[s.day] = s.steps;
@@ -72,11 +75,14 @@ export async function loadAnalysisData(db: SQLiteDatabase, now: Date, heightCm: 
 export interface AnalysisScreenData {
   data: AnalysisData;
   span: number;
+  /** Ekran süresinde aranan dil uygulaması adı (ayarlardaki liste), örn. "Duolingo" */
+  appLabel: string;
 }
 
 export async function loadAnalysis(db: SQLiteDatabase, now: Date, heightCm: number | null): Promise<AnalysisScreenData> {
   const data = await loadAnalysisData(db, now, heightCm);
-  return { data, span: spanDays(data.firstDay, data.today) };
+  const apps = (await getLanguageSettings(db).catch(() => null))?.apps ?? [];
+  return { data, span: spanDays(data.firstDay, data.today), appLabel: apps.length > 0 ? apps.join(', ') : 'Dil uygulaması' };
 }
 
 export { analyze };
