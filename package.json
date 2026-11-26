@@ -18,6 +18,7 @@
     "test:morning": "tsx scripts/test-morning.ts",
     "test:hardday": "tsx scripts/test-hardday.ts",
     "test:weekly": "tsx scripts/test-weekly.ts",
+    "test:analysis": "tsx scripts/test-analysis.ts",
     "test:nutrition": "tsx scripts/test-nutrition.ts",
     "test:goals": "tsx scripts/test-goals.ts",
     "test:outcomes": "tsx scripts/test-outcomes.ts",

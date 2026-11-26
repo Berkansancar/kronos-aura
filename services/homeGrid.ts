@@ -42,10 +42,13 @@ export const HOME_TILES: HomeTileDef[] = [
   // Plan ve takip
   { id: 'rehber', label: 'Rehber', icon: '🧭', group: 'plan', route: '/guide' },
   { id: 'gun-akisi', label: 'Gün akışı', icon: '🕐', group: 'plan', route: '/day' },
+  { id: 'harita', label: 'Harita', icon: '📍', group: 'plan', route: '/location' },
   { id: 'isaretle', label: 'İşaretle', icon: '✅', group: 'plan', route: '/mark' },
   { id: 'hafta', label: 'Hafta', icon: '📋', group: 'plan', route: '/week' },
+  { id: 'haftalik', label: 'Haftalık', icon: '📆', group: 'plan', route: '/weekly' },
   { id: 'takvim', label: 'Takvim', icon: '📅', group: 'plan', route: '/habits' },
   { id: 'gecmis', label: 'Geçmiş', icon: '📈', group: 'plan', route: '/history' },
+  { id: 'analiz', label: 'Analiz', icon: '📊', group: 'plan', route: '/analysis' },
   { id: 'hedef', label: 'Hedefler', icon: '🎯', group: 'plan', route: '/goals' },
   { id: 'karne', label: 'Karne', icon: '📑', group: 'plan', route: '/monthly' },
   { id: 'gunluk', label: 'Günlük', icon: '📓', group: 'plan', route: '/journal' },

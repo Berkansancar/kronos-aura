@@ -85,6 +85,7 @@ npm run test:journal      akşam günlüğü ve "seni ne iyi yapıyor": temizlem
 npm run test:body         kilo ve rekorlar: giriş, haftalık eğilim, hedef, grafik geometrisi, egzersiz rekorları (60 seanstan sonra da), veritabanı, yedek
 npm run test:period       tüm günlerin değerlendirmesi: dönem hesabı, toplamlar, gün satırları, komut ve gizlilik, cevabın doğrulanması, saklama, yedek
 npm run test:location     gün haritası: evde / yolda / durakta / iş noktasında dakikalar, çıkış ve dönüş saati, ekran süresi, uzun boşluklar, takip kapanışı, silme, yedek, komuta yalnızca dakikaların girmesi, 91 kontrol
+npm run test:analysis     analiz: sürgü aralığı (1 gün … ilk kayıttan bugüne), dil / adım / su / günlük toplamları, yol ve damacana kıyasları, veritabanı, 107 kontrol
 npm run test:icons        simgeler: çizilen bardak ve şişeler, ada göre rutin simgesi, eski rutinleri yenileme, beslenme simgeleri, eski telefon uyumu, 111 kontrol
 npm run test:exercise     egzersiz: çizim geometrisi, içerik bütünlüğü, basamak atlama, seans kaydı, program (gün, güne başlama saati), sabah kartı, alarm, bildirim planı, yedek, 334 kontrol
 npm run test:language     dil öğrenme (uygulama süresi, kalem-kağıt, hedef, geçmiş, gün analizi, yedek, veritabanı v10), 52 kontrol
@@ -315,9 +316,9 @@ Veritabanı sürümü 11 (`TaskOutcome`, `Setting`, `DayEvent`, `SmokeLog`, `Stu
 
 Ana ekran **yatay iki sayfadır**; üstteki iki nokta hangi sayfada olduğunu gösterir (noktaya dokunarak da geçilir).
 
-- **1. sayfa (açılış): simgeli ızgara.** Üstte tarih ve ayar düğmesi, "ŞİMDİ" kartı (gün rehberinden), sonra üç sütunlu **21 simgeli kutu**
+- **1. sayfa (açılış): simgeli ızgara.** Üstte tarih ve ayar düğmesi, "ŞİMDİ" kartı (gün rehberinden), sonra üç sütunlu **24 simgeli kutu**
   ve altta açık görevlerin kısa özeti (dokununca 2. sayfaya geçer). Kutular renkle gruplanır: yeşil sağlık ve rutin (Rutinler,
-  Rutin yap, Egzersiz, Su yemek, Dil, Kelime, Etki, Kilo, Rekorlar), mavi plan ve takip (Rehber, Gün akışı, İşaretle, Hafta, Takvim, Geçmiş, Hedefler, Karne,
+  Rutin yap, Egzersiz, Su yemek, Dil, Kelime, Etki, Kilo, Rekorlar), mavi plan ve takip (Rehber, Gün akışı, Harita, İşaretle, Hafta, Haftalık, Takvim, Geçmiş, Analiz, Hedefler, Karne,
   Günlük, Kahraman),
   koçlar (Kronos, Aura; sohbeti ilgili koçla açar). Su kutusunda **damacana** durur ve içtikçe dolar.
 - **Basılı tutma (yaklaşık yarım saniye) ilgili ekranı açar.** Su kutusuna **kısa dokunuş +200 ml ekler**; diğer kutulara kısa
@@ -429,6 +430,25 @@ dönüş saati her gün otomatik hesaplanır. Dükkan değişse de sorun olmaz, 
 - **APK gerekir:** yeni paketler (`expo-location`, `expo-task-manager`) ve konum izinleri var; telefonda görmek için "APK" demen gerekir.
 - Veritabanı v14: `Place`, `LocationPoint`, `LocationDay`. Mantık `services/locationLogic.ts`, veritabanı `services/location.ts`, izin ve takip
   `services/locationTracking.ts`, arka plan görevi `services/locationTask.ts`, ekran `app/location.tsx`.
+
+## Analiz: seçtiğin süre boyunca ne yaptın? (Ana ekran > Analiz)
+
+- **Sürgü:** ekranın altındaki sürgüyü çekersin; en solda **1 gün**, en sağda **uygulamayı kullanmaya başladığından bugüne geçen gün sayısı** durur
+  (örnek: 48 gün geçtiyse sınır 48). Zaman geçtikçe sınır kendiliğinden uzar. Altında hızlı seçimler (1 gün, 1 hafta, 1 ay, 3 ay, 1 yıl, Tümü) ve
+  gün gün ince ayar için −/+ düğmeleri vardır. **Gösterilenler gerçek toplamlardır, gelecek tahmini yoktur**: "son N gün" seçilince bugünden geriye N günün kaydı toplanır.
+- **Dil:** çalışma süresi, çalışılan gün, öğrenilen ve deftere eklenen kelime, **saatte ortalama kaç kelime öğrenildi** (aralıkta en az 1 saat dil çalışması
+  varsa; yoksa nedeni yazılır ve tüm zamanların hızı gösterilir). Öğrenildi = kelime defterinde en yüksek kutuya ulaşan kelime; son çalıştığı güne göre aralığa girer.
+- **Adım:** toplam adım, **km** (adım × adım uzunluğu; adım uzunluğu Hedefler sayfasındaki boyundan hesaplanır, boy yoksa 75 cm varsayılır ve not düşülür) ve
+  yola ya da yapıya **kıyas**: futbol sahası, Eyfel Kulesi, Burj Khalifa, 15 Temmuz Şehitler Köprüsü, 1915 Çanakkale Köprüsü, Everest, maraton,
+  İstanbul–Edirne / Ankara / İzmir, Dünya çevresi, Dünya–Ay. Sıradaki hedefe ne kadar kaldığı çubukla gösterilir. Karayolu uzaklıkları yaklaşıktır.
+- **Su:** toplam litre ve **kaç damacana** (1 damacana = 19 litre); damacana çizimleri dolar (6'dan fazlaysa "+N" yazar).
+- **Günlük:** yazılan gün ve kelime sayısı, kitap sayfası ve kısa roman karşılığı (250 kelime = 1 sayfa, 200 sayfa = 1 kısa roman) ve **bir önceki aynı uzunluktaki
+  aralıkla kıyas** (önceki aralık kayıt başlamadan öncesine taşıyorsa kıyas yapılmaz).
+- **Dürüstlük:** kaydı olmayan gün "sıfır" sayılmaz; ortalamalar yalnızca kayıtlı günlerden hesaplanır. Günlük yazısının metni kullanılmaz, yalnızca kelime sayısı.
+  Bu ekran **yapay zekâya hiçbir şey göndermez**; yargılayıcı sözcük yoktur. Gün sınırı diğer ekranlarla aynıdır (gece 04:00).
+- Ana ekran 1. sayfada "Analiz" (📊), "Harita" (📍) ve "Haftalık" (📆) kutuları eklendi.
+- **APK gerekir:** telefonda görmek için "APK" demen gerekir. Veritabanı değişmedi (v14). Mantık `services/analysisLogic.ts`, veri `services/analysis.ts`,
+  sürgü `components/HorizonSlider.tsx`, ekran `app/analysis.tsx`.
 
 ## Ana ekran ve İlerleme ve geçmiş
 
