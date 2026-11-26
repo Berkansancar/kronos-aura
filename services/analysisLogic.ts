@@ -407,67 +407,6 @@ export function journalCompareText(prev: WindowAnalysis['journalVsPrevious'], da
   return `${label} göre ${fmtNum(Math.abs(prev.diffWords), 0)} kelime ${prev.diffWords > 0 ? 'fazla' : 'az'} (önceki aralıkta ${fmtNum(prev.previousWords, 0)} kelime)`;
 }
 
-// ───────────────────────── Ana ekran özeti ─────────────────────────
-
-export interface HomeLine {
-  key: 'dil' | 'adim' | 'su' | 'gunluk';
-  icon: string;
-  title: string;
-  /** Ana satır: sayılar */
-  main: string;
-  /** İkinci satır: kıyas (yoksa null) */
-  sub: string | null;
-}
-
-const cap = (t: string): string => (t.length > 0 ? t[0].toLocaleUpperCase('tr-TR') + t.slice(1) : t);
-
-/** Ana ekrandaki kısa analiz: dört satır, her biri tek bakışta okunur. Kaydı olmayan başlık "kayıt yok" der (sıfır yazmaz). */
-export function homeSummary(r: WindowAnalysis, appLabel: string): HomeLine[] {
-  const lang = r.language;
-  const langParts: string[] = [];
-  if (lang.minutes > 0) langParts.push(`${appLabel} ${fmtStudy(lang.minutes)}`);
-  if (lang.learned > 0) langParts.push(`${lang.learned} kelime öğrenildi`);
-  if (lang.wordsPerHour !== null) langParts.push(`saatte ${fmtNum(lang.wordsPerHour, 1)} kelime`);
-  const langSide: string[] = [];
-  if (lang.paperMinutes > 0) langSide.push(`kalem kağıt ${fmtStudy(lang.paperMinutes)}`);
-  if (lang.otherMinutes > 0) langSide.push(`dinleme ${fmtStudy(lang.otherMinutes)}`);
-
-  const st = r.steps;
-  const wt = r.water;
-  const jr = r.journal;
-  const vs = journalCompareText(r.journalVsPrevious, r.days);
-  return [
-    {
-      key: 'dil',
-      icon: '🌍',
-      title: 'Dil',
-      main: langParts.length > 0 ? langParts.join(' · ') : 'kayıt yok',
-      sub: langSide.length > 0 ? `Ayrıca ${langSide.join(', ')}` : null,
-    },
-    {
-      key: 'adim',
-      icon: '👣',
-      title: 'Adım',
-      main: st.steps > 0 ? `${formatSteps(st.steps)} adım · ${fmtKm(st.km)}` : 'kayıt yok',
-      sub: st.compare ? cap(st.compare.text) : null,
-    },
-    {
-      key: 'su',
-      icon: '💧',
-      title: 'Su',
-      main: wt.ml > 0 ? `${fmtLiters(wt.ml)} · ${wt.compare.text}` : 'kayıt yok',
-      sub: null,
-    },
-    {
-      key: 'gunluk',
-      icon: '📓',
-      title: 'Günlük',
-      main: jr.words > 0 ? `${formatSteps(jr.words)} kelime · ${jr.entries} gün` : 'kayıt yok',
-      sub: jr.words > 0 ? [cap(jr.compare.text), vs].filter((x): x is string => !!x).join(' · ') : null,
-    },
-  ];
-}
-
 // ───────────────────────── Seçili aralığı hatırlama ─────────────────────────
 
 export const ANALYSIS_DAYS_KEY = 'analysis_days_v1';

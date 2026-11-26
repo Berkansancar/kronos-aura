@@ -10,8 +10,20 @@ export const HOME_LAYOUT_KEY = 'home_layout_v1';
 
 const BY_ID = new Map(ALL_TILES.map((t) => [t.id, t]));
 
-/** Varsayılan düzen: HOME_TILES sırası */
-export const defaultOrder = (): string[] => HOME_TILES.map((t) => t.id);
+/** Ana ekranda "Sık kullanılanlar" olarak görünen kutu sayısı; düzendeki ilk bu kadar kutu gösterilir, gerisi "Tüm menü"dedir. */
+export const HOME_FAVORITE_COUNT = 5;
+
+/** Varsayılan sık kullanılanlar (sırayla): su, dil, egzersiz, günlük, rutinler */
+export const DEFAULT_FAVORITES = ['su', 'dil', 'egzersiz', 'gunluk', 'rutin'];
+
+/** Varsayılan düzen: önce sık kullanılanlar, sonra kalan kutular HOME_TILES sırasıyla */
+export const defaultOrder = (): string[] => {
+  const rest = HOME_TILES.map((t) => t.id).filter((id) => !DEFAULT_FAVORITES.includes(id));
+  return [...DEFAULT_FAVORITES, ...rest];
+};
+
+/** Düzendeki ilk HOME_FAVORITE_COUNT kutu: ana ekranda görünenler. */
+export const favoriteTiles = (order: string[]): HomeTileDef[] => tilesFor(order).slice(0, HOME_FAVORITE_COUNT);
 
 /** Kayıtlı metni düzene çevirir. Bozuksa ya da yoksa varsayılan; bilinmeyen ve tekrar eden kimlikler atılır. Boş liste geçerlidir. */
 export function parseLayout(raw: string | null | undefined): string[] {

@@ -2,9 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { colors, radius, spacing } from '../constants/theme';
 import { formatClock, formatFullDate, formatWeekday } from '../services/format';
+import type { HomeStatCard } from '../services/homeStats';
 import {
+  HOME_FAVORITE_COUNT,
   addTile,
   availableTiles,
+  favoriteTiles,
   isDefaultOrder,
   moveBy,
   positionLabel,
@@ -25,7 +28,6 @@ import {
   type TileGroup,
 } from '../services/homeGrid';
 import { Damacana } from './Damacana';
-import { HomeAnalysis } from './HomeAnalysis';
 
 interface Props {
   /** "Bugünün akışı" / "Yarın için plan" */
@@ -36,9 +38,9 @@ interface Props {
   onOrder: (next: string[]) => void;
   /** Varsayılan düzene dön */
   onResetOrder: () => void;
-  /** Ana ekrandaki analiz verisini tazelemek için anahtar (ör. su eklenince değişir) */
-  analysisKey: string;
-  /** Analiz kartındaki "Ayrıntı ›": tam analiz ekranı */
+  /** Bugünkü üç sayı kartı: adım, su, dil */
+  stats: HomeStatCard[];
+  /** "Ayrıntılı analiz ve sürgü ›": tam analiz ekranı */
   onAnalysisDetail: () => void;
   /** "ŞİMDİ" kartı (rehberden); yoksa kart görünmez */
   nowText: string | null;
@@ -63,11 +65,15 @@ export const TINT: Record<TileGroup, string> = {
   coach: colors.surfaceAlt,
 };
 
-/** Ana ekranın ilk sayfası: gün-tarih-saat, doğrudan görünen analiz, simgeli kutular. Kısa dokunuş hızlı işlem, basılı tutma detay ekranı; "Düzenle" ile kutular burada düzenlenir. */
+/**
+ * Ana ekranın ilk sayfası (sade düzen): gün-tarih-saat, ŞİMDİ kartı, bugünkü üç sayı, "sık kullanılanlar" (düzendeki ilk 5 kutu) ve "Tüm menü".
+ * Kısa dokunuş hızlı işlem, basılı tutma detay ekranı. "Düzenle" ile kutular burada seçilir, taşınır, kaldırılır, eklenir.
+ */
 export function HomeGrid(p: Props) {
   const [message, setMessage] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
   const [editing, setEditing] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => void (timer.current && clearTimeout(timer.current)), []);
@@ -86,12 +92,13 @@ export function HomeGrid(p: Props) {
   };
 
   const peek = taskPeek(p.openTitles);
-  const tiles = tilesFor(p.order);
-  const rows = chunkTiles(tiles, TILE_COLUMNS);
+  const all = tilesFor(p.order);
+  const favorites = favoriteTiles(p.order);
   const extra = availableTiles(p.order);
   const sel = selected && p.order.includes(selected) ? selected : null;
-  const selTile = sel ? tiles.find((t) => t.id === sel) ?? null : null;
+  const selTile = sel ? all.find((t) => t.id === sel) ?? null : null;
   const selIndex = sel ? p.order.indexOf(sel) : -1;
+  const fullGrid = editing || menuOpen;
 
   const change = (next: string[], select: string | null) => {
     p.onOrder(next);
@@ -102,89 +109,180 @@ export function HomeGrid(p: Props) {
     setSelected(null);
   };
 
+  /** Bir kutu: düzenlerken seçer, değilse kısa dokunuşla hızlı işlem, basılı tutunca ekranı açar. */
+  const renderTile = (tile: HomeTileDef, index: number) => (
+    <Pressable
+      key={tile.id}
+      delayLongPress={LONG_PRESS_MS}
+      onPress={() => (editing ? setSelected(sel === tile.id ? null : tile.id) : void Promise.resolve(p.onTap(tile)).then(flash, () => undefined))}
+      onLongPress={() => (editing ? undefined : p.onOpen(tile))}
+      style={({ pressed }) => [styles.tile, { opacity: pressed ? 0.7 : 1 }]}
+      accessibilityRole="button"
+      accessibilityLabel={tile.label}
+      accessibilityHint={editing ? 'Taşımak ya da kaldırmak için seç' : 'Basılı tutarak ayrıntılarını aç'}
+    >
+      <View style={[styles.iconBox, { backgroundColor: TINT[tile.group] }, editing && styles.iconBoxEdit, sel === tile.id && styles.iconBoxSel]}>
+        <TileIcon tile={tile} waterRatio={p.waterRatio} />
+        {editing && index < HOME_FAVORITE_COUNT && (
+          <View style={styles.star}>
+            <Text style={styles.starText}>★</Text>
+          </View>
+        )}
+      </View>
+      <Text style={[styles.label, sel === tile.id && styles.labelSel]} numberOfLines={1}>
+        {tile.label}
+      </Text>
+    </Pressable>
+  );
+
+  const renderRows = (list: HomeTileDef[], tail?: React.ReactNode) => {
+    const items: React.ReactNode[] = list.map((t, i) => renderTile(t, i));
+    if (tail) items.push(tail);
+    const rows: React.ReactNode[][] = [];
+    for (let i = 0; i < items.length; i += TILE_COLUMNS) rows.push(items.slice(i, i + TILE_COLUMNS));
+    return (
+      <View style={styles.grid}>
+        {rows.map((row, i) => (
+          <View key={i} style={styles.row}>
+            {row}
+            {row.length < TILE_COLUMNS && Array.from({ length: TILE_COLUMNS - row.length }).map((_, k) => <View key={`s${k}`} style={styles.tile} />)}
+          </View>
+        ))}
+      </View>
+    );
+  };
+
+  const menuTile = (
+    <Pressable key="__menu" onPress={() => setMenuOpen(true)} style={styles.tile} accessibilityRole="button" accessibilityLabel="Tüm menü">
+      <View style={[styles.iconBox, styles.menuBox]}>
+        <Text style={styles.menuGlyph}>▦</Text>
+      </View>
+      <Text style={styles.label} numberOfLines={1}>
+        Tüm menü
+      </Text>
+    </Pressable>
+  );
+
   return (
     <View style={styles.root}>
       <ScrollView contentContainerStyle={[styles.content, editing && { paddingBottom: 170 }]} showsVerticalScrollIndicator={false}>
-        {/* En üstte: gün, tarih, saat */}
+        {/* Üst satır: ana ekranda gün-tarih-saat; menüde ve düzenlerken başlık */}
         <View style={styles.header}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.clock}>{formatClock(now)}</Text>
-            <Text style={styles.date}>
-              {formatWeekday(now)} · {formatFullDate(now)}
-            </Text>
-            <Text style={styles.subtitle}>{p.subtitle}</Text>
-          </View>
+          {fullGrid ? (
+            <View style={{ flex: 1 }}>
+              {menuOpen && !editing ? (
+                <Pressable onPress={() => setMenuOpen(false)} hitSlop={10}>
+                  <Text style={styles.back}>‹ Geri</Text>
+                </Pressable>
+              ) : null}
+              <Text style={styles.menuTitle}>{editing ? 'Ana ekranı düzenle' : 'Tüm menü'}</Text>
+            </View>
+          ) : (
+            <View style={{ flex: 1 }}>
+              <Text style={styles.clock}>{formatClock(now)}</Text>
+              <Text style={styles.date}>
+                {formatWeekday(now)} · {formatFullDate(now)}
+              </Text>
+              <Text style={styles.subtitle}>{p.subtitle}</Text>
+            </View>
+          )}
           <Pressable
             onPress={editing ? finishEditing : () => setEditing(true)}
             hitSlop={10}
             style={[styles.editChip, editing && styles.editChipOn]}
             accessibilityLabel={editing ? 'Düzenlemeyi bitir' : 'Ana ekranı düzenle'}
           >
-            <Text style={[styles.editText, editing && styles.editTextOn]}>{editing ? '✓ Bitti' : '✎ Düzenle'}</Text>
+            <Text style={[styles.editText, editing && styles.editTextOn]}>{editing ? '✓ Bitti' : 'Düzenle'}</Text>
           </Pressable>
           <Pressable onPress={p.onSettings} hitSlop={12} accessibilityLabel="Ayarlar">
             <Text style={styles.gear}>⚙</Text>
           </Pressable>
         </View>
 
-        {!editing && <HomeAnalysis refreshKey={p.analysisKey} onDetail={p.onAnalysisDetail} />}
-
-        {!editing && <Text style={styles.hint}>Basılı tut: detay · Yana kaydır: tüm akış ›</Text>}
         {editing && (
           <Text style={styles.hint}>
-            Düzenleme: bir kutuya dokun, alttaki oklarla yerini değiştir ya da kaldır. Kaldırdıkların aşağıda "Eklenebilir"de durur. Değişiklikler kendiliğinden kaydedilir.
+            ★ işaretli ilk {HOME_FAVORITE_COUNT} kutu ana ekranda görünür, diğerleri "Tüm menü"dedir. Bir kutuya dokun, alttaki oklarla yerini değiştir ya da kaldır. Değişiklikler kendiliğinden kaydedilir.
           </Text>
         )}
 
-        {!editing && p.nowText && (
-          <Pressable onPress={p.onNow} style={styles.nowCard}>
-            <Text style={styles.nowLabel}>ŞİMDİ</Text>
-            <Text style={styles.nowText} numberOfLines={2}>
-              {p.nowText}
-            </Text>
-            {p.nowNote ? (
-              <Text style={styles.nowNote} numberOfLines={2}>
-                {p.nowNote}
-              </Text>
-            ) : null}
-          </Pressable>
-        )}
-
-        {tiles.length === 0 && <Text style={styles.empty}>Ana ekranda kutu yok. "✎ Düzenle"ye dokunup istediğini ekleyebilirsin.</Text>}
-
-        <View style={styles.grid}>
-          {rows.map((row, i) => (
-            <View key={i} style={styles.row}>
-              {row.map((tile) => (
-                <Pressable
-                  key={tile.id}
-                  delayLongPress={LONG_PRESS_MS}
-                  onPress={() => (editing ? setSelected(sel === tile.id ? null : tile.id) : void Promise.resolve(p.onTap(tile)).then(flash, () => undefined))}
-                  onLongPress={() => (editing ? undefined : p.onOpen(tile))}
-                  style={({ pressed }) => [styles.tile, { opacity: pressed ? 0.7 : 1 }]}
-                  accessibilityRole="button"
-                  accessibilityLabel={tile.label}
-                  accessibilityHint={editing ? 'Taşımak ya da kaldırmak için seç' : 'Basılı tutarak ayrıntılarını aç'}
-                >
-                  <View style={[styles.iconBox, { backgroundColor: TINT[tile.group] }, editing && styles.iconBoxEdit, sel === tile.id && styles.iconBoxSel]}>
-                    <TileIcon tile={tile} waterRatio={p.waterRatio} />
-                  </View>
-                  <Text style={[styles.label, sel === tile.id && styles.labelSel]} numberOfLines={1}>
-                    {tile.label}
+        {/* Ana ekran */}
+        {!fullGrid && (
+          <>
+            {p.nowText && (
+              <Pressable onPress={p.onNow} style={styles.nowCard}>
+                <Text style={styles.nowLabel}>ŞİMDİ</Text>
+                <Text style={styles.nowText} numberOfLines={2}>
+                  {p.nowText}
+                </Text>
+                {p.nowNote ? (
+                  <Text style={styles.nowNote} numberOfLines={2}>
+                    {p.nowNote}
                   </Text>
+                ) : null}
+              </Pressable>
+            )}
+
+            <View style={styles.statRow}>
+              {p.stats.map((c) => (
+                <Pressable key={c.key} onPress={p.onAnalysisDetail} style={styles.statCard} accessibilityLabel={`${c.title}: ${c.value}, ${c.sub}`}>
+                  <Text style={styles.statTitle}>{c.title}</Text>
+                  <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
+                    {c.value}
+                  </Text>
+                  <Text style={styles.statSub} numberOfLines={1}>
+                    {c.sub}
+                  </Text>
+                  {c.ratio !== null && (
+                    <View style={styles.statTrack}>
+                      <View style={[styles.statFill, { width: `${Math.round(c.ratio * 100)}%`, backgroundColor: c.tone === 'kronos' ? colors.kronos : colors.aura }]} />
+                    </View>
+                  )}
                 </Pressable>
               ))}
-              {/* son satır eksikse sütunlar hizalı kalsın */}
-              {row.length < TILE_COLUMNS && Array.from({ length: TILE_COLUMNS - row.length }).map((_, k) => <View key={`s${k}`} style={styles.tile} />)}
             </View>
-          ))}
-        </View>
+            <Pressable onPress={p.onAnalysisDetail} hitSlop={8} style={styles.detailLink}>
+              <Text style={styles.detailText}>Ayrıntılı analiz ve sürgü ›</Text>
+            </Pressable>
+
+            <View style={styles.sectionRow}>
+              <Text style={styles.section}>Sık kullanılanlar</Text>
+              <Text style={styles.sectionNote}>basılı tut: ekranı aç</Text>
+            </View>
+            {favorites.length === 0 && <Text style={styles.empty}>Sık kullanılan kutu yok. "Düzenle"ye dokunup ekleyebilirsin.</Text>}
+            {renderRows(favorites, menuTile)}
+
+            <Pressable onPress={p.onTasks} style={styles.tasks}>
+              <View style={styles.tasksHead}>
+                <Text style={styles.tasksTitle}>Görevler</Text>
+                <Text style={styles.tasksCount}>{p.openCount > 0 ? `${p.openCount} açık ›` : 'tam liste ›'}</Text>
+              </View>
+              {peek.shown.length === 0 ? (
+                <Text style={styles.taskEmpty}>Açık görev yok. Aşağıdaki + ile ekleyebilirsin.</Text>
+              ) : (
+                peek.shown.map((t, i) => (
+                  <Text key={i} style={styles.taskRow} numberOfLines={1}>
+                    ○  {t}
+                  </Text>
+                ))
+              )}
+              {peek.more > 0 && <Text style={styles.taskMore}>+{peek.more} görev daha</Text>}
+            </Pressable>
+          </>
+        )}
+
+        {/* Tüm menü ve düzenleme: bütün kutular, düzendeki sırayla */}
+        {fullGrid && (
+          <>
+            {all.length === 0 && <Text style={styles.empty}>Kutu yok. "Düzenle"ye dokunup istediğini ekleyebilirsin.</Text>}
+            {renderRows(all)}
+          </>
+        )}
 
         {editing && (
           <>
             <Text style={styles.section}>Eklenebilir ({extra.length})</Text>
             {extra.length === 0 ? (
-              <Text style={styles.empty}>Hepsi ana ekranda.</Text>
+              <Text style={styles.empty}>Hepsi ana ekranda ya da menüde.</Text>
             ) : (
               <View style={styles.grid}>
                 {chunkTiles<HomeTileDef>(extra, TILE_COLUMNS).map((row, i) => (
@@ -214,25 +312,6 @@ export function HomeGrid(p: Props) {
             )}
           </>
         )}
-
-        {!editing && (
-          <Pressable onPress={p.onTasks} style={styles.tasks}>
-            <View style={styles.tasksHead}>
-              <Text style={styles.tasksTitle}>Görevler</Text>
-              <Text style={styles.tasksCount}>{p.openCount > 0 ? `${p.openCount} açık ›` : 'tam liste ›'}</Text>
-            </View>
-            {peek.shown.length === 0 ? (
-              <Text style={styles.taskEmpty}>Açık görev yok. Aşağıdaki + ile ekleyebilirsin.</Text>
-            ) : (
-              peek.shown.map((t, i) => (
-                <Text key={i} style={styles.taskRow} numberOfLines={1}>
-                  ○  {t}
-                </Text>
-              ))
-            )}
-            {peek.more > 0 && <Text style={styles.taskMore}>+{peek.more} görev daha</Text>}
-          </Pressable>
-        )}
       </ScrollView>
 
       {/* Düzenleme paneli: seçili kutuyu taşı ya da kaldır (ekranın altında sabit) */}
@@ -242,6 +321,7 @@ export function HomeGrid(p: Props) {
             <>
               <Text style={styles.panelTitle}>
                 {selTile.label} · {positionLabel(selIndex)}
+                {selIndex < HOME_FAVORITE_COUNT ? ' · ana ekranda' : ' · Tüm menü'}
               </Text>
               <View style={styles.panelRow}>
                 <MoveButton label="◀" hint="Sola" disabled={selIndex <= 0} onPress={() => change(moveBy(p.order, selTile.id, -1), selTile.id)} />
@@ -293,10 +373,27 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   content: { padding: spacing.lg, paddingBottom: 120, gap: spacing.lg },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  clock: { color: colors.text, fontSize: 40, fontWeight: '800', lineHeight: 44 },
+  clock: { color: colors.text, fontSize: 46, fontWeight: '800', lineHeight: 50 },
   date: { color: colors.text, fontSize: 16, fontWeight: '700', marginTop: 2 },
   subtitle: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
   gear: { color: colors.textMuted, fontSize: 22 },
+  back: { color: colors.aura, fontSize: 15, fontWeight: '600', marginBottom: 2 },
+  menuTitle: { color: colors.text, fontSize: 24, fontWeight: '800' },
+  statRow: { flexDirection: 'row', gap: 10 },
+  statCard: { flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: 2 },
+  statTitle: { color: colors.textMuted, fontSize: 12, fontWeight: '700' },
+  statValue: { color: colors.text, fontSize: 22, fontWeight: '800' },
+  statSub: { color: colors.textMuted, fontSize: 11 },
+  statTrack: { height: 4, borderRadius: 2, backgroundColor: colors.border, marginTop: 6 },
+  statFill: { height: 4, borderRadius: 2 },
+  detailLink: { alignSelf: 'flex-end', minHeight: 24, justifyContent: 'center' },
+  detailText: { color: colors.aura, fontSize: 12, fontWeight: '700' },
+  sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+  sectionNote: { color: colors.textMuted, fontSize: 11 },
+  menuBox: { backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.border },
+  menuGlyph: { color: colors.text, fontSize: 24 },
+  star: { position: 'absolute', right: -5, top: -5, width: 18, height: 18, borderRadius: 9, backgroundColor: colors.aura, alignItems: 'center', justifyContent: 'center' },
+  starText: { color: colors.bg, fontSize: 11, fontWeight: '800', lineHeight: 13 },
   editChip: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: 6 },
   editChipOn: { borderColor: colors.aura, backgroundColor: colors.aura },
   editText: { color: colors.text, fontSize: 12, fontWeight: '700' },

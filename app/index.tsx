@@ -75,6 +75,8 @@ import { countExhaustedSince, shouldSuggestHardDay } from '../services/hardDayLo
 import { isEssentialRoutine } from '../services/routineRemindersLogic';
 import { addWater, loadDayNutrition } from '../services/nutrition';
 import { defaultOrder, getHomeLayout, resetHomeLayout, saveHomeLayout } from '../services/homeLayout';
+import { homeStatCards } from '../services/homeStats';
+import { getBody } from '../services/goalsSettings';
 import { upgradeRoutineIcons } from '../services/routineIconUpgrade';
 import { HOME_PAGES, QUICK_WATER_ML, pageFromOffset, quickWaterMessage, tapHint, type HomeTileDef } from '../services/homeGrid';
 import { formatWater, type DayNutrition } from '../services/nutritionLogic';
@@ -173,6 +175,7 @@ export default function HomeScreen() {
   const pager = useRef<ScrollViewInstance>(null);
   const [page, setPage] = useState(0);
   const [homeOrder, setHomeOrder] = useState<string[]>(defaultOrder);
+  const [heightCm, setHeightCm] = useState<number | null>(null);
   const [editing, setEditing] = useState<Task | null>(null);
   const [typicalCommute, setTypicalCommute] = useState<number | null>(null);
   const [lang, setLang] = useState<LanguageDayState | null>(null);
@@ -293,6 +296,10 @@ export default function HomeScreen() {
       // Kullanıcının kutu düzeni
       getHomeLayout(db)
         .then(setHomeOrder)
+        .catch(() => undefined);
+      // Adım uzunluğu boydan hesaplanır (km için)
+      getBody()
+        .then((b) => setHeightCm(b?.heightCm ?? null))
         .catch(() => undefined);
     }, [db, load, loadActivity])
   );
@@ -643,7 +650,15 @@ export default function HomeScreen() {
                 { text: 'Dön', onPress: () => resetHomeLayout(db).then(setHomeOrder).catch(() => undefined) },
               ])
             }
-            analysisKey={`${nutrition?.waterMl ?? 0}-${dayKey(now)}`}
+            stats={homeStatCards({
+              steps: activity?.steps ?? null,
+              heightCm,
+              waterMl: nutrition ? nutrition.waterMl : null,
+              waterGoalMl: nutrition ? nutrition.waterGoalMl : null,
+              langMinutes: lang ? lang.summary.appMinutes : null,
+              langGoalMin: lang ? lang.settings.goalMin : null,
+              appLabel: lang && lang.settings.apps.length > 0 ? lang.settings.apps.join(', ') : 'Dil uygulaması',
+            })}
             onAnalysisDetail={() => router.push('/analysis')}
             subtitle={isTomorrow ? 'Yarın için plan' : 'Bugünün akışı'}
             nowText={guideNowState && guideText ? guideText.now : null}

@@ -7,8 +7,10 @@ import { Damacana } from '../components/Damacana';
 import { HorizonSlider } from '../components/HorizonSlider';
 import { colors, radius, spacing } from '../constants/theme';
 import { formatSteps } from '../services/activityLogic';
+import { getSetting, setSetting } from '../database/repository';
 import { loadAnalysis, type AnalysisScreenData } from '../services/analysis';
 import {
+  ANALYSIS_DAYS_KEY,
   analyze,
   clampDays,
   fmtKm,
@@ -16,12 +18,13 @@ import {
   fmtNum,
   fmtStudy,
   journalCompareText,
+  parseHorizon,
+  serializeHorizon,
   windowLabel,
   wordRateText,
 } from '../services/analysisLogic';
 import { getBody } from '../services/goalsSettings';
 
-const DEFAULT_DAYS = 7;
 const MAX_DAMACANA_ICONS = 6;
 
 export default function AnalysisScreen() {
@@ -34,12 +37,12 @@ export default function AnalysisScreen() {
     useCallback(() => {
       let alive = true;
       (async () => {
-        const body = await getBody();
+        const [body, saved] = await Promise.all([getBody(), getSetting(db, ANALYSIS_DAYS_KEY).catch(() => null)]);
         const res = await loadAnalysis(db, new Date(), body?.heightCm ?? null);
         if (!alive) return;
         setLoaded(res);
-        // İlk açılışta bir haftayı göster; sonra seçim korunur, yalnızca sınırın içinde kalır.
-        setDays((prev) => clampDays(prev ?? DEFAULT_DAYS, res.span));
+        // İlk açılışta son seçilen aralık (yoksa 7 gün); sonra seçim korunur, yalnızca sınırın içinde kalır.
+        setDays((prev) => (prev === null ? parseHorizon(saved, res.span) : clampDays(prev, res.span)));
       })().catch(() => undefined);
       return () => {
         alive = false;
@@ -48,7 +51,7 @@ export default function AnalysisScreen() {
   );
 
   const span = loaded?.span ?? 1;
-  const n = clampDays(days ?? DEFAULT_DAYS, span);
+  const n = clampDays(days ?? 7, span);
   const result = useMemo(() => (loaded ? analyze(loaded.data, n) : null), [loaded, n]);
 
   return (
@@ -164,7 +167,15 @@ export default function AnalysisScreen() {
 
       {loaded && loaded.data.firstDay && (
         <View style={styles.panel}>
-          <HorizonSlider days={n} span={span} onChange={setDays} />
+          <HorizonSlider
+            days={n}
+            span={span}
+            onChange={(d) => {
+              const next = clampDays(d, span);
+              setDays(next);
+              setSetting(db, ANALYSIS_DAYS_KEY, serializeHorizon(next, span)).catch(() => undefined);
+            }}
+          />
         </View>
       )}
     </SafeAreaView>

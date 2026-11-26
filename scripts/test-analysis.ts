@@ -19,7 +19,6 @@ import {
   fmtLiters,
   fmtNum,
   fractionFromDays,
-  homeSummary,
   journalCompareText,
   parseHorizon,
   quickPicks,
@@ -234,22 +233,6 @@ const texts = [
   ...LANDMARKS.map((l) => l.gen + l.short),
 ];
 check('yasak sözcük yok', texts.every((t) => !hasBannedWords(t)));
-
-console.log('Ana ekran özeti');
-const hs = homeSummary(a10, 'Duolingo');
-check('dört satır: dil, adım, su, günlük', hs.map((l) => l.key).join() === 'dil,adim,su,gunluk');
-check('dil satırı: uygulama süresi, öğrenilen, hız', hs[0].main === 'Duolingo 5 sa · 3 kelime öğrenildi · saatte 0,6 kelime', hs[0].main);
-check('adım satırı: adım ve km, altında kıyas', hs[1].main.startsWith('40.000 adım · ') && hs[1].main.endsWith(' km') && hs[1].sub !== null && /^[A-ZÇĞİÖŞÜ]/.test(hs[1].sub!), `${hs[1].main} | ${hs[1].sub}`);
-check('su satırı: litre ve damacana', hs[2].main === '20 L · 1,1 damacana', hs[2].main);
-check('günlük satırı: kelime, gün ve önceki aralıkla kıyas', hs[3].main === '1.000 kelime · 10 gün' && hs[3].sub !== null && hs[3].sub!.includes('Önceki 10 güne göre'), `${hs[3].main} | ${hs[3].sub}`);
-const he = homeSummary(empty, 'Duolingo');
-check('kaydı olmayan satırlar "kayıt yok" der, sıfır yazmaz', he.every((l) => l.main === 'kayıt yok' && l.sub === null));
-check('kalem-kağıt ve dinleme dil satırında ayrı not olur', (() => {
-  const d = { ...base, paperByDay: { [dayAgo(0)]: 25 }, otherByDay: { [dayAgo(1)]: 10 } };
-  const l = homeSummary(analyze(d, 10), 'Duolingo')[0];
-  return l.sub === 'Ayrıca kalem kağıt 25 dk, dinleme 10 dk' && l.main.startsWith('Duolingo 5 sa');
-})());
-check('özet metinlerinde yasak sözcük yok', [...hs, ...he].every((l) => !hasBannedWords(`${l.title} ${l.main} ${l.sub ?? ''}`)));
 
 console.log('Seçili aralığı hatırlama');
 check('kayıt yoksa 7 gün (sınıra göre)', parseHorizon(null, 48) === 7 && parseHorizon(undefined, 48) === 7 && parseHorizon('', 48) === 7 && parseHorizon(null, 3) === 3);

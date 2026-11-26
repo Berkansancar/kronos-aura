@@ -85,8 +85,8 @@ npm run test:journal      akşam günlüğü ve "seni ne iyi yapıyor": temizlem
 npm run test:body         kilo ve rekorlar: giriş, haftalık eğilim, hedef, grafik geometrisi, egzersiz rekorları (60 seanstan sonra da), veritabanı, yedek
 npm run test:period       tüm günlerin değerlendirmesi: dönem hesabı, toplamlar, gün satırları, komut ve gizlilik, cevabın doğrulanması, saklama, yedek
 npm run test:location     gün haritası: evde / yolda / durakta / iş noktasında dakikalar, çıkış ve dönüş saati, ekran süresi, uzun boşluklar, takip kapanışı, silme, yedek, komuta yalnızca dakikaların girmesi, 91 kontrol
-npm run test:analysis     analiz: sürgü aralığı (1 gün … ilk kayıttan bugüne), dil / adım / su / günlük toplamları, yol ve damacana kıyasları, ana ekran özeti, hatırlanan aralık, veritabanı, 124 kontrol
-npm run test:homelayout   ana ekran düzeni: kutu kataloğu, sırayı değiştirme, kaldırma ve ekleme, kayıt, yedek, ekran bağlantıları, 46 kontrol
+npm run test:analysis     analiz: sürgü aralığı (1 gün … ilk kayıttan bugüne), dil / adım / su / günlük toplamları, yol ve damacana kıyasları, hatırlanan aralık, veritabanı, 116 kontrol
+npm run test:homelayout   ana ekran: kutu kataloğu, sık kullanılanlar (ilk 5), sırayı değiştirme, kaldırma, ekleme, bugünkü üç sayı, kayıt, yedek, ekran bağlantıları, 62 kontrol
 npm run test:icons        simgeler: çizilen bardak ve şişeler, ada göre rutin simgesi, eski rutinleri yenileme, beslenme simgeleri, eski telefon uyumu, 111 kontrol
 npm run test:exercise     egzersiz: çizim geometrisi, içerik bütünlüğü, basamak atlama, seans kaydı, program (gün, güne başlama saati), sabah kartı, alarm, bildirim planı, yedek, 334 kontrol
 npm run test:language     dil öğrenme (uygulama süresi, kalem-kağıt, hedef, geçmiş, gün analizi, yedek, veritabanı v10), 52 kontrol
@@ -453,20 +453,21 @@ dönüş saati her gün otomatik hesaplanır. Dükkan değişse de sorun olmaz, 
 - **APK gerekir:** telefonda görmek için "APK" demen gerekir. Veritabanı değişmedi (v14). Mantık `services/analysisLogic.ts`, veri `services/analysis.ts`,
   sürgü `components/HorizonSlider.tsx`, ekran `app/analysis.tsx`.
 
-## Ana ekran 1. sayfa: gün-tarih-saat, doğrudan analiz ve burada düzenleme
+## Ana ekran 1. sayfa: sade düzen (A tasarımı)
 
-- **En üstte gün, tarih ve saat:** büyük saat (örnek 10:13), altında "Perşembe · 26 Kasım 2026" ve "Bugünün akışı" ya da "Yarın için plan".
-- **Analiz doğrudan ana ekranda:** saatin hemen altında dört satırlık özet (Dil, Adım, Su, Günlük) ve altında aralık sürgüsü durur; **tıklamadan okunur**.
-  Sürgü 1 günden ilk kayıttan bugüne geçen gün sayısına kadar uzanır; hızlı seçimler (1 gün, 1 hafta, 1 ay, 3 ay, 1 yıl, Tümü) ve −/+ düğmeleri de vardır.
-  Seçilen aralık hatırlanır ("Tümü" seçiliyse zaman geçtikçe birlikte uzar). Dil satırı Duolingo ekran süresini, kelime sayısını ve kelime hızını gösterir;
-  kalem kağıt ve dinleme "Ayrıca" notunda ayrı yazar. Adım satırının altında yol/yapı kıyası, su satırında damacana, günlük satırında sayfa ve önceki aralıkla kıyas çıkar.
-  Kaydı olmayan başlık "kayıt yok" der. **Ayrıntı ›** tam Analiz ekranını açar. Su eklenince özet kendiliğinden tazelenir.
-- **Menüyü burada düzenlersin:** sağ üstteki **✎ Düzenle**ye dokununca ana ekran düzenleme moduna geçer (ayrı ekran yok). Kutuya dokununca seçilir; ekranın altındaki panelde
-  **◀ ▶** (bir kutu sola/sağa), **▲ ▼** (bir satır yukarı/aşağı) ve **Kaldır** düğmeleri çıkar, kutunun yeri yazar ("2. satır, 3. sütun"). Düzenlerken basılı tutmak ekran açmaz, analiz ve görevler gizlenir.
-- **Eklenebilir** bölümü ana ekranda olmayan kutuları gösterir (kaldırdıkların ve hiç eklenmemiş menüler: Aktivite, Sabah, Gün sonu, Profil, Ayarlar). Dokununca sona eklenir, sonra yerini değiştirebilirsin.
-  **Varsayılan düzene dön** ilk haline çevirir. Hiç kutu bırakmak da serbesttir. **✓ Bitti** düzenlemeyi kapatır; değişiklikler anında kaydedilir.
+- **En üstte gün, tarih, saat:** büyük saat (örnek 12:00), altında "Perşembe · 26 Kasım 2026" ve "Bugünün akışı" ya da "Yarın için plan". Sağda **Düzenle** ve ayarlar dişlisi.
+- **ŞİMDİ kartı:** rehberin şu an önerdiği iş (varsa).
+- **Bugünkü üç sayı:** **Adım** (adım ve km), **Su** (litre, damacana ve hedefe doluluk çubuğu), **Dil** (Duolingo ekran süresi ve günlük hedefe çubuk). Ölçülemeyen değer "—" yazar, sıfır yazılmaz.
+  Karta ya da "Ayrıntılı analiz ve sürgü ›" bağlantısına dokununca tam **Analiz** ekranı açılır; gün sürgüsü orada durur ve son seçtiğin aralık hatırlanır.
+- **Sık kullanılanlar:** düzendeki **ilk 5 kutu** (varsayılan: Su yemek, Dil, Egzersiz, Günlük, Rutinler) ve **Tüm menü** kutusu. Kısa dokunuş hızlı işlem yapar (ör. su kutusu 200 ml ekler), basılı tutmak ilgili ekranı açar.
+- **Tüm menü:** bütün kutular, düzendeki sırayla; aynı dokunuş ve basılı tutma davranışı. **‹ Geri** ana ekrana döner.
+- **Görevler** kartı en altta.
+- **Menüyü burada düzenlersin:** **Düzenle**ye dokununca bütün kutular görünür; ilk 5 kutu **★** ile işaretlidir (ana ekranda görünenler). Kutuya dokununca seçilir; alttaki panelde **◀ ▶** (bir kutu sola/sağa),
+  **▲ ▼** (bir satır yukarı/aşağı) ve **Kaldır** düğmeleri çıkar, kutunun yeri ve "ana ekranda" ya da "Tüm menü" yazar. Bir kutuyu ilk 5'e taşımak onu ana ekrana getirir.
+  **Eklenebilir** bölümünde kaldırdıkların ve hiç eklenmemiş menüler durur (Aktivite, Sabah, Gün sonu, Profil, Ayarlar); dokununca sona eklenir. **Varsayılan düzene dön** ilk haline çevirir. **✓ Bitti** kapatır.
+  Her değişiklik anında kaydedilir.
 - Düzen ve analiz aralığı ayar tablosunda (`home_layout_v1`, `analysis_days_v1`) durur ve **yedeğe girer**. 2. sayfadaki "Daha fazla" menüsü olduğu gibi durur.
-- **APK gerekir:** telefonda görmek için "APK" demen gerekir. Mantık `services/homeLayout.ts`, `services/analysisLogic.ts` (`homeSummary`), bileşenler `components/HomeGrid.tsx` ve `components/HomeAnalysis.tsx`.
+- **APK gerekir:** telefonda görmek için "APK" demen gerekir. Mantık `services/homeLayout.ts` (`favoriteTiles`), `services/homeStats.ts` (üç sayı), bileşen `components/HomeGrid.tsx`.
 
 ## Ana ekran ve İlerleme ve geçmiş
 
