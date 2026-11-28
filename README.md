@@ -85,6 +85,7 @@ npm run test:journal      akşam günlüğü ve "seni ne iyi yapıyor": temizlem
 npm run test:body         kilo ve rekorlar: giriş, haftalık eğilim, hedef, grafik geometrisi, egzersiz rekorları (60 seanstan sonra da), veritabanı, yedek
 npm run test:period       tüm günlerin değerlendirmesi: dönem hesabı, toplamlar, gün satırları, komut ve gizlilik, cevabın doğrulanması, saklama, yedek
 npm run test:location     gün haritası: evde / yolda / durakta / iş noktasında dakikalar, çıkış ve dönüş saati, ekran süresi, uzun boşluklar, takip kapanışı, silme, yedek, komuta yalnızca dakikaların girmesi, 91 kontrol
+npm run test:calm         Sakin Mod: ayarlar, renk okunurluğu, gün enerjisi, tek görev seçimi, adımlar, geri sayım, yumuşak ilerleme, veritabanı, yedek, dilin yargılamaması, 103 kontrol
 npm run test:analysis     analiz: sürgü aralığı (1 gün … ilk kayıttan bugüne), dil / adım / su / günlük toplamları, yol ve damacana kıyasları, hatırlanan aralık, veritabanı, 116 kontrol
 npm run test:homelayout   ana ekran: kutu kataloğu, sık kullanılanlar (ilk 5), sırayı değiştirme, kaldırma, ekleme, bugünkü üç sayı, kayıt, yedek, ekran bağlantıları, 62 kontrol
 npm run test:icons        simgeler: çizilen bardak ve şişeler, ada göre rutin simgesi, eski rutinleri yenileme, beslenme simgeleri, eski telefon uyumu, 111 kontrol
@@ -92,6 +93,22 @@ npm run test:exercise     egzersiz: çizim geometrisi, içerik bütünlüğü, b
 npm run test:language     dil öğrenme (uygulama süresi, kalem-kağıt, hedef, geçmiş, gün analizi, yedek, veritabanı v10), 52 kontrol
 ```
 
+
+## Sakin Mod
+
+Farklı çalışan beyinler (DEHB, otizm, disleksi gibi) için günü küçülten ve sadeleştiren ekran. Ana ekranın sağ üstündeki
+🌿 düğmesinden ya da ana ekran düzenlemesinden "Sakin" kutusuyla açılır. Teşhis ya da tedavi aracı değildir; bir destek aracıdır.
+
+- **Gün enerjisi:** Düşük / orta / yüksek seçilir; ekrandaki tek iş buna göre seçilir (düşükte kısa ve hafif iş önce).
+- **Tek görev:** Ekranda yalnızca "ŞİMDİ" yapılacak iş durur; "Başka bir iş göster" ile geçilir.
+- **Sadece 2 dakika:** İşi 2 dakikalık sayaçla başlatır; süre dolunca "10 dakika daha" ya da "Burada bırakıyorum". Bırakmak ceza değildir.
+  Sayaç küçülen bir daireyle gösterilir; kalan süre bitiş anından hesaplanır, uygulama arka plana gitse de şaşmaz.
+- **Adımlara böl:** Kural tabanlı (internet ya da API anahtarı gerekmez); hazırlan, eşit parçalar, toparla. Adımlar silinir, eklenir, işaretlenir.
+- **Zor gün:** Enerji düşükse mevcut zor gün modu yumuşakça önerilir.
+- **Yumuşak ilerleme:** "Son 7 günde X gün başladın" satırı; ara verilen gün hiçbir şeyi sıfırlamaz, seri kırılmaz.
+- **Görünüm:** Yazı boyutu (normal / büyük / çok büyük), geniş satır aralığı, yumuşak renkler, sessiz mod (titreşim yok). Bu ayarlar Sakin ekranı içindir.
+- Her şey telefonda, `Setting` tablosunda tutulur (veritabanı değişmedi) ve yedeğe girer.
+- Mantık `services/calmLogic.ts`, veritabanı işlemleri `services/calm.ts`, ekran `app/calm.tsx`.
 
 ## Gün analizi (yalnızca Android)
 

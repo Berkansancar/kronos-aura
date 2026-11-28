@@ -669,6 +669,7 @@ export default function HomeScreen() {
             openTitles={openTaskTitles}
             onTasks={() => goToPage(1)}
             onSettings={() => router.push('/settings')}
+            onCalm={() => router.push('/calm')}
             onTap={onGridTap}
             onOpen={onGridOpen}
           />
@@ -692,6 +693,9 @@ export default function HomeScreen() {
                   </Pressable>
                 )}
               </View>
+              <Pressable onPress={() => router.push('/calm')} hitSlop={10} accessibilityRole="button" accessibilityLabel="Sakin Mod">
+                <Text style={styles.gear}>🌿</Text>
+              </Pressable>
               <Pressable onPress={() => router.push('/settings')} hitSlop={10}>
                 <Text style={styles.gear}>⚙</Text>
               </Pressable>

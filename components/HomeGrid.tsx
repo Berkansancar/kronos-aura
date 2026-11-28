@@ -53,6 +53,8 @@ interface Props {
   /** Görev satırlarına dokunulunca tam listeye geçilir */
   onTasks: () => void;
   onSettings: () => void;
+  /** Sakin Mod ekranı (tek görev, "sadece 2 dakika"); verilmezse düğme görünmez */
+  onCalm?: () => void;
   /** Kısa dokunuş: hızlı işlem yapar ve ekranda gösterilecek kısa mesajı döndürür */
   onTap: (tile: HomeTileDef) => Promise<string | null> | string | null;
   /** Basılı tutma: ilgili ekranı açar */
@@ -194,6 +196,11 @@ export function HomeGrid(p: Props) {
           >
             <Text style={[styles.editText, editing && styles.editTextOn]}>{editing ? '✓ Bitti' : 'Düzenle'}</Text>
           </Pressable>
+          {p.onCalm && (
+            <Pressable onPress={p.onCalm} hitSlop={12} accessibilityRole="button" accessibilityLabel="Sakin Mod">
+              <Text style={styles.gear}>🌿</Text>
+            </Pressable>
+          )}
           <Pressable onPress={p.onSettings} hitSlop={12} accessibilityLabel="Ayarlar">
             <Text style={styles.gear}>⚙</Text>
           </Pressable>

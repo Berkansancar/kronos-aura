@@ -48,7 +48,8 @@
     "test:journal": "tsx scripts/test-journal.ts",
     "test:body": "tsx scripts/test-body.ts",
     "test:period": "tsx scripts/test-period.ts",
-    "test:location": "tsx scripts/test-location.ts"
+    "test:location": "tsx scripts/test-location.ts",
+    "test:calm": "tsx scripts/test-calm.ts"
   },
   "dependencies": {
     "expo": "~58.0.0",

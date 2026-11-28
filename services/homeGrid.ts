@@ -62,6 +62,7 @@ export const HOME_TILES: HomeTileDef[] = [
 export const EXTRA_TILES: HomeTileDef[] = [
   { id: 'aktivite', label: 'Aktivite', icon: '📱', group: 'plan', route: '/activity' },
   { id: 'sabah', label: 'Sabah', icon: '🌅', group: 'plan', route: '/morning' },
+  { id: 'sakin', label: 'Sakin', icon: '🌿', group: 'plan', route: '/calm' },
   { id: 'gun-sonu', label: 'Gün sonu', icon: '🌙', group: 'plan', route: '/review' },
   { id: 'profil', label: 'Profil', icon: '👤', group: 'plan', route: '/profile' },
   { id: 'ayarlar', label: 'Ayarlar', icon: '⚙️', group: 'plan', route: '/settings' },
